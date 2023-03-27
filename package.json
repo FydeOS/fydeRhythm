@@ -11,22 +11,59 @@
     "package": "plasmo package"
   },
   "dependencies": {
+    "@plasmohq/messaging": "^0.1.6",
+    "async-mutex": "^0.4.0",
+    "browser-level": "^1.0.1",
+    "indexeddb-fs": "^1.2.5",
     "plasmo": "0.67.3",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "unzipit": "^1.4.2",
+    "use-file-picker": "^1.5.2"
   },
   "devDependencies": {
+    "@plasmohq/prettier-plugin-sort-imports": "3.6.3",
     "@types/chrome": "0.0.210",
     "@types/node": "18.11.18",
     "@types/react": "18.0.27",
     "@types/react-dom": "18.0.10",
     "prettier": "2.8.3",
-    "typescript": "4.9.4",
-    "@plasmohq/prettier-plugin-sort-imports": "3.6.3"
+    "typescript": "4.9.4"
   },
   "manifest": {
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "assets/rime_emscripten.wasm"
+        ],
+        "matches": [
+          "https://www.plasmo.com/*"
+        ]
+      }
+    ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    },
     "host_permissions": [
       "https://*/*"
+    ],
+    "permissions": [
+      "unlimitedStorage",
+      "input"
+    ],
+    "input_components": [
+      {
+        "name": "__MSG_pinyin_inputmethod__",
+        "id": "zh-rime",
+        "indicator": "r2",
+        "language": [
+          "zh-CN",
+          "zh"
+        ],
+        "layouts": [
+          "us"
+        ]
+      }
     ]
   }
 }

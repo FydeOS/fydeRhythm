@@ -1,8 +1,12 @@
 import { useState } from "react"
+import { sendToBackground } from "@plasmohq/messaging"
+import { useFilePicker } from 'use-file-picker';
 
 function IndexPopup() {
-  const [data, setData] = useState("")
+  const [data, setData] = useState("16")
+  const [log, setLog] = useState("");
 
+  // Usage
   return (
     <div
       style={{
@@ -18,9 +22,8 @@ function IndexPopup() {
         Extension!
       </h2>
       <input onChange={(e) => setData(e.target.value)} value={data} />
-      <a href="https://docs.plasmo.com" target="_blank">
-        View Docs
-      </a>
+
+      <p>{ log }</p>
     </div>
   )
 }
