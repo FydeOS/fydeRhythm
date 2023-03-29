@@ -1,9 +1,10 @@
-import { generateKeyPair } from "crypto";
 import { openDB, IDBPDatabase } from "idb";
+import lz4, { type InitOutput, decompress, compress } from "./lz4/lz4_wasm";
 
 interface BlobInfo {
     id: string;
     size: number;
+    compressed: boolean;
 }
 
 interface Entry {
@@ -44,6 +45,7 @@ function typedArrayToBuffer(array: Uint8Array): ArrayBuffer {
 
 export class FastIndexedDbFsController {
     dbName: string;
+    lz4: InitOutput;
 
     constructor(name) {
         this.dbName = name;
@@ -59,7 +61,7 @@ export class FastIndexedDbFsController {
                 entryStore.createIndex("type", "type");
             }
         });
-
+        await lz4("./assets/lz4_wasm_bg.wasm");
     }
 
     async readEntry(path: string, create: boolean): Promise<Entry> {
@@ -86,13 +88,29 @@ export class FastIndexedDbFsController {
         }
     }
 
-    async createBlob(data: ArrayBuffer) {
-        const id = generateId(16)
+    async createBlob(rawData: ArrayBuffer): Promise<BlobInfo> {
+        const id = generateId(16);
+        let data = rawData;
+        let compressed = false;
+        if (data.byteLength > 65536) {
+            const start = performance.now();
+            data = compress(new Uint8Array(data)).buffer;
+            const end = performance.now();
+            compressed = true;
+            console.log(`Compress ${id} from ${rawData.byteLength} to ${data.byteLength}, took ${end - start} ms`);
+        }
         await this.db.put("blobs", data, id);
-        return { id: id, size: data.byteLength };
+        return { id: id, size: rawData.byteLength, compressed };
     }
-    async readBlob(ident: any): Promise<ArrayBuffer> {
-        const buf = await this.db.get("blobs", ident.id);
+    async readBlob(ident: BlobInfo): Promise<ArrayBuffer> {
+        let buf = await this.db.get("blobs", ident.id) as ArrayBuffer;
+        let rawBuf = buf;
+        if (ident.compressed) {
+            const start = performance.now();
+            buf = decompress(new Uint8Array(buf)).buffer;
+            const end = performance.now();
+            console.log(`Decompress blob ${ident.id} from ${rawBuf.byteLength} to ${buf.byteLength} took ${end - start} ms`);
+        }
         return buf;
     }
 
