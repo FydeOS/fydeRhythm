@@ -388,4 +388,28 @@ export class FastIndexedDbFsController {
             directories: r2.filter(x => x.isDirectory),
         };
     }
+
+    async collectGarbage(): Promise<void> {
+        const allBlobs = new Set((await this.db.getAllKeys("blobs")) as string[]);
+        const allEntries = (await this.db.getAll("entries")) as Entry[];
+        const usedBlobs = new Set(allEntries.flatMap(e => e.blobs).map(e => e.id));
+        this.openedFiles.forEach((v) => {
+            v.entry.blobs.forEach((b) => {
+                usedBlobs.add(b.id);
+            });
+        });
+        
+        console.log(`There're totally ${allBlobs.size} blobs, of which ${usedBlobs.size} are used.`);
+        const tx = this.db.transaction("blobs", "readwrite");
+        const blobStore = tx.objectStore("blobs");
+        for (let b of allBlobs.values()) {
+            if (!usedBlobs.has(b)) {
+                console.log(`Removing unused blob ${b}`);
+                blobStore.delete(b);
+            }
+        }
+        console.log("Waiting for transaction to finish...");
+        await tx.done;
+        console.log("Garbage collection done.");
+    }
 }
