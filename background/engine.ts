@@ -2,6 +2,7 @@ import CreateRimeWasm from "./rime_emscripten"
 import { getFs } from "../utils"
 import { BrowserLevel } from "browser-level";
 import { Mutex } from 'async-mutex';
+import { openDB, deleteDB, unwrap } from "idb";
 
 export interface RimeContext {
     composition: {
@@ -99,10 +100,8 @@ export class RimeEngine {
                     locateFile: (path, dir) => {
                         return '/assets/' + path;
                     },
-                    fs: fs.fs,
-                    createBlob: fs.createBlob,
-                    readBlob: fs.readBlob,
-                    BrowserLevel
+                    fsc: fs,
+                    idb: {openDB, deleteDB, unwrap}
                 })
                 await this.wasmObject.rimeSetup();
                 this.initialized = true;

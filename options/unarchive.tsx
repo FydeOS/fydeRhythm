@@ -1,13 +1,11 @@
-import {unzip} from 'unzipit';
-import {getFs} from "../utils"
+import { unzip } from 'unzipit';
+import { getFs } from "../utils"
 export async function unarchiveFile(content: ArrayBuffer) {
     const fs = await getFs();
-    const {entries} = await unzip(content);
+    const { entries } = await unzip(content);
 
-    const prefix = "rime-data/";
-    if (!await fs.fs.exists("rime-data")) {
-        await fs.fs.createDirectory("rime-data");
-    }
+    const prefix = "/root/";
+    await fs.createDirectory("/root");
     let pathInFile: string | null = null;
     for (const [name] of Object.entries(entries)) {
         const path = name.split('/');
@@ -29,16 +27,12 @@ export async function unarchiveFile(content: ArrayBuffer) {
                 const fullName = (prefix + nname).replace(/\/$/, '');
                 console.log("Processing %s", name)
                 if (entry.isDirectory) {
-                    if (!await fs.fs.exists(fullName)) {
-                        console.log("Create dir %s", fullName);
-                        await fs.fs.createDirectory(fullName);
-                    } else {
-                        console.log("Dir %s already exists", fullName);
-                    }
+                    console.log("Create dir %s", fullName);
+                    await fs.createDirectory(fullName);
                 } else {
                     console.log("Writing %s, size: %s", fullName, entry.size);
-                    const blob = await fs.createBlob(new Uint8Array(await entry.arrayBuffer()));
-                    await fs.fs.writeFile(fullName, {blobs: [blob], mtime: entry.lastModDate.getTime(), mode: 0o777});
+                    await fs.setFileSize(fullName, 0);
+                    await fs.writeFile(fullName, new Uint8Array(await entry.arrayBuffer()), 0);
                 }
             } else {
                 console.log("Skipped %s", name);
