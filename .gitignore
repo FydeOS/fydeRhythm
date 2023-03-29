@@ -40,3 +40,6 @@ keys.json
 
 # typescript
 .tsbuildinfo
+
+/assets/rime_emscripten.wasm
+/background/rime_emscripten.js
