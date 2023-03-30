@@ -1,5 +1,6 @@
 import { openDB, IDBPDatabase } from "idb";
 import lz4, { type InitOutput, decompress, compress } from "./lz4/lz4_wasm";
+import _ from 'lodash';
 
 interface BlobInfo {
     id: string;
@@ -54,16 +55,19 @@ interface OpenedFile {
 // Compress blobs larger than 64KB
 const kCompressSizeLimit = 65536;
 
-// Cache blobs smaller than 512K, if it's read for more than
+// Cache blobs smaller than 2MB, if it's read for more than
 // 3 times in a single session
 //
 // This mainly optimizes reading speed of yaml-cpp and opencc files,
-// which read files in small 4K chunks, and thus very slow.
+// which read files in small chunks, and thus very slow.
 // 
 // In librime, larger files (like table.bin, prism.bin)
 // have been optimized to read once into memory, so there's 
 // no need for caching big files.
-const kCacheSizeLimit = 524288;
+export const kCacheBlobSizeLimit = 2097152;
+// For big files, only cache at most 3 chunks (most files are actually read sequentially, 
+// so 3 chunks are more than enough)
+const kCacheTotalSizeLimit = kCacheBlobSizeLimit * 3;
 const kCacheFrequency = 3;
 
 // If a file took more than 50ms to read, warn about it
@@ -312,10 +316,21 @@ export class FastIndexedDbFsController {
                 if (blobData === undefined) {
                     // blobData not in cache, read it from DB
                     blobData = await this.readBlob(curBlob);
-                    if (blobData.byteLength < kCacheSizeLimit) {
+
+                    // If blob is smaller than cache size limit, and read more than 3 times, then cache it
+                    if (blobData.byteLength <= kCacheBlobSizeLimit) {
                         let readCount = handle.accessedBlobs.get(curBlob.id) || 1;
                         if (readCount >= kCacheFrequency) {
-                            // If it's read for more than 3 times, cache it
+                            // If total cache size would be bigger than limit, remove one randomly
+                            function totalCacheSize() {
+                                const allCaches = Array.from(handle.cachedBlobs.values());
+                                return _.sumBy(allCaches, c => c.byteLength);
+                            }
+                            while (totalCacheSize() + blobData.byteLength > kCacheTotalSizeLimit) {
+                                const b = _.sample(Array.from(handle.cachedBlobs.keys()));
+                                handle.cachedBlobs.delete(b);
+                                handle.accessedBlobs.delete(b);
+                            }
                             handle.cachedBlobs.set(curBlob.id, blobData);
                         } else {
                             handle.accessedBlobs.set(curBlob.id, readCount + 1);
