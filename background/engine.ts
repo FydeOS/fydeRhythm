@@ -1,6 +1,5 @@
 import CreateRimeWasm from "./rime_emscripten"
 import { getFs } from "../utils"
-import { BrowserLevel } from "browser-level";
 import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
 
@@ -77,6 +76,12 @@ export class RimeSession {
             return await this.wasmSession.getStatus();
         });
     }
+
+    async clearComposition(): Promise<void> {
+        return await this.engine.mutex.runExclusive(async () => {
+            return await this.wasmSession.clearComposition();
+        });
+    }
     
     destroy() {
         this.wasmSession.delete();
@@ -101,7 +106,7 @@ export class RimeEngine {
                         return '/assets/' + path;
                     },
                     fsc: fs,
-                    idb: {openDB, deleteDB, unwrap}
+                    idb: { openDB, deleteDB }
                 })
                 await this.wasmObject.rimeSetup();
                 this.initialized = true;
@@ -119,21 +124,14 @@ export class RimeEngine {
         });
     }
 
+    async performMaintenance(): Promise<void> {
+        return await this.mutex.runExclusive(async () => {
+            await this.wasmObject.rimePerformMaintenance(true);
+        });
+    }
+
     async destroy() {
+        this.wasmObject?.rimeFinalize();
         this.wasmObject = null;
     }
-}
-
-export async function getEngine() {
-    if (!self.currentEngine) {
-        self.currentEngine = new RimeEngine();
-    } 
-    await self.currentEngine.initialize();
-    return self.currentEngine;
-}
-
-export async function reloadEngine() {
-    self.currentEngine = new RimeEngine();
-    await self.currentEngine.initialize();
-    return self.currentEngine;
 }

@@ -1,5 +1,4 @@
-import { createFs } from 'indexeddb-fs';
-const { BrowserLevel } = require('browser-level')
+import { FastIndexedDbFsController } from '~fs'
 
 function dec2hex(dec) {
     return dec.toString(16).padStart(2, "0")
@@ -12,25 +11,7 @@ function generateId(len) {
 }
 
 export async function getFs() {
-    const fs = await createFs({
-        databaseName: "rime-files",
-        databaseVersion: 1,
-        objectStoreName: "files",
-        rootDirectoryName: "emm"
-    });
-
-   const db = new BrowserLevel('rime-blobs', {
-    keyEncoding: 'utf8',
-    valueEncoding: 'buffer'
-   });
-    async function createBlob(data: Uint8Array) {
-        const id = generateId(16)
-        await db.put(id, data);
-        return { id: id, size: data.length };
-    }
-    async function readBlob(ident: any) {
-        const buf = await db.get(ident.id);
-        return buf;
-    }
-    return { fs, createBlob, readBlob };
+    const fs = new FastIndexedDbFsController("rime-files");
+    await fs.open();
+    return fs;
 }

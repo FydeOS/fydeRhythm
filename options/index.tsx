@@ -3,8 +3,6 @@ import { useEffect, useState, useRef } from "react"
 import { sendToBackground } from "@plasmohq/messaging"
 import { useFilePicker } from 'use-file-picker';
 import {unarchiveFile} from './unarchive'
-import x from "../background/rime_emscripten"
-import { BrowserLevel } from "browser-level";
 import {getFs} from "../utils"
 
 function OptionsPage() {
@@ -45,11 +43,29 @@ function OptionsPage() {
   async function loadRime() {
     appendLog("Loading RIME");
     setRimeLoaded(false);
-    const resp = await sendToBackground({
-      name: "LoadRime",
+    await sendToBackground({
+      name: "ReloadRime",
     });
     appendLog("Rime Loaded");
     setRimeLoaded(true);
+  }
+
+  async function loadRimeWithMaintenance() {
+    appendLog("Loading RIME");
+    setRimeLoaded(false);
+    await sendToBackground({
+      name: "ReloadRime",
+      body: {
+        maintenance: true
+      }
+    });
+    appendLog("Rime Loaded");
+    setRimeLoaded(true);
+  }
+
+  async function filesystemGarbageCollect() {
+    const fs = await getFs();
+    await fs.collectGarbage();
   }
 
   async function simulateKey(keyCode: number) {
@@ -116,7 +132,9 @@ function OptionsPage() {
         <p>Have file content: { plainFiles.length }</p>
       <button onClick={openFileSelector}>Select .zip</button>
       <button onClick={unarchive}>Unarchive</button>
-      <button onClick={loadRime}>Load Rime Engine</button>
+      <button onClick={loadRime}>Reload RIME Engine</button>
+      <button onClick={loadRimeWithMaintenance}>Reload RIME Engine With Maintenance</button>
+      <button onClick={filesystemGarbageCollect}>GC</button>
       <p>{typed}</p>
       {context && <>
         <p>Preedit: {context.composition.preedit}</p>

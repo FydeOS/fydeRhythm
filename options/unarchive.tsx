@@ -32,7 +32,9 @@ export async function unarchiveFile(content: ArrayBuffer) {
                 } else {
                     console.log("Writing %s, size: %s", fullName, entry.size);
                     await fs.setFileSize(fullName, 0);
+                    await fs.openFile(fullName, false);
                     await fs.writeFile(fullName, new Uint8Array(await entry.arrayBuffer()), 0);
+                    await fs.closeFile(fullName);
                 }
             } else {
                 console.log("Skipped %s", name);
