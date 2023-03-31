@@ -7,7 +7,7 @@ export class InputController {
     engineId?: string;
     engine?: RimeEngine;
     loadMutex: Mutex;
-    inputCache?: string[];
+    inputCache: string[];
 
     constructor() {
         this.engineId = null;
@@ -49,15 +49,19 @@ export class InputController {
             if (maintenance) {
                 await engine.performMaintenance();
             }
-            this.engine = engine;
-            this.session = await this.engine.createSession();
+            const session = await engine.createSession();
             if (this.inputCache.length > 0) {
                 const list = this.inputCache;
                 this.inputCache = [];
                 for (const c of list) {
-                    await self.controller.session.processKey(c.charCodeAt(0), 0);
+                    if (c == null) // Backspace
+                        await session.processKey(0xff08, 0);
+                    else
+                        await session.processKey(c.charCodeAt(0), 0);
                 }
             }
+            this.engine = engine;
+            this.session = session;
         });
         await this.refreshContext();
     }
@@ -86,7 +90,22 @@ export class InputController {
         this.resetUI();
     }
 
+    inputCacheToString() {
+        const list = [];
+        for (const s of this.inputCache) {
+            if (s == null) {
+                list.pop();
+            } else {
+                list.push(s);
+            }
+        }
+        return list.join("");
+    }
+
     async refreshContext(): Promise<void> {
+        console.log("Engine id = ", this.engineId);
+        if (!this.engineId)
+            return;
         const promises = [];
         if (this.session != null) {
             const rimeContext = await this.session?.getContext();
@@ -167,8 +186,8 @@ export class InputController {
                         }
                     }, (ok) => ok ? res(null) : rej());
                 }));
-                const preedit = this.inputCache.join("");
                 if (this.context != null) {
+                    const preedit = this.inputCacheToString();
                     promises.push(new Promise((res, rej) => {
                         chrome.input.ime.setComposition({
                             contextID: this.context.contextID,

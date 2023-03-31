@@ -94,12 +94,12 @@ chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input
             // RIME is loading
             if (keyData.key.length > 1 && self.controller.inputCache.length > 0) {
                 if (keyData.code == "Backspace") {
-                    self.controller.inputCache.pop();
+                    self.controller.inputCache.push(null);
                 } else if (keyData.code == "Enter") {
                     if (self.controller.context) {
                         chrome.input.ime.commitText({
                             contextID: self.controller.context.contextID,
-                            text: self.controller.inputCache.join("")
+                            text: self.controller.inputCacheToString()
                         });
                         self.controller.inputCache = [];
                     }
