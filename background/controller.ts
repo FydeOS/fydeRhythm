@@ -1,6 +1,25 @@
 import { Mutex } from "async-mutex";
 import { RimeEngine, RimeSession } from "./engine";
 
+const kShiftMask = 1 << 0;
+const kControlMask = 1 << 2;
+const kMod1Mask = 1 << 3;
+const kAltMask = kMod1Mask;
+
+const kSpecialKeys = {
+    'ArrowUp': 0xff52,
+    'ArrowDown': 0xff54,
+    'PageUp': 0xff55,
+    'PageDown': 0xff56,
+    'Enter': 0xff0d, // Return
+    'Backspace': 0xff08,
+    'ArrowRight': 0xff53,
+    'ArrowLeft': 0xff51,
+    'Escape': 0xff1b,
+    'ShiftLeft': 0xffe1,
+    'ShiftRight': 0xffe2
+}
+
 export class InputController {
     context?: chrome.input.ime.InputContext;
     session?: RimeSession;
@@ -55,7 +74,7 @@ export class InputController {
                 this.inputCache = [];
                 for (const c of list) {
                     if (c == null) // Backspace
-                        await session.processKey(0xff08, 0);
+                        await session.processKey(kSpecialKeys['Backspace'], 0);
                     else
                         await session.processKey(c.charCodeAt(0), 0);
                 }
@@ -210,4 +229,76 @@ export class InputController {
         }
         await Promise.all(promises);
     }
+
+    feedKey(keyData: chrome.input.ime.KeyboardEvent): Promise<boolean> | boolean {
+        if (this.session) {
+            let mask = 0;
+            if (keyData.altKey)
+                mask ^= kAltMask;
+            if (keyData.shiftKey)
+                mask ^= kShiftMask;
+            if (keyData.ctrlKey)
+                mask ^= kControlMask;
+            let code: number;
+            if (keyData.key.length > 1) {
+                if (keyData.code in kSpecialKeys) {
+                    code = kSpecialKeys[keyData.code];
+                } else {
+                    console.log("Unhandled key %s", keyData.key);
+                    return false;
+                }
+            } else {
+                code = keyData.key.toLowerCase().charCodeAt(0);
+            }
+            return (async () => {
+                console.log("Send event to RIME: code = %d, mask = %d", code, mask);
+                let handled = false;
+                handled = await this.session.processKey(code, mask);
+                console.log("Rime handled: ", handled);
+                if (handled) {
+                    await this.refreshContext();
+
+                    let commit = await this.session.getCommit();
+                    if (commit) {
+                        await new Promise((res, rej) => {
+                            chrome.input.ime.commitText({
+                                contextID: this.context.contextID,
+                                text: commit.text
+                            }, (ok) => ok ? res(null) : rej());
+                        });
+                    }
+                }
+                return handled;
+            })();
+        } else {
+            // RIME is loading
+            if (keyData.key.length > 1 && this.inputCache.length > 0) {
+                if (keyData.code == "Backspace") {
+                    this.inputCache.push(null);
+                } else if (keyData.code == "Enter") {
+                    if (this.context) {
+                        chrome.input.ime.commitText({
+                            contextID: this.context.contextID,
+                            text: this.inputCacheToString()
+                        });
+                        this.inputCache = [];
+                    }
+                } else if (keyData.code == "Escape") {
+                    this.inputCache = [];
+                } else {
+                    return false;
+                }
+            } else {
+                const char = keyData.key.toLowerCase();
+                if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
+                    // If buffer is empty and input is not letter, just put it to screen directly
+                    return false;
+                }
+                this.inputCache.push(char);
+            }
+            return this.refreshContext().then(() => true);
+        }
+
+    }
+
 }
