@@ -135,12 +135,12 @@ function OptionsPage() {
         }
       </>}
       <p>Text: {text}</p>
-      <textarea value={log} rows={10} style={{ height: 'auto' }} ref={textArea} />
+      <textarea value={log} rows={10} style={{ height: 'auto' }} ref={textArea} readOnly />
       <p>schema: {JSON.stringify(rimeStatus)}</p>
       <div>
         <>
           {rimeStatus.list.map(l => 
-            <button onClick={() => setSchema(l.id)}>
+            <button onClick={() => setSchema(l.id)} key={"schema-btn-" + l.id}>
               {l.name}
             </button>
           )}
