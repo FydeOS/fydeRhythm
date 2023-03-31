@@ -73,6 +73,8 @@ const kCacheFrequency = 3;
 // If a file took more than 50ms to read, warn about it
 const kTimeWarning = 50;
 
+const kEnableCompression = false;
+
 export class FastIndexedDbFsController {
     dbName: string;
     openedFiles: Map<String, OpenedFile>;
@@ -92,7 +94,9 @@ export class FastIndexedDbFsController {
                 entryStore.createIndex("type", "type");
             }
         });
-        await lz4("./assets/lz4_wasm_bg.wasm");
+        if (kEnableCompression) {
+            await lz4("./assets/lz4_wasm_bg.wasm");
+        }
     }
 
     async readEntryRaw(path: string): Promise<Entry> {
@@ -120,7 +124,7 @@ export class FastIndexedDbFsController {
         const id = generateId(16);
         let data = rawData;
         let compressed = false;
-        if (data.byteLength > kCompressSizeLimit) {
+        if (data.byteLength > kCompressSizeLimit && kEnableCompression) {
             const start = performance.now();
             data = compress(new Uint8Array(data)).buffer;
             const end = performance.now();
@@ -134,7 +138,7 @@ export class FastIndexedDbFsController {
     async readBlob(ident: BlobInfo): Promise<ArrayBuffer> {
         let buf = await this.db.get("blobs", ident.id) as ArrayBuffer;
         let rawBuf = buf;
-        if (ident.compressed) {
+        if (ident.compressed && kEnableCompression) {
             const start = performance.now();
             buf = decompress(new Uint8Array(buf)).buffer;
             const end = performance.now();
