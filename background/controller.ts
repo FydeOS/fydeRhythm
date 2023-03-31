@@ -1,5 +1,5 @@
 import { Mutex } from "async-mutex";
-import { RimeContext, RimeEngine, RimeSession } from "./engine";
+import { RimeEngine, RimeSession } from "./engine";
 
 export class InputController {
     context?: chrome.input.ime.InputContext;
@@ -7,12 +7,14 @@ export class InputController {
     engineId?: string;
     engine?: RimeEngine;
     loadMutex: Mutex;
+    inputCache?: string[];
 
     constructor() {
         this.engineId = null;
         this.engine = null;
         this.context = null;
         this.session = null;
+        this.inputCache = [];
         this.loadMutex = new Mutex();
     }
 
@@ -49,7 +51,15 @@ export class InputController {
             }
             this.engine = engine;
             this.session = await this.engine.createSession();
+            if (this.inputCache.length > 0) {
+                const list = this.inputCache;
+                this.inputCache = [];
+                for (const c of list) {
+                    await self.controller.session.processKey(c.charCodeAt(0), 0);
+                }
+            }
         });
+        await this.refreshContext();
     }
 
     resetUI() {
@@ -76,68 +86,109 @@ export class InputController {
         this.resetUI();
     }
 
-    async refreshContext() {
-        const rimeContext = await this.session?.getContext();
-        if (rimeContext) {
-            const promises = [];
-            if (this.context != null) {
-                promises.push(new Promise((res, rej) => {
-                    chrome.input.ime.setComposition({
-                        contextID: this.context.contextID,
-                        cursor: rimeContext.composition.cursorPosition,
-                        selectionEnd: rimeContext.composition.selectionEnd,
-                        selectionStart: rimeContext.composition.selectionStart,
-                        text: rimeContext.composition.preedit
-                    }, (ok) => ok ? res(null) : rej());
-                }));
+    async refreshContext(): Promise<void> {
+        const promises = [];
+        if (this.session != null) {
+            const rimeContext = await this.session?.getContext();
+            if (rimeContext) {
+                if (this.context != null) {
+                    promises.push(new Promise((res, rej) => {
+                        const c = {
+                            contextID: this.context.contextID,
+                            cursor: rimeContext.composition.cursorPosition,
+                            selectionEnd: rimeContext.composition.selectionEnd,
+                            selectionStart: rimeContext.composition.selectionStart,
+                            text: rimeContext.composition.preedit
+                        };
+                        console.log(c);
+                        chrome.input.ime.setComposition(c, (ok) => ok ? res(null) : rej());
+                    }));
+                }
+                if (rimeContext.menu.candidates.length > 0) {
+                    promises.push(new Promise((res, rej) => {
+                        chrome.input.ime.setCandidateWindowProperties({
+                            engineID: this.engineId,
+                            properties: {
+                                visible: true,
+                                cursorVisible: true,
+                                auxiliaryTextVisible: true,
+                                pageSize: rimeContext.menu.pageSize,
+                                auxiliaryText: `Page ${rimeContext.menu.pageNumber}` + (rimeContext.menu.isLastPage ? " (Last)" : ""),
+                                windowPosition: 'composition',
+                                vertical: true
+                            }
+                        }, (ok) => ok ? res(null) : rej());
+                    }));
+                    if (this.context != null) {
+                        promises.push(new Promise((res, rej) => {
+                            chrome.input.ime.setCandidates({
+                                contextID: this.context.contextID,
+                                candidates: rimeContext.menu.candidates.map((v, idx) => ({
+                                    candidate: v.text,
+                                    id: idx,
+                                    label: (idx + 1).toString(),
+                                    annotation: v.comment
+                                })),
+                            }, (ok) => ok ? res(null) : rej());
+                        }));
+                        promises.push(new Promise((res, rej) => {
+                            chrome.input.ime.setCursorPosition({
+                                contextID: this.context.contextID,
+                                candidateID: rimeContext.menu.highlightedCandidateIndex
+                            }, (ok) => ok ? res(null) : rej());
+                        }));
+                    }
+                } else {
+                    promises.push(new Promise((res, rej) => {
+                        chrome.input.ime.setCandidateWindowProperties({
+                            engineID: this.engineId,
+                            properties: {
+                                visible: false,
+                            }
+                        }, (ok) => ok ? res(null) : rej());
+                    }));
+                }
+            } else {
+                this.resetUI();
             }
-            if (rimeContext.menu.candidates.length > 0) {
+        } else {
+            if (this.inputCache.length > 0) {
                 promises.push(new Promise((res, rej) => {
                     chrome.input.ime.setCandidateWindowProperties({
                         engineID: this.engineId,
                         properties: {
                             visible: true,
-                            cursorVisible: true,
+                            cursorVisible: false,
                             auxiliaryTextVisible: true,
-                            pageSize: rimeContext.menu.pageSize,
-                            auxiliaryText: `Page ${rimeContext.menu.pageNumber}` + (rimeContext.menu.isLastPage ? " (Last)" : ""),
+                            pageSize: 1,
+                            auxiliaryText: "Loading RIME...",
                             windowPosition: 'composition',
                             vertical: true
                         }
                     }, (ok) => ok ? res(null) : rej());
                 }));
+                const preedit = this.inputCache.join("");
                 if (this.context != null) {
                     promises.push(new Promise((res, rej) => {
-                        chrome.input.ime.setCandidates({
+                        chrome.input.ime.setComposition({
                             contextID: this.context.contextID,
-                            candidates: rimeContext.menu.candidates.map((v, idx) => ({
-                                candidate: v.text,
-                                id: idx,
-                                label: (idx + 1).toString(),
-                                annotation: v.comment
-                            })),
+                            cursor: preedit.length,
+                            selectionStart: 0,
+                            selectionEnd: preedit.length,
+                            text: preedit,
                         }, (ok) => ok ? res(null) : rej());
                     }));
                     promises.push(new Promise((res, rej) => {
-                        chrome.input.ime.setCursorPosition({
+                        chrome.input.ime.setCandidates({
                             contextID: this.context.contextID,
-                            candidateID: rimeContext.menu.highlightedCandidateIndex
+                            candidates: []
                         }, (ok) => ok ? res(null) : rej());
                     }));
                 }
             } else {
-                promises.push(new Promise((res, rej) => {
-                    chrome.input.ime.setCandidateWindowProperties({
-                        engineID: this.engineId,
-                        properties: {
-                            visible: false,
-                        }
-                    }, (ok) => ok ? res(null) : rej());
-                }));
+                this.resetUI();
             }
-            await Promise.all(promises);
-        } else {
-            this.resetUI();
         }
+        await Promise.all(promises);
     }
 }
