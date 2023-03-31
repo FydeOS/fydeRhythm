@@ -1,8 +1,8 @@
 {
-  "name": "chinese-rime2",
-  "displayName": "Chinese rime2",
+  "name": "fyde-rhythm",
+  "displayName": "FydeRhythm 2",
   "version": "0.0.1",
-  "description": "Chinese RIME",
+  "description": "The FydeRhythm input method",
   "author": "fydeos",
   "packageManager": "npm@8.19.3",
   "scripts": {
@@ -32,6 +32,9 @@
     "typescript": "4.9.4"
   },
   "manifest": {
+    "name": "__MSG_extension_name__",
+    "description": "__MSG_description__",
+    "default_locale": "zh",
     "web_accessible_resources": [
       {
         "resources": [
@@ -55,9 +58,9 @@
     ],
     "input_components": [
       {
-        "name": "__MSG_pinyin_inputmethod__",
-        "id": "zh-rime",
-        "indicator": "r2",
+        "name": "__MSG_input_method_name__",
+        "id": "fyde-rhythm",
+        "indicator": "真",
         "language": [
           "zh-CN",
           "zh"

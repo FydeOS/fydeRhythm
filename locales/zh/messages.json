@@ -1,0 +1,28 @@
+{
+    "extension_name": {
+        "message": "真文韵输入法 2"
+    },
+    "description": {
+        "message": "真文韵输入法是 FydeOS 团队基于 RIME 引擎定制的输入法，适用于 ChromeOS 和 FydeOS 系统。"
+    },
+    "input_method_name": {
+        "message": "真文韵输入法 2"
+    },
+    "setting_page": {
+        "message": "真文韵输入法设置"
+    },
+    "loading_engine": {
+        "message": "正在载入 RIME 引擎..."
+    },
+    "candidate_page": {
+        "message": "第 $PAGE$ 页",
+        "placeholders": {
+            "page": {
+                "content": "$1"
+            }
+        }
+    },
+    "candidate_page_last": {
+        "message": " (末)"
+    }
+}

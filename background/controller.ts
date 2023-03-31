@@ -151,7 +151,8 @@ export class InputController {
                                 cursorVisible: true,
                                 auxiliaryTextVisible: true,
                                 pageSize: rimeContext.menu.pageSize,
-                                auxiliaryText: `Page ${rimeContext.menu.pageNumber}` + (rimeContext.menu.isLastPage ? " (Last)" : ""),
+                                auxiliaryText: chrome.i18n.getMessage("candidate_page", (rimeContext.menu.pageNumber + 1).toString())
+                                    + (rimeContext.menu.isLastPage ? chrome.i18n.getMessage("candidate_page_last") : ""),
                                 windowPosition: 'composition',
                                 vertical: true
                             }
@@ -199,7 +200,7 @@ export class InputController {
                             cursorVisible: false,
                             auxiliaryTextVisible: true,
                             pageSize: 1,
-                            auxiliaryText: "Loading RIME...",
+                            auxiliaryText: chrome.i18n.getMessage("loading_engine"),
                             windowPosition: 'composition',
                             vertical: true
                         }

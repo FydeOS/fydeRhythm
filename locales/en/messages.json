@@ -1,0 +1,28 @@
+{
+    "extension_name": {
+        "message": "FydeRhythm Input Method"
+    },
+    "description": {
+        "message": "Input method for ChromeOS and FydeOS, based on RIME, built by FydeOS team."
+    },
+    "input_method_name": {
+        "message": "FydeRhythm IME"
+    },
+    "setting_page": {
+        "message": "FydeRhythm Settings"
+    },
+    "loading_engine": {
+        "message": "Loading RIME Engine..."
+    },
+    "candidate_page": {
+        "message": "Page $PAGE$",
+        "placeholders": {
+            "page": {
+                "content": "$1"
+            }
+        }
+    },
+    "candidate_page_last": {
+        "message": " (Last)"
+    }
+}
