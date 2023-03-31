@@ -32,8 +32,6 @@ export async function unarchiveFile(content: ArrayBuffer, log: (string) => void)
                     log(`Create directory '${fullName}'`);
                     await fs.createDirectory(fullName);
                 } else {
-                    await fs.setFileSize(fullName, 0);
-                    await fs.openFile(fullName, false);
                     let chunkSizeLimit;
                     if (name.endsWith(".bin")) {
                         // .bin files are read as a whole using mapped_file when RIME session is being
@@ -49,11 +47,17 @@ export async function unarchiveFile(content: ArrayBuffer, log: (string) => void)
                     log(`Extracting '${fullName}' (${formatBytes(entry.size)})`)
                     const buf = await entry.arrayBuffer();
                     log(`Writing '${fullName}' to filesystem (${formatBytes(entry.size)})`);
-                    while (pos < buf.byteLength) {
-                        const len = Math.min(buf.byteLength - pos, chunkSizeLimit);
-                        pos += await fs.writeFile(fullName, new Uint8Array(await entry.arrayBuffer(), pos, len), pos);
+                    try {
+                        await fs.setFileSize(fullName, 0);
+                        await fs.openFile(fullName, false);
+                        while (pos < buf.byteLength) {
+                            const len = Math.min(buf.byteLength - pos, chunkSizeLimit);
+                            pos += await fs.writeFile(fullName, new Uint8Array(await entry.arrayBuffer(), pos, len), pos);
+                        }
                     }
-                    await fs.closeFile(fullName);
+                    finally {
+                        await fs.closeFile(fullName);
+                    }
                 }
             } else {
                 log(`Skipped '${name}'`);
