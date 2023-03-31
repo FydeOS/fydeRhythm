@@ -1,6 +1,7 @@
 import { openDB, IDBPDatabase } from "idb";
 import lz4, { type InitOutput, decompress, compress } from "./lz4/lz4_wasm";
 import _ from 'lodash';
+import { generateId } from './utils';
 
 interface BlobInfo {
     id: string;
@@ -16,17 +17,6 @@ interface Entry {
     parent: string;
     fullPath: string;
 }
-
-function dec2hex(dec) {
-    return dec.toString(16).padStart(2, "0")
-}
-
-function generateId(len) {
-    var arr = new Uint8Array((len || 40) / 2)
-    self.crypto.getRandomValues(arr)
-    return Array.from(arr, dec2hex).join('')
-}
-
 
 function getParentPath(path) {
     const regex = /^(.*)\/[^/]*$/;

@@ -1,8 +1,8 @@
 import { unzip } from 'unzipit';
 import { kCacheBlobSizeLimit } from '~fs';
-import { getFs } from "../utils"
+import { formatBytes, getFs } from "../utils"
 
-export async function unarchiveFile(content: ArrayBuffer) {
+export async function unarchiveFile(content: ArrayBuffer, log: (string) => void) {
     const fs = await getFs();
     const { entries } = await unzip(content);
 
@@ -22,17 +22,16 @@ export async function unarchiveFile(content: ArrayBuffer) {
         pathInFile += "/";
     }
     if (pathInFile != null) {
-        console.log("default.yaml found at %s", pathInFile)
+        log(`default.yaml found at '${pathInFile}', will extract from this directory`);
         for (const [name, entry] of Object.entries(entries)) {
             if (name.startsWith(pathInFile) && !name.includes(".userdb/")) {
                 const nname = name.substring(pathInFile.length);
                 const fullName = (prefix + nname).replace(/\/$/, '');
-                console.log("Processing %s", name)
+                log(`Processing '${name}'`);
                 if (entry.isDirectory) {
-                    console.log("Create dir %s", fullName);
+                    log(`Create directory '${fullName}'`);
                     await fs.createDirectory(fullName);
                 } else {
-                    console.log("Writing %s, size: %s", fullName, entry.size);
                     await fs.setFileSize(fullName, 0);
                     await fs.openFile(fullName, false);
                     let chunkSizeLimit;
@@ -47,7 +46,9 @@ export async function unarchiveFile(content: ArrayBuffer) {
                         chunkSizeLimit = kCacheBlobSizeLimit;
                     }
                     let pos = 0;
+                    log(`Extracting '${fullName}' (${formatBytes(entry.size)})`)
                     const buf = await entry.arrayBuffer();
+                    log(`Writing '${fullName}' to filesystem (${formatBytes(entry.size)})`);
                     while (pos < buf.byteLength) {
                         const len = Math.min(buf.byteLength - pos, chunkSizeLimit);
                         pos += await fs.writeFile(fullName, new Uint8Array(await entry.arrayBuffer(), pos, len), pos);
@@ -55,9 +56,9 @@ export async function unarchiveFile(content: ArrayBuffer) {
                     await fs.closeFile(fullName);
                 }
             } else {
-                console.log("Skipped %s", name);
+                log(`Skipped '${name}'`);
             }
         }
     }
-    console.log("OK")
+    log("Unarchive finished");
 }

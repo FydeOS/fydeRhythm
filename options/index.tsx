@@ -58,8 +58,11 @@ function OptionsPage() {
   }, [rimeLoading]);
 
   async function unarchive() {
-    const fileContent = await plainFiles[0].arrayBuffer();
-    await unarchiveFile(fileContent)
+    const file = plainFiles[0];
+    appendLog(`Loading ${file.name}`);
+    const fileContent = await file.arrayBuffer();
+    await unarchiveFile(fileContent, appendLog);
+    appendLog(`Successfully unarchived ${file.name} to filesystem. Please reload RIME engine.`);
   }
 
   async function loadRime() {

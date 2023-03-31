@@ -1,10 +1,10 @@
 import { FastIndexedDbFsController } from '~fs'
 
-function dec2hex(dec) {
+export function dec2hex(dec) {
     return dec.toString(16).padStart(2, "0")
 }
 
-function generateId(len) {
+export function generateId(len) {
     var arr = new Uint8Array((len || 40) / 2)
     self.crypto.getRandomValues(arr)
     return Array.from(arr, dec2hex).join('')
@@ -14,4 +14,16 @@ export async function getFs() {
     const fs = new FastIndexedDbFsController("rime-files");
     await fs.open();
     return fs;
+}
+
+export function formatBytes(bytes, decimals = 2) {
+    if (!+bytes) return '0 Bytes'
+
+    const k = 1024
+    const dm = decimals < 0 ? 0 : decimals
+    const sizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
