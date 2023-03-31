@@ -39,14 +39,15 @@ export class InputController {
                 this.engine = null;
             }
 
-            this.engine = new RimeEngine();
+            const engine = new RimeEngine();
 
             await new Promise(r => setTimeout(r, 10));
 
-            await this.engine.initialize();
+            await engine.initialize();
             if (maintenance) {
-                await this.engine.performMaintenance();
+                await engine.performMaintenance();
             }
+            this.engine = engine;
             this.session = await this.engine.createSession();
         });
     }

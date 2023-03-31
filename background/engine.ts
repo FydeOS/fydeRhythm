@@ -78,14 +78,36 @@ export class RimeSession {
     }
 
     async clearComposition(): Promise<void> {
+        await this.engine.mutex.runExclusive(async () => {
+            await this.wasmSession.clearComposition();
+        });
+    }
+
+    async getCurrentSchema(): Promise<string> {
         return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.clearComposition();
+            const s = await this.wasmSession.getCurrentSchema();
+            if (s == null)
+                throw new Error("Cannot get current schema");
+            return s;
+        });
+    }
+
+    async selectSchema(newSchema: string): Promise<void> {
+        await this.engine.mutex.runExclusive(async () => {
+            const s = await this.wasmSession.selectSchema(newSchema);
+            if (!s)
+                throw new Error("Cannot set current schema");
         });
     }
     
     destroy() {
         this.wasmSession.delete();
     }
+}
+
+export interface RimeSchema {
+    id: string;
+    name: string;
 }
 
 export class RimeEngine {
@@ -133,5 +155,14 @@ export class RimeEngine {
     async destroy() {
         this.wasmObject?.rimeFinalize();
         this.wasmObject = null;
+    }
+
+    async getSchemaList(): Promise<RimeSchema[]> {
+        return await this.mutex.runExclusive(async () => {
+            const l = await this.wasmObject.rimeGetSchemaList();
+            if (l != null)
+                return l;
+            throw Error("Cannot get schema list");
+        });
     }
 }
