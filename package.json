@@ -29,7 +29,7 @@
     "@types/react": "18.0.27",
     "@types/react-dom": "18.0.10",
     "prettier": "2.8.3",
-    "typescript": "4.9.4"
+    "typescript": "4.9.5"
   },
   "manifest": {
     "name": "__MSG_extension_name__",
