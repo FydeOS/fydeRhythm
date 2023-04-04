@@ -29,16 +29,13 @@ chrome.input.ime.onBlur.addListener((ctxId) => {
 
 chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
     console.log("Processing key: ", keyData);
-    if (keyData.type == 'keydown') {
-        const result = self.controller.feedKey(keyData);
-        if (result === false || result === true) {
-            return result;
-        } else {
-            result.then((handled) => chrome.input.ime.keyEventHandled(requestId, handled));
-            return undefined;
-        }
+    const result = self.controller.feedKey(keyData);
+    if (result === false || result === true) {
+        return result;
+    } else {
+        result.then((handled) => chrome.input.ime.keyEventHandled(requestId, handled));
+        return undefined;
     }
-    return false;
 });
 
 export { }

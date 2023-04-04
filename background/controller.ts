@@ -5,6 +5,7 @@ const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
 const kMod1Mask = 1 << 3;
 const kAltMask = kMod1Mask;
+const kReleaseMask = 1 << 30;
 
 const kSpecialKeys = {
     'ArrowUp': 0xff52,
@@ -232,6 +233,7 @@ export class InputController {
     }
 
     feedKey(keyData: chrome.input.ime.KeyboardEvent): Promise<boolean> | boolean {
+        const release = keyData.type == 'keyup';
         if (this.session) {
             let mask = 0;
             if (keyData.altKey)
@@ -240,6 +242,8 @@ export class InputController {
                 mask ^= kShiftMask;
             if (keyData.ctrlKey)
                 mask ^= kControlMask;
+            if (release)
+                mask ^= kReleaseMask;
             let code: number;
             if (keyData.key.length > 1) {
                 if (keyData.code in kSpecialKeys) {
@@ -272,34 +276,34 @@ export class InputController {
                 return handled;
             })();
         } else {
-            // RIME is loading
-            if (keyData.key.length > 1 && this.inputCache.length > 0) {
-                if (keyData.code == "Backspace") {
-                    this.inputCache.push(null);
-                } else if (keyData.code == "Enter") {
-                    if (this.context) {
-                        chrome.input.ime.commitText({
-                            contextID: this.context.contextID,
-                            text: this.inputCacheToString()
-                        });
+            if (!release) {
+                // RIME is loading
+                if (keyData.key.length > 1 && this.inputCache.length > 0) {
+                    if (keyData.code == "Backspace") {
+                        this.inputCache.push(null);
+                    } else if (keyData.code == "Enter") {
+                        if (this.context) {
+                            chrome.input.ime.commitText({
+                                contextID: this.context.contextID,
+                                text: this.inputCacheToString()
+                            });
+                            this.inputCache = [];
+                        }
+                    } else if (keyData.code == "Escape") {
                         this.inputCache = [];
+                    } else {
+                        return false;
                     }
-                } else if (keyData.code == "Escape") {
-                    this.inputCache = [];
                 } else {
-                    return false;
+                    const char = keyData.key.toLowerCase();
+                    if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
+                        // If buffer is empty and input is not letter, just put it to screen directly
+                        return false;
+                    }
+                    this.inputCache.push(char);
                 }
-            } else {
-                const char = keyData.key.toLowerCase();
-                if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
-                    // If buffer is empty and input is not letter, just put it to screen directly
-                    return false;
-                }
-                this.inputCache.push(char);
+                return this.refreshContext().then(() => true);
             }
-            return this.refreshContext().then(() => true);
         }
-
     }
-
 }
