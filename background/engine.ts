@@ -99,6 +99,20 @@ export class RimeSession {
                 throw new Error("Cannot set current schema");
         });
     }
+
+    async actionCandidateOnCurrentPage(index: number, op: 'select' | 'delete'): Promise<void> {
+        await this.engine.mutex.runExclusive(async () => {
+            let action: number;
+            if (op == 'select') {
+                action = 0;
+            } else if (op == 'delete') {
+                action = 1;
+            }
+            const s = await this.wasmSession.actionCandidateOnCurrentPage(index, action);
+            if (!s)
+                throw new Error(`Cannot ${op} candidate ${index}`);
+        });
+    }
     
     destroy() {
         this.wasmSession.delete();

@@ -38,4 +38,14 @@ chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input
     }
 });
 
+chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) => {
+    console.log(candidateId, button);
+    if (button == 'left') {
+        self.controller.selectCandidate(candidateId);
+        self.controller.lastRightClickItem = -1;
+    } else if (button == 'right') {
+        self.controller.rightClick(candidateId);
+    }
+});
+
 export { }

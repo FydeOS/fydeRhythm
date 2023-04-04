@@ -232,6 +232,18 @@ export class InputController {
         await Promise.all(promises);
     }
 
+    async commitIfAvailable() {
+        let commit = await this.session.getCommit();
+        if (commit) {
+            await new Promise((res, rej) => {
+                chrome.input.ime.commitText({
+                    contextID: this.context.contextID,
+                    text: commit.text
+                }, (ok) => ok ? res(null) : rej());
+            });
+        }
+    }
+
     feedKey(keyData: chrome.input.ime.KeyboardEvent): Promise<boolean> | boolean {
         const release = keyData.type == 'keyup';
         if (this.session) {
@@ -262,16 +274,7 @@ export class InputController {
                 console.log("Rime handled: ", handled);
                 if (handled) {
                     await this.refreshContext();
-
-                    let commit = await this.session.getCommit();
-                    if (commit) {
-                        await new Promise((res, rej) => {
-                            chrome.input.ime.commitText({
-                                contextID: this.context.contextID,
-                                text: commit.text
-                            }, (ok) => ok ? res(null) : rej());
-                        });
-                    }
+                    await this.commitIfAvailable();
                 }
                 return handled;
             })();
@@ -304,6 +307,34 @@ export class InputController {
                 }
                 return this.refreshContext().then(() => true);
             }
+        }
+    }
+
+    async selectCandidate(index: number) {
+        await this.session?.actionCandidateOnCurrentPage(index, 'select');
+        await this.commitIfAvailable();
+        await this.refreshContext();
+    }
+
+    async deleteCandidate(index: number) {
+        await this.session?.actionCandidateOnCurrentPage(index, 'delete');
+        await this.refreshContext();
+    }
+
+    lastRightClickItem: number;
+    lastRightClickTime: number;
+
+    rightClick(index: number) {
+        const curTime = (new Date()).getTime();
+        if (this.lastRightClickItem == index && curTime - this.lastRightClickTime < 3000) {
+            console.log("Del candidate");
+            this.deleteCandidate(index);
+            this.lastRightClickItem = -1;
+        } else {
+            console.log("Ready Del candidate");
+            this.deleteCandidate(index);
+            this.lastRightClickItem = index;
+            this.lastRightClickTime = curTime;
         }
     }
 }
