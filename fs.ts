@@ -9,7 +9,7 @@ interface BlobInfo {
     compressed: boolean;
 }
 
-interface Entry {
+export interface Entry {
     isDirectory: boolean;
     mtime: number;
     mode: number;
@@ -340,6 +340,44 @@ export class FastIndexedDbFsController {
         return read;
     }
 
+    async readWholeFile(path: string): Promise<Uint8Array> {
+        let file = this.openedFiles.get(path)?.entry;
+        if (!file) {
+            file = await this.readEntryRaw(path);
+        }
+        const totalSize = _.sumBy(file.blobs, b => b.size);
+        const buf = new Uint8Array(totalSize);
+        let pos = 0;
+        for (let b of file.blobs) {
+            const blobData = new Uint8Array(await this.readBlob(b));
+            buf.set(blobData, pos);
+            pos += blobData.length;
+        }
+        return buf;
+    }
+
+    async writeWholeFile(path: string, buffer: Uint8Array): Promise<void> {
+        let curEntry = await this.readEntry(path);
+        if (!curEntry) {
+            curEntry = {
+                isDirectory: false,
+                mtime: 0,
+                mode: 0o777,
+                blobs: [],
+                parent: getParentPath(path),
+                fullPath: path
+            };
+        }
+        if (curEntry.isDirectory) {
+            throw new Error("Path " + path + " is a directory, cannot set its size.");
+        }
+        const blob = await this.createBlob(typedArrayToBuffer(buffer));
+        curEntry.blobs = [blob];
+        curEntry.mtime = new Date().getTime();
+        await this.writeEntry(curEntry);
+    }
+
+
     async closeFile(path: string): Promise<void> {
         console.log(`Close ${path}`);
         let f = this.openedFiles.get(path);
@@ -381,13 +419,17 @@ export class FastIndexedDbFsController {
         return await this.db.countFromIndex("entries", "parent", path);
     }
 
-    async readDirectory(path: string): Promise<any> {
+    async readDirectory(path: string): Promise<{files: FullEntry[], directories: FullEntry[]}> {
         const r: Array<Entry> = await this.db.getAllFromIndex("entries", "parent", path);
         const r2 = r.map(x => ({ ...x, name: getFileName(x.fullPath) }));
         return {
             files: r2.filter(x => !x.isDirectory),
             directories: r2.filter(x => x.isDirectory),
         };
+    }
+
+    async readAll(): Promise<Entry[]> {
+        return await this.db.getAll("entries");
     }
 
     async collectGarbage(): Promise<void> {
