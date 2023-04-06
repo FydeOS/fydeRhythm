@@ -11,13 +11,21 @@
     "package": "plasmo package"
   },
   "dependencies": {
+    "@emotion/react": "^11.10.6",
+    "@emotion/styled": "^11.10.6",
+    "@monaco-editor/react": "^4.4.6",
+    "@mui/icons-material": "^5.11.16",
+    "@mui/lab": "5.0.0-alpha.125",
+    "@mui/material": "^5.11.16",
     "@plasmohq/messaging": "^0.1.6",
     "async-mutex": "^0.4.0",
     "idb": "^7.1.1",
     "lodash": "^4.17.21",
+    "monaco-editor": "^0.37.0",
     "plasmo": "0.67.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "react-icons": "^4.8.0",
     "unzipit": "^1.4.2",
     "use-file-picker": "^1.5.2"
   },
@@ -39,7 +47,8 @@
       {
         "resources": [
           "assets/rime_emscripten.wasm",
-          "assets/lz4_wasm_bg.wasm"
+          "assets/lz4_wasm_bg.wasm",
+          "assets/monaco/**"
         ],
         "matches": [
           "https://www.plasmo.com/*"

@@ -4,6 +4,7 @@ import { sendToBackground } from "@plasmohq/messaging"
 import { useFilePicker } from 'use-file-picker';
 import { unarchiveFile } from './unarchive'
 import { getFs } from "../utils"
+import FileEditor from "./fileEditor";
 
 function OptionsPage() {
   const [data, setData] = useState("nihao")
@@ -146,6 +147,7 @@ function OptionsPage() {
           )}
         </>
       </div>
+      <FileEditor/>
     </div>
   )
 }
