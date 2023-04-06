@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from "idb";
 import lz4, { type InitOutput, decompress, compress } from "./lz4/lz4_wasm";
 import _ from 'lodash';
-import { generateId } from './utils';
+import { generateId, getParentPath, getFileName } from './utils';
 
 interface BlobInfo {
     id: string;
@@ -18,16 +18,8 @@ interface Entry {
     fullPath: string;
 }
 
-function getParentPath(path) {
-    const regex = /^(.*)\/[^/]*$/;
-    const match = regex.exec(path);
-    return match ? match[1] : "/";
-}
-
-function getFileName(path) {
-    const regex = /\/([^/]+)$/;
-    const match = regex.exec(path);
-    return match ? match[1] : null;
+interface FullEntry extends Entry {
+    name: string;
 }
 
 function typedArrayToBuffer(array: Uint8Array): ArrayBuffer {

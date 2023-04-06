@@ -27,3 +27,15 @@ export function formatBytes(bytes, decimals = 2) {
 
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
+
+export function getParentPath(path) {
+    const regex = /^(.*)\/[^/]*$/;
+    const match = regex.exec(path);
+    return match ? match[1] : "/";
+}
+
+export function getFileName(path) {
+    const regex = /\/([^/]+)$/;
+    const match = regex.exec(path);
+    return match ? match[1] : null;
+}
