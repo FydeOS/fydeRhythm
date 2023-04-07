@@ -166,7 +166,7 @@ export class InputController {
                                 candidates: rimeContext.menu.candidates.map((v, idx) => ({
                                     candidate: v.text,
                                     id: idx,
-                                    label: rimeContext.selectLabels ? rimeContext.selectLabels[idx] : (idx + 1).toString(),
+                                    label: rimeContext.selectLabels[idx] || (idx + 1).toString(),
                                     annotation: v.comment
                                 })),
                             }, (ok) => ok ? res(null) : rej());
