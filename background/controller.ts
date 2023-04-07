@@ -268,14 +268,10 @@ export class InputController {
                 code = keyData.key.toLowerCase().charCodeAt(0);
             }
             return (async () => {
-                console.log("Send event to RIME: code = %d, mask = %d", code, mask);
                 let handled = false;
                 handled = await this.session.processKey(code, mask);
-                console.log("Rime handled: ", handled);
-                if (handled) {
-                    await this.refreshContext();
-                    await this.commitIfAvailable();
-                }
+                await this.refreshContext();
+                await this.commitIfAvailable();
                 return handled;
             })();
         } else {
