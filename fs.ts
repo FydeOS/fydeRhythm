@@ -419,13 +419,9 @@ export class FastIndexedDbFsController {
         return await this.db.countFromIndex("entries", "parent", path);
     }
 
-    async readDirectory(path: string): Promise<{files: FullEntry[], directories: FullEntry[]}> {
+    async readDirectory(path: string): Promise<FullEntry[]> {
         const r: Array<Entry> = await this.db.getAllFromIndex("entries", "parent", path);
-        const r2 = r.map(x => ({ ...x, name: getFileName(x.fullPath) }));
-        return {
-            files: r2.filter(x => !x.isDirectory),
-            directories: r2.filter(x => x.isDirectory),
-        };
+        return r.map(x => ({ ...x, name: getFileName(x.fullPath) }));
     }
 
     async readAll(): Promise<Entry[]> {
