@@ -96,12 +96,14 @@ export class InputController {
                 text: ""
             });
         }
-        chrome.input.ime.setCandidateWindowProperties({
-            engineID: this.engineId,
-            properties: {
-                visible: false,
-            }
-        });
+        if (this.engineId != null) {
+            chrome.input.ime.setCandidateWindowProperties({
+                engineID: this.engineId,
+                properties: {
+                    visible: false,
+                }
+            });
+        }
     }
 
     async clearContext() {
