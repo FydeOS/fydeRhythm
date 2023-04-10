@@ -1,5 +1,4 @@
 import { InputController } from "./controller";
-import { RimeContext, RimeEngine, RimeSession } from "./engine";
 import { serviceWorkerKeepalive } from "./keepalive";
 
 
@@ -47,5 +46,11 @@ chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) 
         self.controller.rightClick(candidateId);
     }
 });
+
+chrome.runtime.onMessage.addListener((m, s, resp) => {
+    if (m.name)
+        return;
+    console.log("BG Received message: ", m);
+})
 
 export { }
