@@ -1,0 +1,22 @@
+* {
+    font-family: 'proxima-nova' !important;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    font-size: 16px;
+}
+
+.MuiOutlinedInput-input.MuiInputBase-input {
+    padding: 6px 18px;
+    text-align: center;
+}
+
+.MuiInputLabel-root.MuiInputLabel-formControl {
+    font-size: 12px;
+    line-height: 22px;
+    color: #999999;
+}
