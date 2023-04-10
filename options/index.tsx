@@ -1,11 +1,12 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-
-import { FormControl, FormControlLabel, Radio, RadioGroup, Checkbox, FormGroup, TextField, Snackbar } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar } from "@mui/material";
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
+import { sendToBackground } from "@plasmohq/messaging";
+import type { RimeSchema } from "~shared-types";
 
 const schemaMap = [
     {
@@ -65,167 +66,155 @@ const fuzzyMap = [
     }
 ];
 
-interface IHomeProps {
-}
+function OptionsPage() {
+    const state = {
+        currentFuzzy: [],
+        snackbarOpen: false,
+        snackbarText: "",
+        pageSize: "",
+    };
 
-interface IHomeState {
-    currentSchema: string;
-    currentFuzzy: Array<string>;
-    snackbarOpen: boolean;
-    snackbarText: string;
-    pageSize: string;
-}
+    const { currentFuzzy, pageSize } = state;
+    let snackbarOpen = false;
+    let snackbarText = "";
 
-class Home extends React.Component<IHomeProps, IHomeState>  {
-    constructor(props: IHomeProps) {
-        super(props);
-        this.state = {
-            currentSchema: "",
-            currentFuzzy: [],
-            snackbarOpen: false,
-            snackbarText: "",
-            pageSize: "",
-        };
-    }
+    const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, schemaList: [] as RimeSchema[], currentSchema: "" as string });
+    const [tempStatus, setTempStatus] = useState<typeof engineStatus>(null);
 
-    componentDidMount = async () => {
-    }
-
-    actionChangeSchema = async (schema: string) => {
-    }
-
-    actionChangeFuzzy = async (type: boolean, fuzzy: string) => {
-    }
-
-    actionChangePageSize = (pageSize: string) => {
-        this.setState({
-            pageSize
+    async function updateRimeStatus() {
+        const result = await sendToBackground({
+            name: "GetEngineStatus"
         });
-        localStorage.setItem("pageSize", pageSize)
+        console.log("Got rime status", result);
+        setEngineStatus(result);
+        if (!result.loading) {
+            setTempStatus(null);
+        }
     }
 
-    public render() {
-        const { currentSchema, currentFuzzy, snackbarOpen, snackbarText, pageSize } = this.state;
+    useEffect(() => {
+        console.log("Begin use effect");
+        // update RIME status upon loading
+        updateRimeStatus();
 
+        const listener = (m, s, resp) => {
+            console.log("FG Received message: ", m);
+            if (m.rimeStatusChanged) {
+                updateRimeStatus();
+            }
+        }
+        chrome.runtime.onMessage.addListener(listener)
+
+        return () => {
+            chrome.runtime.onMessage.removeListener(listener);
+        }
+    }, []);
+
+    async function loadRime() {
+        await sendToBackground({
+            name: "ReloadRime",
+        });
+    }
+
+    async function changeSchema(id: string) {
+        const newStatus = Object.assign({}, engineStatus);
+        newStatus.currentSchema = id;
+        setTempStatus(newStatus);
+        await sendToBackground({
+            name: "SetSchema",
+            body: {
+                id: id
+            }
+        });
+    }
+
+    const engineStatusDisplay = tempStatus ?? engineStatus;
+
+    let engineStatusString: string = "未启动";
+    if (tempStatus && engineStatus.loading) {
+        engineStatusString = "启动中";
+        snackbarText = "正在应用配置...";
+        snackbarOpen = true;
+    } else if (engineStatus.loading) {
+        engineStatusString = "启动中";
+        snackbarText = "正在启动 RIME 引擎...";
+        snackbarOpen = true;
+    } else if (engineStatus.loaded) {
+        engineStatusString = "就绪";
+    }
 
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
-      <div className={styles.bgBlock}>
-        <div className={styles.leftTop1} />
-        <div className={styles.leftTop2} />
-        <div className={styles.leftTop3} />
-        <div className={styles.rightMid1} />
-        <div className={styles.rightMid2} />
-      </div>
-      <div className={styles.topAnimation}>
-        <Animation
-          loop={true}
-          width={500}
-          height={180}
-        />
-      </div>
-      <div className={styles.formGroup}>
-        <div className={styles.formBox}>
-          <FormControl className={styles.formControl}>
-            <div className={styles.formLabel}>选择输入法引擎</div>
-            <FormGroup>
-              <RadioGroup
-                value={currentSchema}
-                onChange={async (e) => await this.actionChangeSchema(e.target.value)}
-                name="schema"
-                row
-              >
-                {
-                  schemaMap.map((schema) =>
-                    <FormControlLabel
-                      control={<Radio />}
-                      value={schema.value}
-                      label={schema.label}
-                    />
-                  )
-                }
-              </RadioGroup>
-            </FormGroup>
-          </FormControl>
-        </div>
-        <div className={styles.formBox}>
-          <FormControl className={styles.formControl}>
-            <div className={styles.pageSize}>
-              <div className={styles.formLabel}>设置单页候选词数量</div>
-              <TextField
-                className={styles.input}
-                id="outlined-basic"
-                variant="outlined"
-                value={pageSize}
-                onChange={e => {
-                  if (e.target.value.match(/^\+?[1-9]\d*$/) || e.target.value === "") {
-                    this.actionChangePageSize(e.target.value);
-                  } else {
-                    this.setState({
-                      snackbarOpen: true,
-                      snackbarText: "请输入介于 3-10 之间的数字",
-                    });
-                  }
-                }}
-                onBlur={e => {
-                  if (!e.target.value.match(/^([3|4|5|6|7|8|9]|(10))$/)) {
-                    this.actionChangePageSize("10");
-                    this.setState({
-                      snackbarOpen: true,
-                      snackbarText: "请输入介于 3-10 之间的数字",
-                    });
-                  }
-                }}
-              />
+            <div className={styles.bgBlock}>
+                <div className={styles.leftTop1} />
+                <div className={styles.leftTop2} />
+                <div className={styles.leftTop3} />
+                <div className={styles.rightMid1} />
+                <div className={styles.rightMid2} />
             </div>
-          </FormControl>
+            <div className={styles.topAnimation}>
+                <Animation
+                    loop={true}
+                    width={500}
+                    height={180}
+                />
+            </div>
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
+                        {engineStatus.loaded &&
+                            <div>
+                                <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>
+                            </div>}
+                    </FormControl>
+                </div>
+            </div>
+            {
+                engineStatusDisplay.schemaList.length > 0 &&
+                <div className={styles.formGroup}>
+                    <div className={styles.formBox}>
+                        <FormControl className={styles.formControl}>
+                            <div className={styles.formLabel}>选择输入方案</div>
+                            <FormGroup>
+                                <RadioGroup
+                                    value={engineStatusDisplay.currentSchema}
+                                    onChange={async (e) => changeSchema(e.target.value)}
+                                    name="schema"
+                                    row
+                                >
+                                    {
+                                        engineStatusDisplay.schemaList.map((schema) =>
+                                            <FormControlLabel
+                                                control={<Radio />}
+                                                value={schema.id}
+                                                label={schema.name}
+                                                key={"schema" + schema.id}
+                                            />
+                                        )
+                                    }
+                                </RadioGroup>
+                            </FormGroup>
+                        </FormControl>
+                    </div>
+                </div>
+            }
+            <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
+            <Snackbar
+                anchorOrigin={{
+                    vertical: 'top',
+                    horizontal: 'center',
+                }}
+                open={snackbarOpen}
+                autoHideDuration={3000}
+                ContentProps={{
+                    'aria-describedby': 'message-id',
+                }}
+                onClose={() => this.setState({ snackbarOpen: false, snackbarText: "" })}
+                message={<span id="message-id">{snackbarText}</span>}
+            />
         </div>
-        {
-          ["luna_pinyin_simp", "luna_pinyin"].includes(currentSchema) &&
-          <div className={styles.formBox}>
-            <FormControl className={styles.formControl}>
-              <div className={styles.formLabel}>设置模糊音</div>
-              <FormGroup row>
-                {
-                  fuzzyMap.map((fuzzy) =>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          value={fuzzy.value}
-                          name={fuzzy.label}
-                          checked={currentFuzzy.includes(fuzzy.value)}
-                          onChange={async (e) => await this.actionChangeFuzzy(e.target.checked, e.target.value)}
-                        />
-                      }
-                      label={fuzzy.label}
-                      key={fuzzy.value}
-                    />
-                  )
-                }
-              </FormGroup>
-            </FormControl>
-          </div>
-        }
-      </div>
-      <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
-      <Snackbar
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
-        }}
-        open={snackbarOpen}
-        autoHideDuration={3000}
-        ContentProps={{
-          'aria-describedby': 'message-id',
-        }}
-        onClose={() => this.setState({ snackbarOpen: false, snackbarText: "" })}
-        message={<span id="message-id">{snackbarText}</span>}
-      />
-    </div>
-        </ThemeProvider>
-
-    }
+    </ThemeProvider>
 }
 
-// @ts-ignore
-export default Home;
+export default OptionsPage;
