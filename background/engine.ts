@@ -2,47 +2,7 @@ import CreateRimeWasm from "./rime_emscripten"
 import { getFs } from "../utils"
 import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
-
-export interface RimeContext {
-    composition: {
-        length: number;
-        cursorPosition: number;
-        selectionStart: number;
-        selectionEnd: number;
-        preedit: string;
-    };
-
-    menu: {
-        pageSize: number;
-        pageNumber: number;
-        isLastPage: boolean;
-        highlightedCandidateIndex: number;
-        candidates: Array<{
-            text: string;
-            comment: string;
-        }>
-    };
-
-    selectKeys: string;
-    commitTextPreview: string;
-    selectLabels: string[];
-}
-
-export interface RimeCommit {
-    text: string;
-}
-
-export interface RimeStatus {
-    schemaId: string;
-    schemaName: string;
-    isDisabled: boolean;
-    isComposing: boolean;
-    isAsciiMode: boolean;
-    isFullShape: boolean;
-    isSimplified: boolean;
-    isTraditional: boolean;
-    isAsciiPunct: boolean;
-}
+import type { RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
 
 export class RimeSession {
     engine: RimeEngine;
@@ -117,11 +77,6 @@ export class RimeSession {
     destroy() {
         this.wasmSession.delete();
     }
-}
-
-export interface RimeSchema {
-    id: string;
-    name: string;
 }
 
 export class RimeEngine {
