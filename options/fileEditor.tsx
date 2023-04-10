@@ -9,10 +9,28 @@ import _ from "lodash";
 import React from "react";
 import Editor, { loader, type Monaco } from "@monaco-editor/react";
 import type monaco from 'monaco-editor';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import CloseIcon from '@mui/icons-material/Close';
+import Slide from '@mui/material/Slide';
+import type { TransitionProps } from '@mui/material/transitions';
 
 loader.config({ paths: { vs: "/assets/monaco/vs" } });
 
-function fileEditor() {
+const Transition = React.forwardRef(function Transition(
+    props: TransitionProps & {
+        children: React.ReactElement;
+    },
+    ref: React.Ref<unknown>,
+) {
+    return <Slide direction="up" ref={ref} {...props} />;
+});
+
+function FileEditorButton() {
     const [data, setData] = useState([{ name: "", id: "", parent: null, isDir: true, size: 0 }]);
     useEffect(() => {
         async function load() {
@@ -125,31 +143,58 @@ function fileEditor() {
     }
 
     const [currentChangeTimer, setCurrentChangeTimer] = useState(null);
+    const [open, setOpen] = useState(false);
 
-
-    return <div style={{ display: 'flex' }}>
-        <div>
-            <TreeView
-                aria-label="multi-select"
-                defaultCollapseIcon={<ExpandMore />}
-                defaultExpandIcon={<ChevronRight />}
-                onNodeSelect={onSelectFile}
-                sx={{ height: 216, flexGrow: 1, maxWidth: 400, overflowY: 'auto' }}
-            >
-                {RenderDirectory("")}
-            </TreeView>
-        </div>
-        <div style={{ flexGrow: 1 }}>
-            {fileContent != null ?
-                <Editor
-                    defaultValue={fileContent}
-                    path={filePath}
-                    onMount={handleEditorDidMount}
-                    onChange={handleEditorChange}
-                /> : "Cannot edit this one"
-            }
-        </div>
-    </div>;
+    return <>
+        <Button variant="contained" onClick={() => setOpen(true)}>
+            编辑 RIME 配置文件
+        </Button>
+        <Dialog
+            fullScreen
+            open={open}
+            onClose={() => setOpen(false)}
+            TransitionComponent={Transition}
+        >
+            <AppBar sx={{ position: 'relative' }}>
+                <Toolbar>
+                    <IconButton
+                        edge="start"
+                        color="inherit"
+                        onClick={() => setOpen(false)}
+                        aria-label="close"
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                    <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
+                        编辑 RIME 配置
+                    </Typography>
+                </Toolbar>
+            </AppBar>
+            <div style={{ display: 'flex' }}>
+                <div>
+                    <TreeView
+                        aria-label="multi-select"
+                        defaultCollapseIcon={<ExpandMore />}
+                        defaultExpandIcon={<ChevronRight />}
+                        onNodeSelect={onSelectFile}
+                        sx={{ flexGrow: 1, overflowY: 'auto' }}
+                    >
+                        {RenderDirectory("")}
+                    </TreeView>
+                </div>
+                <div style={{ flexGrow: 1 }}>
+                    {fileContent != null ?
+                        <Editor
+                            defaultValue={fileContent}
+                            path={filePath}
+                            onMount={handleEditorDidMount}
+                            onChange={handleEditorChange}
+                        /> : "Cannot edit this one"
+                    }
+                </div>
+            </div>
+        </Dialog>
+    </>
 }
 
-export default fileEditor;
+export default FileEditorButton;

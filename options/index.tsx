@@ -7,6 +7,7 @@ import "./global.css";
 import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import type { RimeSchema } from "~shared-types";
+import FileEditorButton from "./fileEditor";
 
 const schemaMap = [
     {
@@ -167,6 +168,9 @@ function OptionsPage() {
                             <div>
                                 <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>
                             </div>}
+                        <div>
+                            <FileEditorButton />
+                        </div>
                     </FormControl>
                 </div>
             </div>
