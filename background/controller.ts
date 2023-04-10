@@ -38,14 +38,44 @@ export class InputController {
         this.loadMutex = new Mutex();
     }
 
+    get engineLoading(): boolean {
+        return this.loadMutex.isLocked();
+    }
+
+    notifyRimeStatusChanged() {
+        chrome.runtime.sendMessage({ rimeStatusChanged: true }, {}, () => {
+            // Prevent printing "Could not establish connection. Receiving end does not exist." 
+            // error message when options page is not open
+            chrome.runtime.lastError;
+        });
+    }
+
+    async unloadRime() {
+        if (this.engineId) {
+            this.resetUI();
+        }
+        await this.loadMutex.runExclusive(async () => {
+            if (this.engine) {
+                if (this.session) {
+                    this.session.destroy();
+                    this.session = null;
+                }
+                this.engine.destroy();
+                this.engine = null;
+                this.notifyRimeStatusChanged();
+            }
+        });
+    }
+
     async loadRime(maintenance: boolean = false) {
         if (this.engineId) {
             this.resetUI();
         }
         if (this.loadMutex.isLocked()) {
-            console.log("RIME is locked, wait for unlock");
+            console.log("RIME loading mutex is locked, wait for unlock");
             // If RIME is already loading, just wait for it to complete
             await this.loadMutex.waitForUnlock();
+            // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
             if (!maintenance) {
                 return;
             }
@@ -59,6 +89,7 @@ export class InputController {
                 }
                 this.engine.destroy();
                 this.engine = null;
+                this.notifyRimeStatusChanged();
             }
 
             const engine = new RimeEngine();
@@ -82,6 +113,7 @@ export class InputController {
             }
             this.engine = engine;
             this.session = session;
+            this.notifyRimeStatusChanged();
         });
         await this.refreshContext();
     }
@@ -306,6 +338,15 @@ export class InputController {
                 return this.refreshContext().then(() => true);
             }
         }
+    }
+
+    async selectSchema(id: string): Promise<void> {
+        this.resetUI();
+        await this.loadMutex.runExclusive(async () => {
+            this.notifyRimeStatusChanged();
+            await this.session?.selectSchema(id);
+            this.notifyRimeStatusChanged();
+        });
     }
 
     async selectCandidate(index: number) {

@@ -1,13 +1,15 @@
 import type { PlasmoMessaging } from "@plasmohq/messaging"
 
 const handler: PlasmoMessaging.MessageHandler = async (req, res) => {
-    if (self.controller.loadMutex.isLocked()) {
-        await self.controller.loadMutex.waitForUnlock();
-    }
     const loaded = self.controller.engine != null;
-    const list = await self.controller.engine?.getSchemaList();
-    let current = await self.controller.session?.getCurrentSchema();
-    res.send({ loaded, list, current });
+    const loading = self.controller.engineLoading;
+    let schemaList = [];
+    let currentSchema = "";
+    if (loaded && !loading) {
+        schemaList = await self.controller.engine?.getSchemaList();
+        currentSchema = await self.controller.session?.getCurrentSchema();
+    }
+    res.send({ loading, loaded, schemaList, currentSchema });
 }
 
 export default handler
