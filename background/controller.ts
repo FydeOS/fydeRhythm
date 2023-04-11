@@ -95,6 +95,31 @@ export class InputController {
         return result;
     }
 
+    inputCacheToString() {
+        const list = [];
+        for (const s of this.inputCache) {
+            if (s == null) {
+                list.pop();
+            } else {
+                list.push(s);
+            }
+        }
+        return list.join("");
+    }
+
+    async flushInputCacheToSession(session: RimeSession) {
+        if (this.inputCache.length > 0) {
+            const list = this.inputCache;
+            this.inputCache = [];
+            for (const c of list) {
+                if (c == null) // Backspace
+                    await session.processKey(kSpecialKeys['Backspace'], 0);
+                else
+                    await session.processKey(c.charCodeAt(0), 0);
+            }
+        }
+    }
+
     async loadRime(maintenance: boolean = false) {
         if (this.engineId) {
             this.resetUI();
@@ -129,16 +154,7 @@ export class InputController {
                 await engine.performMaintenance();
             }
             const session = await engine.createSession();
-            if (this.inputCache.length > 0) {
-                const list = this.inputCache;
-                this.inputCache = [];
-                for (const c of list) {
-                    if (c == null) // Backspace
-                        await session.processKey(kSpecialKeys['Backspace'], 0);
-                    else
-                        await session.processKey(c.charCodeAt(0), 0);
-                }
-            }
+            await this.flushInputCacheToSession(session);
             this.engine = engine;
             this.session = session;
             this.notifyRimeStatusChanged();
@@ -172,23 +188,11 @@ export class InputController {
         this.resetUI();
     }
 
-    inputCacheToString() {
-        const list = [];
-        for (const s of this.inputCache) {
-            if (s == null) {
-                list.pop();
-            } else {
-                list.push(s);
-            }
-        }
-        return list.join("");
-    }
-
     async refreshContext(): Promise<void> {
         if (!this.engineId)
             return;
         const promises = [];
-        if (this.session != null) {
+        if (this.session != null && !this.loadMutex.isLocked()) {
             const rimeContext = await this.session?.getContext();
             if (rimeContext) {
                 if (this.context != null) {
@@ -369,9 +373,13 @@ export class InputController {
     async selectSchema(id: string): Promise<void> {
         this.resetUI();
         await this.loadMutex.runExclusive(async () => {
-            this.notifyRimeStatusChanged();
-            await this.session?.selectSchema(id);
-            this.notifyRimeStatusChanged();
+            if (this.session) {
+                this.notifyRimeStatusChanged();
+                await this.session.selectSchema(id);
+                await this.flushInputCacheToSession(this.session);
+                this.refreshContext();
+                this.notifyRimeStatusChanged();
+            }
         });
     }
 
