@@ -196,8 +196,10 @@ export class InputController {
                         const c = {
                             contextID: this.context.contextID,
                             cursor: rimeContext.composition.cursorPosition,
-                            selectionEnd: rimeContext.composition.selectionEnd,
-                            selectionStart: rimeContext.composition.selectionStart,
+                            // Showing selection will result in incorrect cursor display under Linux apps
+                            // As showing selection doesn't provide much value, do not show selection for now
+                            // selectionEnd: rimeContext.composition.selectionEnd,
+                            // selectionStart: rimeContext.composition.selectionStart,
                             text: rimeContext.composition.preedit
                         };
                         chrome.input.ime.setComposition(c, (ok) => ok ? res(null) : rej());
@@ -273,8 +275,6 @@ export class InputController {
                         chrome.input.ime.setComposition({
                             contextID: this.context.contextID,
                             cursor: preedit.length,
-                            selectionStart: 0,
-                            selectionEnd: preedit.length,
                             text: preedit,
                         }, (ok) => ok ? res(null) : rej());
                     }));
