@@ -10,64 +10,6 @@ import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 
-const schemaMap = [
-    {
-        value: "luna_pinyin_simp",
-        label: "简体拼音"
-    },
-    {
-        value: "double_pinyin_flypy",
-        label: "小鹤双拼"
-    },
-    {
-        value: "double_pinyin_mspy",
-        label: "微软双拼"
-    },
-    {
-        value: "luna_pinyin",
-        label: "朙月拼音"
-    },
-    {
-        value: "double_pinyin",
-        label: "自然碼雙拼"
-    },
-    {
-        value: "cangjie5",
-        label: "倉頡五代"
-    },
-    {
-        value: "cangjie3",
-        label: "倉頡三代"
-    },
-];
-
-const fuzzyMap = [
-    {
-        value: "derive/^([zcs])h/$1/",
-        label: "zh, ch, sh => z, c, s"
-    },
-    {
-        value: "derive/^([zcs])([^h])/$1h$2/",
-        label: "z, c, s => zh, ch, sh"
-    },
-    {
-        value: "derive/^n/l/",
-        label: "n => l"
-    },
-    {
-        value: "derive/^l/n/",
-        label: "l => n"
-    },
-    {
-        value: "derive/([ei])n$/$1ng/",
-        label: "en => eng, in => ing"
-    },
-    {
-        value: "derive/([ei])ng$/$1n/",
-        label: "eng => en, ing => in"
-    }
-];
-
 function OptionsPage() {
     let snackbarOpen = false;
     let snackbarText = "";
