@@ -27,7 +27,7 @@ chrome.input.ime.onBlur.addListener((ctxId) => {
 });
 
 chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
-    console.log("Processing key: ", keyData);
+    console.log("Processing key: ", JSON.stringify(keyData));
     const result = self.controller.feedKey(keyData);
     if (result === false || result === true) {
         return result;

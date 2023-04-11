@@ -80,7 +80,6 @@ function OptionsPage() {
         const result = await sendToBackground({
             name: "GetEngineStatus"
         });
-        console.log("Got rime status", result);
         setEngineStatus(result);
         if (!result.loading) {
             setTempStatus(null);
@@ -101,7 +100,6 @@ function OptionsPage() {
     }, [rimeLogs]);
 
     useEffect(() => {
-        console.log("Begin use effect");
         // update RIME status upon loading
         updateRimeStatus();
         updateRimeLogs();

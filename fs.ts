@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from "idb";
 import lz4, { type InitOutput, decompress, compress } from "./lz4/lz4_wasm";
 import _ from 'lodash';
-import { generateId, getParentPath, getFileName } from './utils';
+import { generateId, getParentPath, getFileName, formatBytes } from './utils';
 
 interface BlobInfo {
     id: string;
@@ -190,7 +190,6 @@ export class FastIndexedDbFsController {
     }
 
     async openFile(path: string, readonly: boolean): Promise<void> {
-        console.log(`Open ${path}`);
         if (this.openedFiles.has(path)) {
             // already opened
             const inst = this.openedFiles.get(path);
@@ -334,7 +333,7 @@ export class FastIndexedDbFsController {
 
         const end = performance.now();
         if (end - start > kTimeWarning) {
-            console.warn(`Slow read: took ${end - start} to read ${read} bytes from file ${path}`);
+            console.warn(`Slow read: took ${(end - start).toFixed(2)}ms to read ${formatBytes(read)} from file ${path}`);
         }
 
         return read;
@@ -379,7 +378,6 @@ export class FastIndexedDbFsController {
 
 
     async closeFile(path: string): Promise<void> {
-        console.log(`Close ${path}`);
         let f = this.openedFiles.get(path);
         if (f.dirty) {
             await this.writeEntry(f.entry);

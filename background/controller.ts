@@ -185,7 +185,6 @@ export class InputController {
     }
 
     async refreshContext(): Promise<void> {
-        console.log("Engine id = ", this.engineId);
         if (!this.engineId)
             return;
         const promises = [];
@@ -201,7 +200,6 @@ export class InputController {
                             selectionStart: rimeContext.composition.selectionStart,
                             text: rimeContext.composition.preedit
                         };
-                        console.log(c);
                         chrome.input.ime.setComposition(c, (ok) => ok ? res(null) : rej());
                     }));
                 }
