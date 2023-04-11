@@ -24,5 +24,8 @@
     },
     "candidate_page_last": {
         "message": " (末)"
+    },
+    "rime_logs": {
+        "message": "RIME 引擎日志"
     }
 }

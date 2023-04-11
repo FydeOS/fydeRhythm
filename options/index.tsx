@@ -8,6 +8,7 @@ import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
+import RimeLogDisplay from "./rimeLogDisplay";
 
 const schemaMap = [
     {
@@ -73,8 +74,6 @@ function OptionsPage() {
 
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, schemaList: [] as RimeSchema[], currentSchema: "" as string });
     const [tempStatus, setTempStatus] = useState<typeof engineStatus>(null);
-    const [rimeLogs, setRimeLogs] = useState<string[]>([]);
-    const logTextArea = useRef<HTMLTextAreaElement>();
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
@@ -86,29 +85,13 @@ function OptionsPage() {
         }
     }
 
-    async function updateRimeLogs() {
-        const result = await sendToBackground({
-            name: "GetRimeLogs"
-        });
-        setRimeLogs(result.logs);
-    }
-
-    useEffect(() => {
-        // Scroll textarea to bottom on log update
-        const area = logTextArea.current;
-        area.scrollTop = area.scrollHeight;
-    }, [rimeLogs]);
-
     useEffect(() => {
         // update RIME status upon loading
         updateRimeStatus();
-        updateRimeLogs();
 
         const listener = (m, s, resp) => {
             if (m.rimeStatusChanged) {
                 updateRimeStatus();
-            } else if (m.rimeLog) {
-                setRimeLogs(rimeLogs => [...rimeLogs, m.rimeLog]);
             }
         }
         chrome.runtime.onMessage.addListener(listener)
@@ -207,14 +190,8 @@ function OptionsPage() {
                     </div>
                 </div>
             }
-            <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>RIME 引擎日志</div>
-                        <textarea readOnly value={rimeLogs.join("\n")} rows={10} ref={logTextArea}></textarea>
-                    </FormControl>
-                </div>
-            </div>
+
+            <RimeLogDisplay />
 
             <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
             <Snackbar

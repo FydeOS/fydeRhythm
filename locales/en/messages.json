@@ -24,5 +24,8 @@
     },
     "candidate_page_last": {
         "message": " (Last)"
+    },
+    "rime_logs": {
+        "message": "RIME Engine Logs"
     }
 }
