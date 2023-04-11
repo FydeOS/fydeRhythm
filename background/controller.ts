@@ -164,7 +164,7 @@ export class InputController {
 
     resetUI() {
         if (this.context != null) {
-            chrome.input.ime.setComposition({
+            this.setComposition({
                 contextID: this.context.contextID,
                 cursor: 0,
                 selectionEnd: 0,
@@ -188,6 +188,22 @@ export class InputController {
         this.resetUI();
     }
 
+    preeditEmpty: boolean;
+    setComposition(param: chrome.input.ime.CompositionParameters): Promise<void> {
+        return new Promise((res, rej) => {
+            if (param.text.length == 0 && this.preeditEmpty) {
+                // If preedit is already empty, and new preedit is also empty, then do not call
+                // setComposition. This will mostly happen in ASCII mode (e.g. input method is 
+                // switched off by pressing Shift). If we still call setComposition in this case,
+                // Chrome omnibar autofill text will disappear, resulting in bad user experience
+                res(null);
+            } else {
+                this.preeditEmpty = param.text.length == 0;
+                chrome.input.ime.setComposition(param, (ok) => ok ? res(null) : rej());
+            }
+        })
+    }
+
     async refreshContext(): Promise<void> {
         if (!this.engineId)
             return;
@@ -196,18 +212,16 @@ export class InputController {
             const rimeContext = await this.session?.getContext();
             if (rimeContext) {
                 if (this.context != null) {
-                    promises.push(new Promise((res, rej) => {
-                        const c = {
-                            contextID: this.context.contextID,
-                            cursor: rimeContext.composition.cursorPosition,
-                            // Showing selection will result in incorrect cursor display under Linux apps
-                            // As showing selection doesn't provide much value, do not show selection for now
-                            // selectionEnd: rimeContext.composition.selectionEnd,
-                            // selectionStart: rimeContext.composition.selectionStart,
-                            text: rimeContext.composition.preedit
-                        };
-                        chrome.input.ime.setComposition(c, (ok) => ok ? res(null) : rej());
-                    }));
+                    const c = {
+                        contextID: this.context.contextID,
+                        cursor: rimeContext.composition.cursorPosition,
+                        /* Showing selection will result in incorrect cursor display under Linux apps
+                         * As showing selection doesn't provide much value, do not show selection for now */
+                        // selectionEnd: rimeContext.composition.selectionEnd,
+                        // selectionStart: rimeContext.composition.selectionStart,
+                        text: rimeContext.composition.preedit
+                    };
+                    promises.push(this.setComposition(c));
                 }
                 if (rimeContext.menu.candidates.length > 0) {
                     promises.push(new Promise((res, rej) => {
@@ -275,13 +289,12 @@ export class InputController {
                 }));
                 if (this.context != null) {
                     const preedit = this.inputCacheToString();
-                    promises.push(new Promise((res, rej) => {
-                        chrome.input.ime.setComposition({
-                            contextID: this.context.contextID,
-                            cursor: preedit.length,
-                            text: preedit,
-                        }, (ok) => ok ? res(null) : rej());
-                    }));
+                    const c = {
+                        contextID: this.context.contextID,
+                        cursor: preedit.length,
+                        text: preedit,
+                    };
+                    promises.push(this.setComposition(c));
                     promises.push(new Promise((res, rej) => {
                         chrome.input.ime.setCandidates({
                             contextID: this.context.contextID,
