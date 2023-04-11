@@ -9,6 +9,7 @@ import { sendToBackground } from "@plasmohq/messaging";
 import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
+import SchemaPackDownloader from "./schemaPackDownloader";
 
 function OptionsPage() {
     let snackbarOpen = false;
@@ -92,12 +93,13 @@ function OptionsPage() {
                     height={180}
                 />
             </div>
+            <SchemaPackDownloader />
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
                         <Stack spacing={2} direction="row">
-                            {engineStatus.loaded && <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>}
+                            <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>
                             <FileEditorButton />
                         </Stack>
                     </FormControl>
