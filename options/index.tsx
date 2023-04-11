@@ -99,7 +99,7 @@ function OptionsPage() {
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
                         <Stack spacing={2} direction="row">
-                            <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>
+                            <Button variant="contained" onClick={() => loadRime()} disabled={engineStatus.loading}>重新启动 RIME 引擎</Button>
                             <FileEditorButton />
                         </Stack>
                     </FormControl>
