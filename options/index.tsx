@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack } from "@mui/material";
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
@@ -68,19 +68,13 @@ const fuzzyMap = [
 ];
 
 function OptionsPage() {
-    const state = {
-        currentFuzzy: [],
-        snackbarOpen: false,
-        snackbarText: "",
-        pageSize: "",
-    };
-
-    const { currentFuzzy, pageSize } = state;
     let snackbarOpen = false;
     let snackbarText = "";
 
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, schemaList: [] as RimeSchema[], currentSchema: "" as string });
     const [tempStatus, setTempStatus] = useState<typeof engineStatus>(null);
+    const [rimeLogs, setRimeLogs] = useState<string[]>([]);
+    const logTextArea = useRef<HTMLTextAreaElement>();
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
@@ -93,15 +87,30 @@ function OptionsPage() {
         }
     }
 
+    async function updateRimeLogs() {
+        const result = await sendToBackground({
+            name: "GetRimeLogs"
+        });
+        setRimeLogs(result.logs);
+    }
+
+    useEffect(() => {
+        // Scroll textarea to bottom on log update
+        const area = logTextArea.current;
+        area.scrollTop = area.scrollHeight;
+    }, [rimeLogs]);
+
     useEffect(() => {
         console.log("Begin use effect");
         // update RIME status upon loading
         updateRimeStatus();
+        updateRimeLogs();
 
         const listener = (m, s, resp) => {
-            console.log("FG Received message: ", m);
             if (m.rimeStatusChanged) {
                 updateRimeStatus();
+            } else if (m.rimeLog) {
+                setRimeLogs(rimeLogs => [...rimeLogs, m.rimeLog]);
             }
         }
         chrome.runtime.onMessage.addListener(listener)
@@ -164,13 +173,10 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
-                        {engineStatus.loaded &&
-                            <div>
-                                <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>
-                            </div>}
-                        <div>
+                        <Stack spacing={2} direction="row">
+                            {engineStatus.loaded && <Button variant="contained" onClick={() => loadRime()}>重新启动 RIME 引擎</Button>}
                             <FileEditorButton />
-                        </div>
+                        </Stack>
                     </FormControl>
                 </div>
             </div>
@@ -203,6 +209,15 @@ function OptionsPage() {
                     </div>
                 </div>
             }
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>RIME 引擎日志</div>
+                        <textarea readOnly value={rimeLogs.join("\n")} rows={10} ref={logTextArea}></textarea>
+                    </FormControl>
+                </div>
+            </div>
+
             <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
             <Snackbar
                 anchorOrigin={{

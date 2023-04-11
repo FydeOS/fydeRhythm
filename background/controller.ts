@@ -29,7 +29,12 @@ export class InputController {
     loadMutex: Mutex;
     inputCache: string[];
 
+    rimeLogBuffer: string[];
+    rimeLogBufferPos: number;
+
     constructor() {
+        this.rimeLogBuffer = new Array<string>(400);
+        this.rimeLogBufferPos = 0;
         this.engineId = null;
         this.engine = null;
         this.context = null;
@@ -67,6 +72,29 @@ export class InputController {
         });
     }
 
+    printErr(err: string) {
+        this.rimeLogBuffer[this.rimeLogBufferPos] = err;
+        this.rimeLogBufferPos++;
+        this.rimeLogBufferPos %= this.rimeLogBuffer.length;
+        chrome.runtime.sendMessage({ rimeLog: err }, {}, () => {
+            // Prevent printing "Could not establish connection. Receiving end does not exist." 
+            // error message when options page is not open
+            chrome.runtime.lastError;
+        });
+    }
+
+    getLogs(): string[] {
+        const result = [];
+        let i = this.rimeLogBufferPos;
+        do {
+            if (this.rimeLogBuffer[i] != undefined) {
+                result.push(this.rimeLogBuffer[i]);
+            }
+            i = (i + 1) % this.rimeLogBuffer.length;
+        } while (i != this.rimeLogBufferPos);
+        return result;
+    }
+
     async loadRime(maintenance: boolean = false) {
         if (this.engineId) {
             this.resetUI();
@@ -96,7 +124,7 @@ export class InputController {
 
             await new Promise(r => setTimeout(r, 10));
 
-            await engine.initialize();
+            await engine.initialize(this.printErr.bind(this));
             if (maintenance) {
                 await engine.performMaintenance();
             }

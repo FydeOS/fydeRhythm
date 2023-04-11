@@ -88,7 +88,7 @@ export class RimeEngine {
         this.initialized = false;
     }
 
-    async initialize() {
+    async initialize(printErr: (string) => void) {
         await this.mutex.runExclusive(async () => {
             if (!this.initialized) {
                 const fs = await getFs();
@@ -97,7 +97,8 @@ export class RimeEngine {
                         return '/assets/' + path;
                     },
                     fsc: fs,
-                    idb: { openDB, deleteDB }
+                    idb: { openDB, deleteDB },
+                    printErr,
                 })
                 await this.wasmObject.rimeSetup();
                 this.initialized = true;
