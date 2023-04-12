@@ -43,5 +43,5 @@ export function getFileName(path) {
 export interface ImeSettings {
     schema: string;
     pageSize: number;
-    extraAlgebras: string[];
+    algebraList: string[];
 }

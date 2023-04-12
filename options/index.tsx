@@ -10,27 +10,40 @@ import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
+import type { ImeSettings } from "~utils";
+
+const schemaList = [
+    { id: "rime_ice", name: "雾凇拼音" },
+    { id: "double_pinyin", name: "自然码双拼" },
+    { id: "double_pinyin_flypy", name: "小鹤双拼" },
+    { id: "double_pinyin_mspy", name: "微软双拼" },
+];
 
 function OptionsPage() {
     let snackbarOpen = false;
     let snackbarText = "";
 
-    const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, schemaList: [] as RimeSchema[], currentSchema: "" as string });
-    const [tempStatus, setTempStatus] = useState<typeof engineStatus>(null);
+    const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
+    const [imeSettings, setImeSettings] = useState<ImeSettings>({schema: null, pageSize: 5, algebraList: []});
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
             name: "GetEngineStatus"
         });
         setEngineStatus(result);
-        if (!result.loading) {
-            setTempStatus(null);
+    }
+
+    async function loadSettings() {
+        const obj = await chrome.storage.sync.get(["settings"]);
+        if (obj.settings) {
+            setImeSettings(obj.settings);
         }
     }
 
     useEffect(() => {
         // update RIME status upon loading
         updateRimeStatus();
+        loadSettings();
 
         const listener = (m, s, resp) => {
             if (m.rimeStatusChanged) {
@@ -39,8 +52,16 @@ function OptionsPage() {
         }
         chrome.runtime.onMessage.addListener(listener)
 
+        const settingsChangeListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+            if (changes.settings) {
+                setImeSettings(changes.settings.newValue);
+            }
+        };
+        chrome.storage.sync.onChanged.addListener(settingsChangeListener);
+
         return () => {
             chrome.runtime.onMessage.removeListener(listener);
+            chrome.storage.sync.onChanged.removeListener(settingsChangeListener);
         }
     }, []);
 
@@ -51,25 +72,16 @@ function OptionsPage() {
     }
 
     async function changeSchema(id: string) {
-        const newStatus = Object.assign({}, engineStatus);
-        newStatus.currentSchema = id;
-        setTempStatus(newStatus);
-        await sendToBackground({
-            name: "SetSchema",
-            body: {
-                id: id
-            }
-        });
+        const newSettings = Object.assign({}, imeSettings, {schema: id});
+        await chrome.storage.sync.set({settings: newSettings});
+        setImeSettings(newSettings);
+        await loadRime();
     }
 
-    const engineStatusDisplay = tempStatus ?? engineStatus;
+    const engineStatusDisplay = engineStatus;
 
     let engineStatusString: string = "未启动";
-    if (tempStatus && engineStatus.loading) {
-        engineStatusString = "启动中";
-        snackbarText = "正在应用配置...";
-        snackbarOpen = true;
-    } else if (engineStatus.loading) {
+    if (engineStatus.loading) {
         engineStatusString = "启动中";
         snackbarText = "正在启动 RIME 引擎...";
         snackbarOpen = true;
@@ -105,35 +117,32 @@ function OptionsPage() {
                     </FormControl>
                 </div>
             </div>
-            {
-                engineStatusDisplay.schemaList.length > 0 &&
-                <div className={styles.formGroup}>
-                    <div className={styles.formBox}>
-                        <FormControl className={styles.formControl}>
-                            <div className={styles.formLabel}>选择输入方案</div>
-                            <FormGroup>
-                                <RadioGroup
-                                    value={engineStatusDisplay.currentSchema}
-                                    onChange={async (e) => changeSchema(e.target.value)}
-                                    name="schema"
-                                    row
-                                >
-                                    {
-                                        engineStatusDisplay.schemaList.map((schema) =>
-                                            <FormControlLabel
-                                                control={<Radio />}
-                                                value={schema.id}
-                                                label={schema.name}
-                                                key={"schema" + schema.id}
-                                            />
-                                        )
-                                    }
-                                </RadioGroup>
-                            </FormGroup>
-                        </FormControl>
-                    </div>
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>选择输入方案</div>
+                        <FormGroup>
+                            <RadioGroup
+                                value={imeSettings.schema}
+                                onChange={async (e) => changeSchema(e.target.value)}
+                                name="schema"
+                                row
+                            >
+                                {
+                                    schemaList.map((schema) =>
+                                        <FormControlLabel
+                                            control={<Radio />}
+                                            value={schema.id}
+                                            label={schema.name}
+                                            key={"schema" + schema.id}
+                                        />
+                                    )
+                                }
+                            </RadioGroup>
+                        </FormGroup>
+                    </FormControl>
                 </div>
-            }
+            </div>
 
             <RimeLogDisplay />
 

@@ -132,14 +132,14 @@ export class InputController {
             schemaConfig.menu = {};
         }
         schemaConfig.menu.page_size = settings.pageSize;
-        if (settings.extraAlgebras.length > 0) {
+        if (settings.algebraList.length > 0) {
             if (!schemaConfig.speller) {
                 schemaConfig.speller = {};
             }
             if (!schemaConfig.speller.algebra) {
                 schemaConfig.speller.algebra = [];
             }
-            schemaConfig.speller.algebra.push(...settings.extraAlgebras);
+            schemaConfig.speller.algebra.push(...settings.algebraList);
         }
         return stringify(schemaConfig);
     }
