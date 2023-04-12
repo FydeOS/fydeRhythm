@@ -6,7 +6,6 @@ const handler: PlasmoMessaging.MessageHandler = async (req, res) => {
     let schemaList = [];
     let currentSchema = "";
     if (loaded && !loading) {
-        schemaList = await self.controller.engine?.getSchemaList();
         currentSchema = await self.controller.session?.getCurrentSchema();
     }
     res.send({ loading, loaded, schemaList, currentSchema });

@@ -39,3 +39,9 @@ export function getFileName(path) {
     const match = regex.exec(path);
     return match ? match[1] : null;
 }
+
+export interface ImeSettings {
+    schema: string;
+    pageSize: number;
+    extraAlgebras: string[];
+}

@@ -1,5 +1,8 @@
 import { Mutex } from "async-mutex";
+import { getFs, ImeSettings } from "~utils";
 import { RimeEngine, RimeSession } from "./engine";
+import { parse, stringify } from 'yaml'
+import { fstat } from "fs";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -120,7 +123,28 @@ export class InputController {
         }
     }
 
-    async loadRime(maintenance: boolean = false) {
+    async loadRimeConfig(settings: ImeSettings): Promise<string> {
+        const fs = await getFs();
+        const schemaConfigBuffer = await fs.readWholeFile(`/root/build/${settings.schema}.schema.yaml`);
+        const schemaConfigString = new TextDecoder().decode(schemaConfigBuffer);
+        const schemaConfig = parse(schemaConfigString);
+        if (!schemaConfig.menu) {
+            schemaConfig.menu = {};
+        }
+        schemaConfig.menu.page_size = settings.pageSize;
+        if (settings.extraAlgebras.length > 0) {
+            if (!schemaConfig.speller) {
+                schemaConfig.speller = {};
+            }
+            if (!schemaConfig.speller.algebra) {
+                schemaConfig.speller.algebra = [];
+            }
+            schemaConfig.speller.algebra.push(...settings.extraAlgebras);
+        }
+        return stringify(schemaConfig);
+    }
+
+    async loadRime() {
         if (this.engineId) {
             this.resetUI();
         }
@@ -129,11 +153,15 @@ export class InputController {
             // If RIME is already loading, just wait for it to complete
             await this.loadMutex.waitForUnlock();
             // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
-            if (!maintenance) {
-                return;
-            }
+            return;
         }
         console.log("Loading RIME engine...");
+        const configObj = await chrome.storage.sync.get(["settings"]);
+        if (!configObj.settings) {
+            console.error("Could not find RIME settings.");
+            return;
+        }
+        const settings = configObj.settings as ImeSettings;
         await this.loadMutex.runExclusive(async () => {
             if (this.engine) {
                 if (this.session) {
@@ -150,10 +178,8 @@ export class InputController {
             await new Promise(r => setTimeout(r, 10));
 
             await engine.initialize(this.printErr.bind(this));
-            if (maintenance) {
-                await engine.performMaintenance();
-            }
-            const session = await engine.createSession();
+            const config = await this.loadRimeConfig(settings);
+            const session = await engine.createSession(settings.schema, config);
             await this.flushInputCacheToSession(session);
             this.engine = engine;
             this.session = session;
@@ -352,7 +378,7 @@ export class InputController {
                 return handled;
             })();
         } else {
-            if (!release) {
+            if (!release && this.loadMutex.isLocked()) {
                 // RIME is loading
                 if (keyData.key.length > 1 && this.inputCache.length > 0) {
                     if (keyData.code == "Backspace") {
@@ -379,21 +405,10 @@ export class InputController {
                     this.inputCache.push(char);
                 }
                 return this.refreshContext().then(() => true);
+            } else {
+                return false;
             }
         }
-    }
-
-    async selectSchema(id: string): Promise<void> {
-        this.resetUI();
-        await this.loadMutex.runExclusive(async () => {
-            if (this.session) {
-                this.notifyRimeStatusChanged();
-                await this.session.selectSchema(id);
-                await this.flushInputCacheToSession(this.session);
-                this.refreshContext();
-                this.notifyRimeStatusChanged();
-            }
-        });
     }
 
     async selectCandidate(index: number) {

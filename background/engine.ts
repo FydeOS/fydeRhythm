@@ -3,6 +3,7 @@ import { getFs } from "../utils"
 import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
 import type { RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
+import type { Schema } from "yaml";
 
 export class RimeSession {
     engine: RimeEngine;
@@ -52,14 +53,6 @@ export class RimeSession {
         });
     }
 
-    async selectSchema(newSchema: string): Promise<void> {
-        await this.engine.mutex.runExclusive(async () => {
-            const s = await this.wasmSession.selectSchema(newSchema);
-            if (!s)
-                throw new Error("Cannot set current schema");
-        });
-    }
-
     async actionCandidateOnCurrentPage(index: number, op: 'select' | 'delete'): Promise<void> {
         await this.engine.mutex.runExclusive(async () => {
             let action: number;
@@ -106,12 +99,12 @@ export class RimeEngine {
         })
     }
 
-    async createSession(): Promise<RimeSession> {
+    async createSession(schemaId: string, schemaConfig: string): Promise<RimeSession> {
         return await this.mutex.runExclusive(async () => {
             console.log("Creating session")
             const newSession = new this.wasmObject.RimeSession();
             console.log("Initializing session");
-            await newSession.initialize();
+            await newSession.initialize(schemaId, schemaConfig);
             return new RimeSession(newSession, this);
         });
     }

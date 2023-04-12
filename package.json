@@ -1,7 +1,7 @@
 {
   "name": "fyde-rhythm",
   "displayName": "FydeRhythm 2",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "The FydeRhythm input method",
   "author": "fydeos",
   "packageManager": "npm@8.19.3",
@@ -29,7 +29,8 @@
     "react-dom": "18.2.0",
     "react-icons": "^4.8.0",
     "unzipit": "^1.4.2",
-    "use-file-picker": "^1.5.2"
+    "use-file-picker": "^1.5.2",
+    "yaml": "^2.2.1"
   },
   "devDependencies": {
     "@plasmohq/prettier-plugin-sort-imports": "3.6.3",
@@ -62,6 +63,7 @@
       "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
     },
     "permissions": [
+      "storage",
       "unlimitedStorage",
       "input"
     ],
