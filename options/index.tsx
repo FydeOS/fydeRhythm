@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider } from "@mui/material";
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
@@ -19,12 +19,14 @@ const schemaList = [
     { id: "double_pinyin_mspy", name: "微软双拼" },
 ];
 
+const kDefaultSettings = { schema: null, pageSize: 5, algebraList: [] };
+
 function OptionsPage() {
     let snackbarOpen = false;
     let snackbarText = "";
 
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
-    const [imeSettings, setImeSettings] = useState<ImeSettings>({schema: null, pageSize: 5, algebraList: []});
+    const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
@@ -66,19 +68,16 @@ function OptionsPage() {
     }, []);
 
     async function loadRime() {
+        await chrome.storage.sync.set({ settings: imeSettings });
         await sendToBackground({
             name: "ReloadRime",
         });
     }
 
-    async function changeSchema(id: string) {
-        const newSettings = Object.assign({}, imeSettings, {schema: id});
-        await chrome.storage.sync.set({settings: newSettings});
+    function changeSettings(change: any) {
+        const newSettings = Object.assign({}, imeSettings, change);
         setImeSettings(newSettings);
-        await loadRime();
     }
-
-    const engineStatusDisplay = engineStatus;
 
     let engineStatusString: string = "未启动";
     if (engineStatus.loading) {
@@ -124,7 +123,7 @@ function OptionsPage() {
                         <FormGroup>
                             <RadioGroup
                                 value={imeSettings.schema}
-                                onChange={async (e) => changeSchema(e.target.value)}
+                                onChange={async (e) => changeSettings({schema: e.target.value})}
                                 name="schema"
                                 row
                             >
@@ -140,6 +139,23 @@ function OptionsPage() {
                                 }
                             </RadioGroup>
                         </FormGroup>
+                    </FormControl>
+                </div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>每页候选词个数</div>
+                        <Slider
+                            value={imeSettings.pageSize}
+                            onChange={(e, v) => changeSettings({pageSize: v})}
+                            valueLabelDisplay="auto"
+                            step={1}
+                            marks
+                            min={3}
+                            max={9}
+                        />
                     </FormControl>
                 </div>
             </div>
