@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider, Checkbox } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider, Checkbox, TextField, IconButton } from "@mui/material";
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
@@ -12,6 +12,9 @@ import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
 import type { ImeSettings } from "~utils";
 import _ from "lodash";
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import { SpatialAudioRounded } from "@mui/icons-material";
 
 const schemaList = [
     { id: "rime_ice", name: "雾凇拼音" },
@@ -197,19 +200,48 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>每页候选词个数 {imeSettings.pageSize}</div>
-                        <Slider
-                            value={imeSettings.pageSize}
-                            onChange={(e, v) => changeSettings({ pageSize: v })}
-                            valueLabelDisplay="auto"
-                            step={1}
-                            marks={getArray(kMinPageSize, kMaxPageSize)}
-                            min={kMinPageSize}
-                            max={kMaxPageSize}
-                        />
+                        <div className={styles.pageSize}>
+                            <div className={styles.formLabel}>单页候选词数量</div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+                                <IconButton onClick={() => {
+                                    const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
+                                    if (s > kMinPageSize) { changeSettings({ pageSize: s - 1 }) }
+                                }}>
+                                    <RemoveIcon />
+                                </IconButton>
+
+                                <TextField
+                                    className={styles.input}
+                                    id="outlined-basic"
+                                    variant="outlined"
+                                    value={imeSettings.pageSize?.toString() ?? ""}
+                                    onChange={e => {
+                                        let v = e.target.value;
+                                        if (v.length >= 2) {
+                                            v = v.substring(v.length - 1);
+                                        }
+                                        let val = parseInt(v);
+                                        if (!isNaN(val) && val >= kMinPageSize && val <= kMaxPageSize) {
+                                            changeSettings({ pageSize: val });
+                                        } else if (v.length == 0) {
+                                            changeSettings({ pageSize: null });
+                                        }
+                                    }}
+                                />
+
+                                <IconButton onClick={() => {
+                                    const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
+                                    if (s < kMaxPageSize) { changeSettings({ pageSize: s + 1 }) }
+                                }}>
+                                    <AddIcon />
+                                </IconButton>
+                            </div>
+                        </div>
                     </FormControl>
                 </div>
             </div>
+
 
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
