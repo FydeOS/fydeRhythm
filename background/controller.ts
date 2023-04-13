@@ -139,12 +139,14 @@ export class InputController {
             if (!schemaConfig.speller.algebra) {
                 schemaConfig.speller.algebra = [];
             }
-            schemaConfig.speller.algebra.push(...settings.algebraList);
+            for (const a of settings.algebraList) {
+                schemaConfig.speller.algebra.push(a);
+            }
         }
         return stringify(schemaConfig);
     }
 
-    async loadRime() {
+    async loadRime(rebuildPrism: boolean) {
         if (this.engineId) {
             this.resetUI();
         }
@@ -153,7 +155,9 @@ export class InputController {
             // If RIME is already loading, just wait for it to complete
             await this.loadMutex.waitForUnlock();
             // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
-            return;
+            if (!rebuildPrism) {
+                return;
+            }
         }
         console.log("Loading RIME engine...");
         const configObj = await chrome.storage.sync.get(["settings"]);
@@ -179,6 +183,9 @@ export class InputController {
 
             await engine.initialize(this.printErr.bind(this));
             const config = await this.loadRimeConfig(settings);
+            if (rebuildPrism) {
+                await engine.rebuildPrism(settings.schema, config);
+            }
             const session = await engine.createSession(settings.schema, config);
             await this.flushInputCacheToSession(session);
             this.engine = engine;

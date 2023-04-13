@@ -4,7 +4,7 @@ import { serviceWorkerKeepalive } from "./keepalive";
 
 self.controller = new InputController();
 // Load engine (no need to wait for it to complete)
-self.controller.loadRime();
+self.controller.loadRime(false);
 
 chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     self.controller.engineId = engineId;

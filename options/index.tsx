@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider, Checkbox } from "@mui/material";
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
@@ -11,12 +11,40 @@ import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
 import type { ImeSettings } from "~utils";
+import _ from "lodash";
 
 const schemaList = [
     { id: "rime_ice", name: "雾凇拼音" },
     { id: "double_pinyin", name: "自然码双拼" },
     { id: "double_pinyin_flypy", name: "小鹤双拼" },
     { id: "double_pinyin_mspy", name: "微软双拼" },
+];
+
+const kFuzzyMap = [
+    {
+        value: "derive/^([zcs])h/$1/",
+        label: "zh, ch, sh => z, c, s"
+    },
+    {
+        value: "derive/^([zcs])([^h])/$1h$2/",
+        label: "z, c, s => zh, ch, sh"
+    },
+    {
+        value: "derive/^n/l/",
+        label: "n => l"
+    },
+    {
+        value: "derive/^l/n/",
+        label: "l => n"
+    },
+    {
+        value: "derive/([ei])n$/$1ng/",
+        label: "en => eng, in => ing"
+    },
+    {
+        value: "derive/([ei])ng$/$1n/",
+        label: "eng => en, ing => in"
+    }
 ];
 
 const kDefaultSettings = { schema: null, pageSize: 5, algebraList: [] };
@@ -27,6 +55,7 @@ function OptionsPage() {
 
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
+    const [settingsDirty, setSettingsDirty] = useState(false);
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
@@ -68,6 +97,7 @@ function OptionsPage() {
     }, []);
 
     async function loadRime() {
+        setSettingsDirty(false);
         await chrome.storage.sync.set({ settings: imeSettings });
         await sendToBackground({
             name: "ReloadRime",
@@ -76,7 +106,16 @@ function OptionsPage() {
 
     function changeSettings(change: any) {
         const newSettings = Object.assign({}, imeSettings, change);
+        setSettingsDirty(true);
         setImeSettings(newSettings);
+    }
+
+    function changeFuzzy(chk: boolean, val: string) {
+        if (chk) {
+            changeSettings({ algebraList: _.uniq([...imeSettings.algebraList, val]) });
+        } else {
+            changeSettings({ algebraList: imeSettings.algebraList.filter(a => a != val) });
+        }
     }
 
     let engineStatusString: string = "未启动";
@@ -86,6 +125,14 @@ function OptionsPage() {
         snackbarOpen = true;
     } else if (engineStatus.loaded) {
         engineStatusString = "就绪";
+    }
+
+    const kMinPageSize = 3, kMaxPageSize = 9;
+    function getArray(start, end) {
+        return Array.from(Array(end - start + 1).keys()).map(i => ({
+            value: i + start,
+            label: (i + start).toString()
+        }))
     }
 
     return <ThemeProvider theme={theme}>
@@ -110,10 +157,11 @@ function OptionsPage() {
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
                         <Stack spacing={2} direction="row">
-                            <Button variant="contained" onClick={() => loadRime()} disabled={engineStatus.loading}>重新启动 RIME 引擎</Button>
+                            <Button variant="contained" onClick={() => loadRime()} disabled={engineStatus.loading}>保存设置，重新启动 RIME 引擎</Button>
                             <FileEditorButton />
                         </Stack>
                     </FormControl>
+                    {settingsDirty && <p style={{color: "red"}}>设置已经修改，请点击保存按钮</p>}
                 </div>
             </div>
             <div className={styles.formGroup}>
@@ -123,7 +171,7 @@ function OptionsPage() {
                         <FormGroup>
                             <RadioGroup
                                 value={imeSettings.schema}
-                                onChange={async (e) => changeSettings({schema: e.target.value})}
+                                onChange={async (e) => changeSettings({ schema: e.target.value })}
                                 name="schema"
                                 row
                             >
@@ -146,16 +194,42 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>每页候选词个数</div>
+                        <div className={styles.formLabel}>每页候选词个数 {imeSettings.pageSize}</div>
                         <Slider
                             value={imeSettings.pageSize}
-                            onChange={(e, v) => changeSettings({pageSize: v})}
+                            onChange={(e, v) => changeSettings({ pageSize: v })}
                             valueLabelDisplay="auto"
                             step={1}
-                            marks
-                            min={3}
-                            max={9}
+                            marks={getArray(kMinPageSize, kMaxPageSize)}
+                            min={kMinPageSize}
+                            max={kMaxPageSize}
                         />
+                    </FormControl>
+                </div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>设置模糊音</div>
+                        <FormGroup row>
+                            {
+                                kFuzzyMap.map((fuzzy) =>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                value={fuzzy.value}
+                                                name={fuzzy.label}
+                                                checked={imeSettings.algebraList.includes(fuzzy.value)}
+                                                onChange={async (e) => changeFuzzy(e.target.checked, e.target.value)}
+                                            />
+                                        }
+                                        label={fuzzy.label}
+                                        key={fuzzy.value}
+                                    />
+                                )
+                            }
+                        </FormGroup>
                     </FormControl>
                 </div>
             </div>

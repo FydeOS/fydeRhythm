@@ -99,6 +99,12 @@ export class RimeEngine {
         })
     }
 
+    async rebuildPrism(schemaId: string, schemaConfig: string): Promise<void> {
+        await this.mutex.runExclusive(async () => {
+            await this.wasmObject.rimeRebuildPrismForSchema(schemaId, schemaConfig);
+        });
+    }
+
     async createSession(schemaId: string, schemaConfig: string): Promise<RimeSession> {
         return await this.mutex.runExclusive(async () => {
             console.log("Creating session")
