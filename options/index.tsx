@@ -137,7 +137,7 @@ function OptionsPage() {
 
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
-            <div style={{ position: 'fixed', top: 30, left: 30 }}>
+            <div style={{ position: 'absolute', top: 30, left: 30 }}>
                 <object type="image/svg+xml" data="/assets/logo.svg"></object>
             </div>
             <div className={styles.bgBlock}>
