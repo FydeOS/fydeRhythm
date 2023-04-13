@@ -52,7 +52,8 @@
           "assets/rime_emscripten.wasm",
           "assets/lz4_wasm_bg.wasm",
           "assets/monaco/**",
-          "assets/unzipit-worker.min.js"
+          "assets/unzipit-worker.min.js",
+          "assets/logo.svg"
         ],
         "matches": [
           "https://www.plasmo.com/*"

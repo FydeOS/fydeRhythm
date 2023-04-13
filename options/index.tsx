@@ -137,6 +137,9 @@ function OptionsPage() {
 
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
+            <div style={{ position: 'fixed', top: 30, left: 30 }}>
+                <object type="image/svg+xml" data="/assets/logo.svg"></object>
+            </div>
             <div className={styles.bgBlock}>
                 <div className={styles.leftTop1} />
                 <div className={styles.leftTop2} />
@@ -161,7 +164,7 @@ function OptionsPage() {
                             <FileEditorButton />
                         </Stack>
                     </FormControl>
-                    {settingsDirty && <p style={{color: "red"}}>设置已经修改，请点击保存按钮</p>}
+                    {settingsDirty && <p style={{ color: "red" }}>设置已经修改，请点击保存按钮</p>}
                 </div>
             </div>
             <div className={styles.formGroup}>
