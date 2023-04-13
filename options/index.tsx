@@ -164,7 +164,7 @@ function OptionsPage() {
                             <FileEditorButton />
                         </Stack>
                     </FormControl>
-                    {settingsDirty && <p style={{ color: "red" }}>设置已经修改，请点击保存按钮</p>}
+                    {settingsDirty && <p style={{ color: "red" }}>设置已经修改，请点击保存按钮（这个后面可以改成这样：修改设置后在页面底部弹出一条提示保存的横条，把保存按钮移动到里面去）</p>}
                 </div>
             </div>
             <div className={styles.formGroup}>
