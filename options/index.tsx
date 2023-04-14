@@ -1,7 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import theme from "./theme"
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, RadioGroup, FormGroup, Button, Snackbar, Stack, Slider, Checkbox, TextField, IconButton } from "@mui/material";
+import { FormControl, FormControlLabel, Radio, FormGroup, Button, Snackbar, Stack, Checkbox, TextField, IconButton } from "@mui/material";
+import ListItem from '@mui/material/ListItem';
+import List from '@mui/material/List';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+
 import * as styles from "./styles.module.less";
 import "./global.css";
 import Animation from "./utils/animation";
@@ -14,13 +19,16 @@ import type { ImeSettings } from "~utils";
 import _ from "lodash";
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import { SpatialAudioRounded } from "@mui/icons-material";
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 
 const schemaList = [
-    { id: "rime_ice", name: "雾凇拼音" },
-    { id: "double_pinyin", name: "自然码双拼" },
-    { id: "double_pinyin_flypy", name: "小鹤双拼" },
-    { id: "double_pinyin_mspy", name: "微软双拼" },
+    { id: "pinyin_simp", name: "袖珍简化字拼音", description: "内置方案", downloaded: true },
+    { id: "rime_ice", name: "雾凇拼音", description: "雾凇拼音 - 全拼", downloaded: true },
+    { id: "double_pinyin", name: "自然码双拼", description: "雾凇拼音 - 自然码双拼", downloaded: false },
+    { id: "double_pinyin_flypy", name: "小鹤双拼", description: "雾凇拼音 - 小鹤双拼", downloaded: true },
+    { id: "double_pinyin_mspy", name: "微软双拼", description: "雾凇拼音 - 微软双拼", downloaded: false },
+    { id: "wubi86_jidian", name: "极点五笔 86", description: "五笔字形 86 极点极爽版", downloaded: false },
+    { id: "cangjie5", name: "倉頡五代", description: "第五代倉頡輸入法", downloaded: false },
 ];
 
 const kFuzzyMap = [
@@ -174,25 +182,22 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>选择输入方案</div>
-                        <FormGroup>
-                            <RadioGroup
-                                value={imeSettings.schema}
-                                onChange={async (e) => changeSettings({ schema: e.target.value })}
-                                name="schema"
-                                row
-                            >
-                                {
-                                    schemaList.map((schema) =>
-                                        <FormControlLabel
-                                            control={<Radio />}
-                                            value={schema.id}
-                                            label={schema.name}
-                                            key={"schema" + schema.id}
-                                        />
-                                    )
-                                }
-                            </RadioGroup>
-                        </FormGroup>
+                        <List>
+                            {schemaList.map((schema) =>
+                                <ListItem key={schema.id} disablePadding>
+                                    <ListItemIcon>
+                                        {schema.downloaded ?
+                                            <Radio
+                                                checked={imeSettings.schema == schema.id}
+                                                tabIndex={-1}
+                                            /> :
+                                            <IconButton>
+                                                <CloudDownloadIcon />
+                                            </IconButton>}
+                                    </ListItemIcon>
+                                    <ListItemText primary={schema.name} secondary={schema.description} />
+                                </ListItem>)}
+                        </List>
                     </FormControl>
                 </div>
             </div>
