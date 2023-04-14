@@ -87,18 +87,9 @@ export default createTheme({
       MuiRadio: {
         styleOverrides: {
           root: {
-            top: "-1px",
-            padding: 0,
-            marginRight: "8px",
-            width: "16px",
-            height: "16px",
-            transform: "scale(.7)",
             "&.Mui-checked": {
               color: "rgba(228, 0, 70, 1)"
             },
-            "&+.MuiTypography-root": {
-              fontSize: "12px"
-            }
           }
         }
       },
