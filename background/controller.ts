@@ -176,10 +176,9 @@ export class InputController {
                 this.notifyRimeStatusChanged();
             }
 
-            const engine = new RimeEngine();
-
             await new Promise(r => setTimeout(r, 10));
 
+            const config = await this.loadRimeConfig(settings);
             const fs = await getFs();
             const dirs = ['/root/build', '/root/shared', '/root/user'];
             for (const d of dirs) {
@@ -187,15 +186,21 @@ export class InputController {
                     await fs.createDirectory(d);
                 }
             }
-
-            await engine.initialize(this.printErr.bind(this), fs);
-            const config = await this.loadRimeConfig(settings);
             if (maintenance) {
-                await engine.rebuildPrism(settings.schema, config);
                 if (config.includes("lua_")) {
                     const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
                     await fs.writeWholeFile("/root/user/rime.lua", luaContent);
                 }
+                // TODO: add GUI for switch key config
+                await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
+                    { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
+                )));
+            }
+
+            const engine = new RimeEngine();
+            await engine.initialize(this.printErr.bind(this), fs);
+            if (maintenance) {
+                await engine.rebuildPrism(settings.schema, config);
             }
 
             const session = await engine.createSession(settings.schema, config);
