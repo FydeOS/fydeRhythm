@@ -1,27 +1,39 @@
 import React, { useEffect, useState, useRef } from "react";
-import theme from "./theme"
+import _ from "lodash";
+import axios from "axios";
+import { parse, stringify } from 'yaml'
 import { ThemeProvider } from '@mui/material/styles';
-import { FormControl, FormControlLabel, Radio, FormGroup, Button, Snackbar, Stack, Checkbox, TextField, IconButton } from "@mui/material";
+
+import theme from "./theme"
+import * as styles from "./styles.module.less";
+import "./global.css";
+
+import IconButton from "@mui/material/IconButton";
+import Radio from "@mui/material/Radio";
+import FormControl from "@mui/material/FormControl";
+import TextField from "@mui/material/TextField";
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
+import Snackbar from "@mui/material/Snackbar";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import RadioGroup from '@mui/material/RadioGroup'
 import ListItem from '@mui/material/ListItem';
 import List from '@mui/material/List';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 
-import * as styles from "./styles.module.less";
-import "./global.css";
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+
 import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
-import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
 import { getFs, ImeSettings } from "~utils";
-import _ from "lodash";
-import AddIcon from '@mui/icons-material/Add';
-import RemoveIcon from '@mui/icons-material/Remove';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import axios from "axios";
-import { parse, stringify } from 'yaml'
 
 const kFuzzyMap = [
     {
