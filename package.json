@@ -82,5 +82,6 @@
         ]
       }
     ]
-  }
+  },
+  "alias": { "yaml": "node_modules/yaml/browser/dist/index.js" }
 }
