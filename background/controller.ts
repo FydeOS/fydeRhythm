@@ -2,7 +2,6 @@ import { Mutex } from "async-mutex";
 import { getFs, ImeSettings } from "~utils";
 import { RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
-import { fstat } from "fs";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -181,7 +180,15 @@ export class InputController {
 
             await new Promise(r => setTimeout(r, 10));
 
-            await engine.initialize(this.printErr.bind(this));
+            const fs = await getFs();
+            const dirs = ['/root/build', '/root/shared', '/root/user'];
+            for (const d of dirs) {
+                if (!await fs.readEntryRaw(d)) {
+                    await fs.createDirectory(d);
+                }
+            }
+
+            await engine.initialize(this.printErr.bind(this), fs);
             const config = await this.loadRimeConfig(settings);
             if (rebuildPrism) {
                 await engine.rebuildPrism(settings.schema, config);

@@ -4,6 +4,7 @@ import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
 import type { RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
 import type { Schema } from "yaml";
+import type { FastIndexedDbFsController } from "~fs";
 
 export class RimeSession {
     engine: RimeEngine;
@@ -66,7 +67,7 @@ export class RimeSession {
                 throw new Error(`Cannot ${op} candidate ${index}`);
         });
     }
-    
+
     destroy() {
         this.wasmSession.delete();
     }
@@ -81,10 +82,9 @@ export class RimeEngine {
         this.initialized = false;
     }
 
-    async initialize(printErr: (string) => void) {
+    async initialize(printErr: (string) => void, fs: FastIndexedDbFsController) {
         await this.mutex.runExclusive(async () => {
             if (!this.initialized) {
-                const fs = await getFs();
                 this.wasmObject = await CreateRimeWasm({
                     locateFile: (path, dir) => {
                         return '/assets/' + path;
