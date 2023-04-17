@@ -113,15 +113,15 @@ function OptionsPage() {
         }
     }
 
-    async function loadLocalSchemaList(): Promise<void> {
+    async function loadLocalSchemaList(): Promise<string[]> {
         const fs = await getFs();
         const content = await fs.readAll();
         const schemaRegex = /\/root\/build\/(\w+)\.schema\.yaml/g;
         console.log(content.map(c => c.fullPath));
         console.log(content.map(c => [...c.fullPath.matchAll(schemaRegex)]));
         const list = content.map(c => [...c.fullPath.matchAll(schemaRegex)]).filter(c => c.length == 1).map(c => c[0][1].toString());
-        console.log("Local schema: ", list);
         setLocalSchemaList(list);
+        return list;
     }
 
     async function loadSchemaList() {
@@ -348,8 +348,12 @@ function OptionsPage() {
         } catch (ex) {
             console.log(ex);
         } finally {
-            await loadLocalSchemaList();
+            const list = await loadLocalSchemaList();
             setDownloadSchemaId(null);
+
+            if (list.length == 1) {
+                changeSettings({schema: list[0]});
+            }
         }
     }
 
