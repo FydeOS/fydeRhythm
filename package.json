@@ -53,7 +53,8 @@
           "assets/lz4_wasm_bg.wasm",
           "assets/monaco/**",
           "assets/unzipit-worker.min.js",
-          "assets/logo.svg"
+          "assets/logo.svg",
+          "assets/builtin/**"
         ],
         "matches": [
           "https://www.plasmo.com/*"

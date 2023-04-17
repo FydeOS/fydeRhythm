@@ -45,3 +45,5 @@ export interface ImeSettings {
     pageSize: number;
     algebraList: string[];
 }
+
+export const kDefaultSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [] };

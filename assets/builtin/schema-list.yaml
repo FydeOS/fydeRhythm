@@ -1,0 +1,6 @@
+schemas:
+  - id: aurora_pinyin
+    name: 极光拼音
+    description: 轻巧好用的简体拼音输入方案。
+    website: https://github.com/rime/rime-pinyin-simp
+    fuzzy_pinyin: true

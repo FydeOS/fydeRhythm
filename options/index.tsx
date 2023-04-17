@@ -32,7 +32,7 @@ import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { getFs, ImeSettings } from "~utils";
+import { getFs, ImeSettings, kDefaultSettings } from "~utils";
 import CircularProgress from "@mui/material/CircularProgress";
 
 const kFuzzyMap = [
@@ -61,8 +61,6 @@ const kFuzzyMap = [
         label: "eng => en, ing => in"
     }
 ];
-
-const kDefaultSettings = { schema: null, pageSize: 5, algebraList: [] };
 
 interface SchemaDescription {
     id: string;
