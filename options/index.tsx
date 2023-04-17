@@ -15,21 +15,13 @@ import type { RimeSchema } from "~shared-types";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
-import type { ImeSettings } from "~utils";
+import { getFs, ImeSettings } from "~utils";
 import _ from "lodash";
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-
-const schemaList = [
-    { id: "pinyin_simp", name: "袖珍简化字拼音", description: "内置方案", downloaded: true },
-    { id: "rime_ice", name: "雾凇拼音", description: "雾凇拼音 - 全拼", downloaded: true },
-    { id: "double_pinyin", name: "自然码双拼", description: "雾凇拼音 - 自然码双拼", downloaded: false },
-    { id: "double_pinyin_flypy", name: "小鹤双拼", description: "雾凇拼音 - 小鹤双拼", downloaded: true },
-    { id: "double_pinyin_mspy", name: "微软双拼", description: "雾凇拼音 - 微软双拼", downloaded: false },
-    { id: "wubi86_jidian", name: "极点五笔 86", description: "五笔字形 86 极点极爽版", downloaded: false },
-    { id: "cangjie5", name: "倉頡五代", description: "第五代倉頡輸入法", downloaded: false },
-];
+import axios from "axios";
+import { parse, stringify } from 'yaml'
 
 const kFuzzyMap = [
     {
@@ -60,6 +52,19 @@ const kFuzzyMap = [
 
 const kDefaultSettings = { schema: null, pageSize: 5, algebraList: [] };
 
+interface SchemaDescription {
+    id: string;
+    name: string;
+    description: string;
+    website: string;
+    extra_data: boolean | undefined;
+    fuzzy_pinyin: boolean | undefined;
+}
+
+interface SchemaListFile {
+    schemas: SchemaDescription[];
+}
+
 function OptionsPage() {
     let snackbarOpen = false;
     let snackbarText = "";
@@ -67,6 +72,14 @@ function OptionsPage() {
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
     const [settingsDirty, setSettingsDirty] = useState(false);
+
+    const [schemaList, setSchemaList] = useState<SchemaListFile>({schemas: []});
+    const [fetchingList, setFetchingList] = useState<boolean>(false);
+    const [fetchListError, setFetchListError] = useState<string>(null);
+
+    const [localSchemaList, setLocalSchemaList] = useState<string[]>([]);
+
+    // chrome.storage.local.get
 
     async function updateRimeStatus() {
         const result = await sendToBackground({
@@ -82,10 +95,46 @@ function OptionsPage() {
         }
     }
 
+    async function loadLocalSchemaList(): Promise<void> {
+        const fs = await getFs();
+        const content = await fs.readAll();
+        const schemaRegex = /\/root\/build\/(\w+)\.schema\.yaml/g;
+        console.log(content.map(c=>c.fullPath));
+        console.log(content.map(c=>[...c.fullPath.matchAll(schemaRegex)]));
+        const list = content.map(c => [...c.fullPath.matchAll(schemaRegex)]).filter(c => c.length == 1).map(c => c[0][1].toString());
+        console.log("Local schema: ",list);
+        setLocalSchemaList(list);
+    }
+
+    async function loadSchemaList() {
+        const l = await chrome.storage.local.get(["schemaList"]);
+        if (l.schemaList) {
+            setSchemaList(l.schemaList);
+        }
+        setFetchingList(true);
+        let newData: SchemaListFile;
+        try {
+            const text = (await axios.get('https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm/schema-list.yaml', {
+                responseType: 'text',
+            })).data;
+            newData = parse(text);
+        } catch (error) {
+            console.log(error.toString());
+            setFetchListError(error.toString());
+            return;
+        } finally {
+            setFetchingList(false);
+        }
+        setSchemaList(newData);
+        await chrome.storage.local.set({ schemaList: newData });
+    }
+
     useEffect(() => {
         // update RIME status upon loading
         updateRimeStatus();
         loadSettings();
+        loadSchemaList();
+        loadLocalSchemaList();
 
         const listener = (m, s, resp) => {
             if (m.rimeStatusChanged) {
@@ -181,12 +230,12 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>选择输入方案</div>
+                        <div className={styles.formLabel}>选择输入方案{fetchingList ? "（正在刷新列表）" : ""}</div>
                         <List>
-                            {schemaList.map((schema) =>
+                            {schemaList.schemas.map((schema) =>
                                 <ListItem key={schema.id} disablePadding>
                                     <ListItemIcon>
-                                        {schema.downloaded ?
+                                        {localSchemaList.includes(schema.id) ?
                                             <Radio
                                                 checked={imeSettings.schema == schema.id}
                                                 tabIndex={-1}
