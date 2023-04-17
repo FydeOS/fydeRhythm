@@ -343,15 +343,12 @@ function OptionsPage() {
             }
             // Schema should be the last file to be written, in case an error is encountered while downloading
             await fs.writeWholeFile(`/root/${schemaFile}`, new TextEncoder().encode(schemaYaml));
+            changeSettings({schema: id});
         } catch (ex) {
             console.log(ex);
         } finally {
-            const list = await loadLocalSchemaList();
+            await loadLocalSchemaList();
             setDownloadSchemaId(null);
-
-            if (list.length == 1) {
-                changeSettings({schema: list[0]});
-            }
         }
     }
 
