@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { formatBytes, getFileName, getFs } from "~utils";
 import { ExpandMore, ChevronRight } from '@mui/icons-material';
-import { AiFillSetting, AiFillFileText, AiFillFile, AiFillFolder, AiFillHdd, AiFillFileMarkdown } from "react-icons/ai";
+import { AiFillSetting } from '@react-icons/all-files/ai/AiFillSetting'
+import { AiFillFileText } from '@react-icons/all-files/ai/AiFillFileText'
+import { AiFillFile } from '@react-icons/all-files/ai/AiFillFile'
+import { AiFillFolder } from '@react-icons/all-files/ai/AiFillFolder'
+import { AiFillHdd } from '@react-icons/all-files/ai/AiFillHdd'
+import { AiFillFileMarkdown } from '@react-icons/all-files/ai/AiFillFileMarkdown'
 import TreeView from '@mui/lab/TreeView';
 import TreeItem from '@mui/lab/TreeItem';
-import type { IconType } from "react-icons";
+import type { IconType } from "@react-icons/all-files";
 import _ from "lodash";
 import React from "react";
 import Editor, { loader, type Monaco } from "@monaco-editor/react";
