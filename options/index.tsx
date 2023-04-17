@@ -85,7 +85,7 @@ function OptionsPage() {
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
     const [settingsDirty, setSettingsDirty] = useState(false);
 
-    const [schemaList, setSchemaList] = useState<SchemaListFile>({schemas: []});
+    const [schemaList, setSchemaList] = useState<SchemaListFile>({ schemas: [] });
     const [fetchingList, setFetchingList] = useState<boolean>(false);
     const [fetchListError, setFetchListError] = useState<string>(null);
 
@@ -111,10 +111,10 @@ function OptionsPage() {
         const fs = await getFs();
         const content = await fs.readAll();
         const schemaRegex = /\/root\/build\/(\w+)\.schema\.yaml/g;
-        console.log(content.map(c=>c.fullPath));
-        console.log(content.map(c=>[...c.fullPath.matchAll(schemaRegex)]));
+        console.log(content.map(c => c.fullPath));
+        console.log(content.map(c => [...c.fullPath.matchAll(schemaRegex)]));
         const list = content.map(c => [...c.fullPath.matchAll(schemaRegex)]).filter(c => c.length == 1).map(c => c[0][1].toString());
-        console.log("Local schema: ",list);
+        console.log("Local schema: ", list);
         setLocalSchemaList(list);
     }
 
@@ -207,6 +207,10 @@ function OptionsPage() {
         }))
     }
 
+    function currentSchemaInfo(): SchemaDescription | null {
+        return schemaList.schemas.filter(x => x.id == imeSettings.schema)[0] || null;
+    }
+
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
             <div style={{ position: 'absolute', top: 30, left: 30 }}>
@@ -243,22 +247,24 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>选择输入方案{fetchingList ? "（正在刷新列表）" : ""}</div>
-                        <List>
-                            {schemaList.schemas.map((schema) =>
-                                <ListItem key={schema.id} disablePadding>
-                                    <ListItemIcon>
-                                        {localSchemaList.includes(schema.id) ?
-                                            <Radio
-                                                checked={imeSettings.schema == schema.id}
-                                                tabIndex={-1}
-                                            /> :
-                                            <IconButton>
-                                                <CloudDownloadIcon />
-                                            </IconButton>}
-                                    </ListItemIcon>
-                                    <ListItemText primary={schema.name} secondary={schema.description} />
-                                </ListItem>)}
-                        </List>
+                        <RadioGroup
+                            value={imeSettings.schema}
+                            onChange={(e, v) => changeSettings({ schema: v })}
+                        >
+                            <List>
+                                {schemaList.schemas.map((schema) =>
+                                    <ListItem key={schema.id} disablePadding>
+                                        <ListItemIcon>
+                                            {localSchemaList.includes(schema.id) ?
+                                                <Radio value={schema.id} /> :
+                                                <IconButton>
+                                                    <CloudDownloadIcon />
+                                                </IconButton>}
+                                        </ListItemIcon>
+                                        <ListItemText primary={schema.name} secondary={schema.description} />
+                                    </ListItem>)}
+                            </List>
+                        </RadioGroup>
                     </FormControl>
                 </div>
             </div>
@@ -308,8 +314,7 @@ function OptionsPage() {
                 </div>
             </div>
 
-
-            <div className={styles.formGroup}>
+            {currentSchemaInfo()?.fuzzy_pinyin && <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>设置模糊音</div>
@@ -333,7 +338,7 @@ function OptionsPage() {
                         </FormGroup>
                     </FormControl>
                 </div>
-            </div>
+            </div>}
 
             <RimeLogDisplay />
 
