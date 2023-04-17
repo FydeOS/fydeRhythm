@@ -265,7 +265,8 @@ function OptionsPage() {
                 for (const t of schema.engine.translators) {
                     const tn = t.split("@");
                     // Only these two use a dictionary
-                    if (tn[0] == "script_translator" || tn[0] == "table_translator") {
+                    const translators = ["script_translator", "table_translator", "reverse_lookup_translator"];
+                    if (translators.includes(tn[0])) {
                         const ns = tn[1] ?? "translator";
                         const dictName: string = schema[ns].dictionary;
                         if (!dictName) {
