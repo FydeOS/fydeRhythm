@@ -145,7 +145,7 @@ export class InputController {
         return stringify(schemaConfig);
     }
 
-    async loadRime(rebuildPrism: boolean) {
+    async loadRime(maintenance: boolean) {
         if (this.engineId) {
             this.resetUI();
         }
@@ -154,7 +154,7 @@ export class InputController {
             // If RIME is already loading, just wait for it to complete
             await this.loadMutex.waitForUnlock();
             // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
-            if (!rebuildPrism) {
+            if (!maintenance) {
                 return;
             }
         }
@@ -190,9 +190,14 @@ export class InputController {
 
             await engine.initialize(this.printErr.bind(this), fs);
             const config = await this.loadRimeConfig(settings);
-            if (rebuildPrism) {
+            if (maintenance) {
                 await engine.rebuildPrism(settings.schema, config);
+                if (config.includes("lua_")) {
+                    const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
+                    await fs.writeWholeFile("/root/user/rime.lua", luaContent);
+                }
             }
+
             const session = await engine.createSession(settings.schema, config);
             await this.flushInputCacheToSession(session);
             this.engine = engine;

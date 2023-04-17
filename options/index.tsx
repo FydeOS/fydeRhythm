@@ -34,6 +34,7 @@ import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import SchemaPackDownloader from "./schemaPackDownloader";
 import { getFs, ImeSettings } from "~utils";
+import CircularProgress from "@mui/material/CircularProgress";
 
 const kFuzzyMap = [
     {
@@ -77,6 +78,8 @@ interface SchemaListFile {
     schemas: SchemaDescription[];
 }
 
+const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
+
 function OptionsPage() {
     let snackbarOpen = false;
     let snackbarText = "";
@@ -90,6 +93,10 @@ function OptionsPage() {
     const [fetchListError, setFetchListError] = useState<string>(null);
 
     const [localSchemaList, setLocalSchemaList] = useState<string[]>([]);
+
+    const kTotalProgress = 100;
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [downloadSchemaId, setDownloadSchemaId] = useState(null);
 
     // chrome.storage.local.get
 
@@ -126,7 +133,7 @@ function OptionsPage() {
         setFetchingList(true);
         let newData: SchemaListFile;
         try {
-            const text = (await axios.get('https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm/schema-list.yaml', {
+            const text = (await axios.get(`${kRepoUrl}/schema-list.yaml`, {
                 responseType: 'text',
             })).data;
             newData = parse(text);
@@ -200,15 +207,150 @@ function OptionsPage() {
     }
 
     const kMinPageSize = 3, kMaxPageSize = 9;
-    function getArray(start, end) {
-        return Array.from(Array(end - start + 1).keys()).map(i => ({
-            value: i + start,
-            label: (i + start).toString()
-        }))
-    }
-
     function currentSchemaInfo(): SchemaDescription | null {
         return schemaList.schemas.filter(x => x.id == imeSettings.schema)[0] || null;
+    }
+
+    async function downloadSchema(id: string) {
+        try {
+            setDownloadSchemaId(id);
+            setDownloadProgress(0);
+            const schemaFile = `build/${id}.schema.yaml`;
+            const schemaYaml: string = (await axios.get(`${kRepoUrl}/${schemaFile}`, {
+                responseType: 'text',
+            })).data;
+            const schema = parse(schemaYaml);
+
+            const dependencies: Set<string> = new Set();
+
+            if (schemaYaml.includes("lua_")) {
+                dependencies.add(`shared/${id}.rime.lua`);
+            }
+
+            if (schema.engine?.filters) {
+                for (const t of schema.engine.filters) {
+                    const tn = t.split("@");
+                    if (tn[0] == "simplifier") {
+                        const opencc = schema[tn[1] ?? "simplifier"];
+                        const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
+                        dependencies.add(configPath);
+                        const opencc_config = (await axios.get(`${kRepoUrl}/${configPath}`, {
+                            responseType: 'text',
+                        })).data;
+                        const config = JSON.parse(opencc_config);
+
+                        function parseDict(dict) {
+                            if (dict.type === 'ocd2' || dict.type === 'text') {
+                                dependencies.add(`shared/opencc/${dict.file}`);
+                            } else if (dict.type === 'group') {
+                                dict.dicts.forEach(d => parseDict(d));
+                            }
+                        }
+
+                        if (config.segmentation && config.segmentation.dict) {
+                            parseDict(config.segmentation.dict);
+                        }
+
+                        if (config.conversion_chain) {
+                            config.conversion_chain.forEach(step => {
+                                if (step.dict) {
+                                    parseDict(step.dict);
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (schema.engine?.translators) {
+                for (const t of schema.engine.translators) {
+                    const tn = t.split("@");
+                    // Only these two use a dictionary
+                    if (tn[0] == "script_translator" || tn[0] == "table_translator") {
+                        const ns = tn[1] ?? "translator";
+                        const dictName: string = schema[ns].dictionary;
+                        if (!dictName) {
+                            continue;
+                        }
+                        const prismName: string = schema[ns].prism ?? dictName;
+
+                        dependencies.add(`build/${dictName}.table.bin`);
+                        dependencies.add(`build/${dictName}.reverse.bin`);
+                        dependencies.add(`build/${prismName}.prism.bin`);
+                    }
+                }
+            }
+            if (schema.grammar?.language) {
+                dependencies.add(`shared/${schema.grammar.language}.gram`);
+            }
+
+            const kPhase1Weight = 30;
+            const phase2Files = [];
+            const phase2Sizes = [];
+            let phase1Progress = 0;
+
+            const fs = await getFs();
+            // Phase 1: Download small files and get size of big files
+            for (const f of dependencies) {
+                if (await fs.readEntry(`/root/${f}`)) {
+                    // file already exists
+                    console.log(`${f} already exists, skipped`);
+                } else {
+                    let controller = new AbortController();
+                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal });
+                    const size = parseInt(res.headers.get('Content-Length'));
+                    if ((size && size < 70 * 1024) ||
+                        // If response is gzipped, size = NaN
+                        isNaN(size)
+                    ) {
+                        const buf = await res.arrayBuffer();
+                        fs.writeWholeFile(`/root/${f}`, new Uint8Array(buf));
+                        console.log("Downloaded", f);
+                    } else {
+                        phase2Files.push(f);
+                        phase2Sizes.push(size);
+                        controller.abort();
+                        console.log("Checked", f, `Size = ${size}`);
+                    }
+                }
+                phase1Progress++;
+                setDownloadProgress(kPhase1Weight * phase1Progress / dependencies.size);
+            }
+
+            // Phase 2: Download big files
+            let downloadedSize = 0;
+            let phase2LastProgress = 0;
+            let phase2TotalSize = _.sum(phase2Sizes);
+            for (let i = 0; i < phase2Files.length; i++) {
+                const f = phase2Files[i];
+                const res = await fetch(`${kRepoUrl}/${f}`);
+                const reader = res.body.getReader();
+                const buf = new ArrayBuffer(phase2Sizes[i]);
+                let offset = 0;
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = new Uint8Array(buf, offset, value.length);
+                    chunk.set(new Uint8Array(value));
+                    offset += value.length;
+                    downloadedSize += value.length;
+                    let newProgress = kPhase1Weight + (kTotalProgress - kPhase1Weight) * downloadedSize / phase2TotalSize;
+                    if (newProgress - phase2LastProgress > 0.5) {
+                        setDownloadProgress(newProgress);
+                        phase2LastProgress = newProgress;
+                    }
+                }
+                fs.writeWholeFile(`/root/${f}`, new Uint8Array(buf));
+                console.log("Downloaded", f);
+            }
+            // Schema should be the last file to be written, in case an error is encountered while downloading
+            await fs.writeWholeFile(`/root/${schemaFile}`, new TextEncoder().encode(schemaYaml));
+        } catch (ex) {
+            console.log(ex);
+        } finally {
+            await loadLocalSchemaList();
+            setDownloadSchemaId(null);
+        }
     }
 
     return <ThemeProvider theme={theme}>
@@ -255,11 +397,11 @@ function OptionsPage() {
                                 {schemaList.schemas.map((schema) =>
                                     <ListItem key={schema.id} disablePadding>
                                         <ListItemIcon>
-                                            {localSchemaList.includes(schema.id) ?
-                                                <Radio value={schema.id} /> :
-                                                <IconButton>
-                                                    <CloudDownloadIcon />
-                                                </IconButton>}
+                                            {localSchemaList.includes(schema.id) ? <Radio value={schema.id} /> :
+                                                downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
+                                                    <IconButton onClick={() => downloadSchema(schema.id)}>
+                                                        <CloudDownloadIcon />
+                                                    </IconButton>}
                                         </ListItemIcon>
                                         <ListItemText primary={schema.name} secondary={schema.description} />
                                     </ListItem>)}
