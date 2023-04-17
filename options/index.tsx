@@ -32,7 +32,6 @@ import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import SchemaPackDownloader from "./schemaPackDownloader";
 import { getFs, ImeSettings } from "~utils";
 import CircularProgress from "@mui/material/CircularProgress";
 
@@ -372,7 +371,6 @@ function OptionsPage() {
                     height={180}
                 />
             </div>
-            <SchemaPackDownloader />
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
