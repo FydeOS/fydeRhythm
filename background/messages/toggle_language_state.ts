@@ -4,7 +4,8 @@ import type { PlasmoMessaging } from "@plasmohq/messaging"
 
 const handler: PlasmoMessaging.MessageHandler = async (req, res) => {
     const isEnMode: boolean = (req as any).msg;
-    console.log("Is EN mode: ", isEnMode);
+    console.log("Keyboard notify ascii", !isEnMode);
+    self.controller.setAsciiMode(!isEnMode);
 }
 
 export default handler

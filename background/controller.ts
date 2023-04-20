@@ -207,6 +207,12 @@ export class InputController {
             await this.flushInputCacheToSession(session);
             this.engine = engine;
             this.session = session;
+            this.session.addListener('optionChanged', (name: string, val: boolean) => {
+                if (name == "ascii_mode") {
+                    chrome.runtime.sendMessage({name: 'front_toggle_language_state', msg: !val });
+                }
+            });
+            await this.refreshAsciiMode();
             this.notifyRimeStatusChanged();
         });
         await this.refreshContext();
@@ -461,5 +467,25 @@ export class InputController {
             this.lastRightClickItem = index;
             this.lastRightClickTime = curTime;
         }
+    }
+
+    inputViewVisible: boolean;
+
+    async refreshAsciiMode() {
+        // TODO: show ascii mode in menu
+        if (this.inputViewVisible) {
+            const asciiMode = await this.session?.getOption("ascii_mode");
+            console.log("Set keyboard ascii to", asciiMode);
+            chrome.runtime.sendMessage({name: 'front_toggle_language_state', msg: !asciiMode });
+        }
+    }
+
+    async setAsciiMode(isAscii: boolean) {
+        await this.session?.setOption("ascii_mode", isAscii);
+    }
+
+    async handleInputViewVisibilityChanged(visible: boolean) {
+        this.inputViewVisible = visible;
+        this.refreshAsciiMode();
     }
 }

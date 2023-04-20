@@ -5,12 +5,14 @@ import { openDB, deleteDB, unwrap } from "idb";
 import type { RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
 import type { Schema } from "yaml";
 import type { FastIndexedDbFsController } from "~fs";
+import EventEmitter from "events";
 
-export class RimeSession {
+export class RimeSession extends EventEmitter {
     engine: RimeEngine;
     wasmSession: any;
 
     constructor(session: any, engine: RimeEngine) {
+        super();
         this.wasmSession = session;
         this.engine = engine;
     }
@@ -68,6 +70,24 @@ export class RimeSession {
         });
     }
 
+    async setOption(option: string, val: boolean) {
+        await this.engine.mutex.runExclusive(async () => {
+            await this.wasmSession.setOption(option, val);
+        });
+    }
+
+    async getOption(option: string): Promise<boolean> {
+        return await this.engine.mutex.runExclusive(async () => {
+            return await this.wasmSession.getOption(option);
+        });
+    }
+
+    async getOptionLabel(option: string, state: boolean): Promise<string> {
+        return await this.engine.mutex.runExclusive(async () => {
+            return await this.wasmSession.getOptionLabel(option, state);
+        });
+    }
+
     destroy() {
         this.wasmSession.delete();
     }
@@ -110,8 +130,11 @@ export class RimeEngine {
             console.log("Creating session")
             const newSession = new this.wasmObject.RimeSession();
             console.log("Initializing session");
-            await newSession.initialize(schemaId, schemaConfig);
-            return new RimeSession(newSession, this);
+            const session = new RimeSession(newSession, this);
+            await newSession.initialize(schemaId, schemaConfig, (name: string, val: boolean, label: string) => {
+                session.emit('optionChanged', name, val, label);
+            });
+            return session;
         });
     }
 
