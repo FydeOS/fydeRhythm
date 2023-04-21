@@ -1,7 +1,8 @@
 import { Mutex } from "async-mutex";
 import { getFs, ImeSettings } from "~utils";
-import { RimeEngine, RimeSession } from "./engine";
+import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
+import type { RimeCandidate } from "~shared-types";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -43,6 +44,8 @@ export class InputController {
         this.session = null;
         this.inputCache = [];
         this.loadMutex = new Mutex();
+        this.candidateCache = [];
+        this.candidateIterator = null;
     }
 
     get engineLoading(): boolean {
@@ -63,6 +66,7 @@ export class InputController {
         }
         await this.loadMutex.runExclusive(async () => {
             if (this.engine) {
+                this.invalidateCandidateCache();
                 if (this.session) {
                     this.session.destroy();
                     this.session = null;
@@ -111,6 +115,7 @@ export class InputController {
 
     async flushInputCacheToSession(session: RimeSession) {
         if (this.inputCache.length > 0) {
+            this.invalidateCandidateCache();
             const list = this.inputCache;
             this.inputCache = [];
             for (const c of list) {
@@ -167,6 +172,7 @@ export class InputController {
         const settings = configObj.settings as ImeSettings;
         await this.loadMutex.runExclusive(async () => {
             if (this.engine) {
+                this.invalidateCandidateCache();
                 if (this.session) {
                     this.session.destroy();
                     this.session = null;
@@ -209,7 +215,7 @@ export class InputController {
             this.session = session;
             this.session.addListener('optionChanged', (name: string, val: boolean) => {
                 if (name == "ascii_mode") {
-                    chrome.runtime.sendMessage({name: 'front_toggle_language_state', msg: !val });
+                    chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
                 }
             });
             await this.refreshAsciiMode();
@@ -233,6 +239,14 @@ export class InputController {
                 engineID: this.engineId,
                 properties: {
                     visible: false,
+                }
+            });
+        }
+        if (this.inputViewVisible) {
+            chrome.runtime.sendMessage({
+                name: "candidates_back", msg: {
+                    source: "sourcefuck",
+                    candidates: []
                 }
             });
         }
@@ -279,17 +293,100 @@ export class InputController {
                     };
                     promises.push(this.setComposition(c));
                 }
-                if (rimeContext.menu.candidates.length > 0) {
+                if (!this.inputViewVisible) {
+                    // Virtual keyboard is not visible, candidiates are displayed in system candidate window
+                    if (rimeContext.menu.candidates.length > 0) {
+                        promises.push(new Promise((res, rej) => {
+                            chrome.input.ime.setCandidateWindowProperties({
+                                engineID: this.engineId,
+                                properties: {
+                                    visible: true,
+                                    cursorVisible: true,
+                                    auxiliaryTextVisible: true,
+                                    pageSize: rimeContext.menu.pageSize,
+                                    auxiliaryText: chrome.i18n.getMessage("candidate_page", (rimeContext.menu.pageNumber + 1).toString())
+                                        + (rimeContext.menu.isLastPage ? chrome.i18n.getMessage("candidate_page_last") : ""),
+                                    windowPosition: 'composition',
+                                    vertical: true
+                                }
+                            }, (ok) => ok ? res(null) : rej());
+                        }));
+                        if (this.context != null) {
+                            promises.push(new Promise((res, rej) => {
+                                chrome.input.ime.setCandidates({
+                                    contextID: this.context.contextID,
+                                    candidates: rimeContext.menu.candidates.map((v, idx) => ({
+                                        candidate: v.text,
+                                        id: idx,
+                                        label: rimeContext.selectLabels[idx] || (idx + 1).toString(),
+                                        annotation: v.comment
+                                    })),
+                                }, (ok) => ok ? res(null) : rej());
+                            }));
+                            promises.push(new Promise((res, rej) => {
+                                chrome.input.ime.setCursorPosition({
+                                    contextID: this.context.contextID,
+                                    candidateID: rimeContext.menu.highlightedCandidateIndex
+                                }, (ok) => ok ? res(null) : rej());
+                            }));
+                        }
+                    } else {
+                        promises.push(new Promise((res, rej) => {
+                            chrome.input.ime.setCandidateWindowProperties({
+                                engineID: this.engineId,
+                                properties: {
+                                    visible: false,
+                                }
+                            }, (ok) => ok ? res(null) : rej());
+                        }));
+                    }
+                } else {
+                    // Virtual keyboard is visible, send candidates to display them in virtual keyboard
+
+                    if (!this.candidateIterator) {
+                        this.candidateIterator = await this.session.iterateCandidates(0);
+                        await this.fetchMoreCandidates(10);
+                    }
+
+                    const msg = {
+                        name: "candidates_back", msg: {
+                            source: "source",
+                            candidates: this.candidateCache.map((v) => ({
+                                candidate: v.text,
+                                ix: v.index,
+                            }))
+                        }
+                    }
+                    console.log("Send msg to vk: ", msg);
+                    chrome.runtime.sendMessage(
+                        msg
+                    );
+                }
+            } else {
+                this.resetUI();
+            }
+        } else {
+            if (this.inputCache.length > 0) {
+                if (this.context != null) {
+                    const preedit = this.inputCacheToString();
+                    const c = {
+                        contextID: this.context.contextID,
+                        cursor: preedit.length,
+                        text: preedit,
+                    };
+                    promises.push(this.setComposition(c));
+                }
+                if (!this.inputViewVisible) {
+                    // Virtual keyboard is not visible, candidiates are displayed in system candidate window
                     promises.push(new Promise((res, rej) => {
                         chrome.input.ime.setCandidateWindowProperties({
                             engineID: this.engineId,
                             properties: {
                                 visible: true,
-                                cursorVisible: true,
+                                cursorVisible: false,
                                 auxiliaryTextVisible: true,
-                                pageSize: rimeContext.menu.pageSize,
-                                auxiliaryText: chrome.i18n.getMessage("candidate_page", (rimeContext.menu.pageNumber + 1).toString())
-                                    + (rimeContext.menu.isLastPage ? chrome.i18n.getMessage("candidate_page_last") : ""),
+                                pageSize: 1,
+                                auxiliaryText: chrome.i18n.getMessage("loading_engine"),
                                 windowPosition: 'composition',
                                 vertical: true
                             }
@@ -299,68 +396,33 @@ export class InputController {
                         promises.push(new Promise((res, rej) => {
                             chrome.input.ime.setCandidates({
                                 contextID: this.context.contextID,
-                                candidates: rimeContext.menu.candidates.map((v, idx) => ({
-                                    candidate: v.text,
-                                    id: idx,
-                                    label: rimeContext.selectLabels[idx] || (idx + 1).toString(),
-                                    annotation: v.comment
-                                })),
-                            }, (ok) => ok ? res(null) : rej());
-                        }));
-                        promises.push(new Promise((res, rej) => {
-                            chrome.input.ime.setCursorPosition({
-                                contextID: this.context.contextID,
-                                candidateID: rimeContext.menu.highlightedCandidateIndex
+                                candidates: []
                             }, (ok) => ok ? res(null) : rej());
                         }));
                     }
                 } else {
-                    promises.push(new Promise((res, rej) => {
-                        chrome.input.ime.setCandidateWindowProperties({
-                            engineID: this.engineId,
-                            properties: {
-                                visible: false,
-                            }
-                        }, (ok) => ok ? res(null) : rej());
-                    }));
-                }
-            } else {
-                this.resetUI();
-            }
-        } else {
-            if (this.inputCache.length > 0) {
-                promises.push(new Promise((res, rej) => {
-                    chrome.input.ime.setCandidateWindowProperties({
-                        engineID: this.engineId,
-                        properties: {
-                            visible: true,
-                            cursorVisible: false,
-                            auxiliaryTextVisible: true,
-                            pageSize: 1,
-                            auxiliaryText: chrome.i18n.getMessage("loading_engine"),
-                            windowPosition: 'composition',
-                            vertical: true
+                    // Virtual keyboard is visible, send candidates to display them in virtual keyboard
+                    chrome.runtime.sendMessage({
+                        name: "candidates_back", msg: {
+                            source: "sourcefuck",
+                            candidates: [{
+                                candidate: chrome.i18n.getMessage("loading_engine"),
+                                ix: 1,
+                            }]
                         }
-                    }, (ok) => ok ? res(null) : rej());
-                }));
-                if (this.context != null) {
-                    const preedit = this.inputCacheToString();
-                    const c = {
-                        contextID: this.context.contextID,
-                        cursor: preedit.length,
-                        text: preedit,
-                    };
-                    promises.push(this.setComposition(c));
-                    promises.push(new Promise((res, rej) => {
-                        chrome.input.ime.setCandidates({
-                            contextID: this.context.contextID,
-                            candidates: []
-                        }, (ok) => ok ? res(null) : rej());
-                    }));
+                    });
                 }
             } else {
                 this.resetUI();
             }
+        }
+        if (this.inputViewVisible) {
+            chrome.input.ime.setCandidateWindowProperties({
+                engineID: this.engineId,
+                properties: {
+                    visible: false,
+                }
+            });
         }
         await Promise.all(promises);
     }
@@ -400,6 +462,7 @@ export class InputController {
             } else {
                 code = keyData.key.toLowerCase().charCodeAt(0);
             }
+            this.invalidateCandidateCache();
             return (async () => {
                 let handled = false;
                 handled = await this.session.processKey(code, mask);
@@ -476,7 +539,7 @@ export class InputController {
         if (this.inputViewVisible) {
             const asciiMode = await this.session?.getOption("ascii_mode");
             console.log("Set keyboard ascii to", asciiMode);
-            chrome.runtime.sendMessage({name: 'front_toggle_language_state', msg: !asciiMode });
+            chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !asciiMode });
         }
     }
 
@@ -486,6 +549,29 @@ export class InputController {
 
     async handleInputViewVisibilityChanged(visible: boolean) {
         this.inputViewVisible = visible;
+        this.refreshContext();
         this.refreshAsciiMode();
+    }
+
+    // Only used in input view
+    candidateCache: RimeCandidate[];
+    candidateIterator?: RimeCandidateIterator;
+
+    async fetchMoreCandidates(count: number) {
+        if (this.candidateIterator) {
+            for (let i = 0; i < count; i++) {
+                await this.candidateIterator.advance();
+                const c = await this.candidateIterator.current();
+                if (c == null)
+                    break;
+                this.candidateCache.push(c);
+            }
+        }
+    }
+
+    async invalidateCandidateCache() {
+        this.candidateCache = [];
+        this.candidateIterator?.destroy();
+        this.candidateIterator = null;
     }
 }

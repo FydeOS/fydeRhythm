@@ -2,10 +2,36 @@ import CreateRimeWasm from "./rime_emscripten"
 import { getFs } from "../utils"
 import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
-import type { RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
+import type { RimeCandidate, RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
 import type { Schema } from "yaml";
 import type { FastIndexedDbFsController } from "~fs";
 import EventEmitter from "events";
+
+export class RimeCandidateIterator {
+    wasmIterator: any;
+    engine: RimeEngine;
+
+    constructor(it: any, eng: RimeEngine) {
+        this.wasmIterator = it;
+        this.engine = eng;
+    }
+
+    destroy() {
+        this.wasmIterator.delete();
+    }
+
+    async advance() {
+        await this.engine.mutex.runExclusive(async () => {
+            await this.wasmIterator.advance();
+        });
+    }
+
+    async current() : Promise<RimeCandidate | null> {
+        return await this.engine.mutex.runExclusive(async () => {
+            return await this.wasmIterator.current();
+        });
+    }
+}
 
 export class RimeSession extends EventEmitter {
     engine: RimeEngine;
@@ -85,6 +111,12 @@ export class RimeSession extends EventEmitter {
     async getOptionLabel(option: string, state: boolean): Promise<string> {
         return await this.engine.mutex.runExclusive(async () => {
             return await this.wasmSession.getOptionLabel(option, state);
+        });
+    }
+
+    async iterateCandidates(startIndex: number): Promise<RimeCandidateIterator> {
+        return await this.engine.mutex.runExclusive(async () => {
+            return new RimeCandidateIterator(await this.wasmSession.iterateCandidates(startIndex), this.engine);
         });
     }
 

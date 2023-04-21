@@ -44,3 +44,9 @@ export interface RimeStatus {
     isTraditional: boolean;
     isAsciiPunct: boolean;
 }
+
+export interface RimeCandidate {
+    index: number;
+    text: string;
+    comment: string;
+}
