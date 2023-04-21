@@ -277,7 +277,6 @@ export class InputController {
                 candidates
             }
         };
-        console.log("Sending cand: ", msg);
         chrome.runtime.sendMessage(msg);
     }
 
