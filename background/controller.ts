@@ -66,7 +66,6 @@ export class InputController {
         }
         await this.loadMutex.runExclusive(async () => {
             if (this.engine) {
-                this.invalidateCandidateCache();
                 if (this.session) {
                     this.session.destroy();
                     this.session = null;
@@ -172,7 +171,6 @@ export class InputController {
         const settings = configObj.settings as ImeSettings;
         await this.loadMutex.runExclusive(async () => {
             if (this.engine) {
-                this.invalidateCandidateCache();
                 if (this.session) {
                     this.session.destroy();
                     this.session = null;
@@ -250,6 +248,7 @@ export class InputController {
                 }
             });
         }
+        this.invalidateCandidateCache();
     }
 
     async clearContext() {
@@ -436,6 +435,7 @@ export class InputController {
                     text: commit.text
                 }, (ok) => ok ? res(null) : rej());
             });
+            this.invalidateCandidateCache();
         }
     }
 
