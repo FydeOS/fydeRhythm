@@ -3,6 +3,7 @@ import { getFs, ImeSettings } from "~utils";
 import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
 import type { RimeCandidate } from "~shared-types";
+import { ConstructionOutlined } from "@mui/icons-material";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -241,14 +242,9 @@ export class InputController {
             });
         }
         if (this.inputViewVisible) {
-            chrome.runtime.sendMessage({
-                name: "candidates_back", msg: {
-                    source: "sourcefuck",
-                    candidates: []
-                }
-            });
         }
         this.invalidateCandidateCache();
+        this.sendCandidatesToInputView([]);
     }
 
     async clearContext() {
@@ -271,6 +267,25 @@ export class InputController {
                 chrome.input.ime.setComposition(param, (ok) => ok ? res(null) : rej());
             }
         })
+    }
+
+    sendCandidatesToInputView(candidates: Array<{ candidate: string, ix: number }>) {
+        const msg = {
+            name: "candidates_back",
+            msg: {
+                source: "source",
+                candidates
+            }
+        };
+        console.log("Sending cand: ", msg);
+        chrome.runtime.sendMessage(msg);
+    }
+
+    sendCandidateCacheToInputView() {
+        this.sendCandidatesToInputView(this.candidateCache.map((v) => ({
+            candidate: v.text,
+            ix: v.index
+        })));
     }
 
     async refreshContext(): Promise<void> {
@@ -341,25 +356,11 @@ export class InputController {
                     }
                 } else {
                     // Virtual keyboard is visible, send candidates to display them in virtual keyboard
-
                     if (!this.candidateIterator) {
                         this.candidateIterator = await this.session.iterateCandidates(0);
                         await this.fetchMoreCandidates(10);
                     }
-
-                    const msg = {
-                        name: "candidates_back", msg: {
-                            source: "source",
-                            candidates: this.candidateCache.map((v) => ({
-                                candidate: v.text,
-                                ix: v.index,
-                            }))
-                        }
-                    }
-                    console.log("Send msg to vk: ", msg);
-                    chrome.runtime.sendMessage(
-                        msg
-                    );
+                    this.sendCandidateCacheToInputView();
                 }
             } else {
                 this.resetUI();
@@ -401,15 +402,10 @@ export class InputController {
                     }
                 } else {
                     // Virtual keyboard is visible, send candidates to display them in virtual keyboard
-                    chrome.runtime.sendMessage({
-                        name: "candidates_back", msg: {
-                            source: "sourcefuck",
-                            candidates: [{
-                                candidate: chrome.i18n.getMessage("loading_engine"),
-                                ix: 1,
-                            }]
-                        }
-                    });
+                    this.sendCandidatesToInputView([{
+                        candidate: chrome.i18n.getMessage("loading_engine"),
+                        ix: 1,
+                    }]);
                 }
             } else {
                 this.resetUI();
@@ -436,6 +432,7 @@ export class InputController {
                 }, (ok) => ok ? res(null) : rej());
             });
             this.invalidateCandidateCache();
+            this.sendCandidatesToInputView([]);
         }
     }
 
@@ -505,6 +502,7 @@ export class InputController {
     }
 
     async selectCandidate(index: number, currentPage: boolean = true) {
+        this.invalidateCandidateCache();
         await this.session?.actionCandidate(index, 'select', currentPage);
         await this.commitIfAvailable();
         await this.refreshContext();
@@ -549,8 +547,12 @@ export class InputController {
 
     async handleInputViewVisibilityChanged(visible: boolean) {
         this.inputViewVisible = visible;
-        this.refreshContext();
-        this.refreshAsciiMode();
+        if (!visible) {
+            this.clearContext();
+        } else {
+            this.refreshContext();
+            this.refreshAsciiMode();
+        }
     }
 
     // Only used in input view
@@ -566,6 +568,7 @@ export class InputController {
                     break;
                 this.candidateCache.push(c);
             }
+            this.sendCandidateCacheToInputView();
         }
     }
 
