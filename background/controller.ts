@@ -504,14 +504,14 @@ export class InputController {
         }
     }
 
-    async selectCandidate(index: number) {
-        await this.session?.actionCandidateOnCurrentPage(index, 'select');
+    async selectCandidate(index: number, currentPage: boolean = true) {
+        await this.session?.actionCandidate(index, 'select', currentPage);
         await this.commitIfAvailable();
         await this.refreshContext();
     }
 
-    async deleteCandidate(index: number) {
-        await this.session?.actionCandidateOnCurrentPage(index, 'delete');
+    async deleteCandidate(index: number, currentPage: boolean = true) {
+        await this.session?.actionCandidate(index, 'delete', currentPage);
         await this.refreshContext();
     }
 

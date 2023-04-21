@@ -82,7 +82,7 @@ export class RimeSession extends EventEmitter {
         });
     }
 
-    async actionCandidateOnCurrentPage(index: number, op: 'select' | 'delete'): Promise<void> {
+    async actionCandidate(index: number, op: 'select' | 'delete', currentPage: boolean): Promise<void> {
         await this.engine.mutex.runExclusive(async () => {
             let action: number;
             if (op == 'select') {
@@ -90,7 +90,7 @@ export class RimeSession extends EventEmitter {
             } else if (op == 'delete') {
                 action = 1;
             }
-            const s = await this.wasmSession.actionCandidateOnCurrentPage(index, action);
+            const s = await this.wasmSession.actionCandidate(index, action, currentPage);
             if (!s)
                 throw new Error(`Cannot ${op} candidate ${index}`);
         });
