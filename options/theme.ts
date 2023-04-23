@@ -120,31 +120,6 @@ export default createTheme({
           }
         }
       },
-      MuiSnackbar: {
-        styleOverrides: {
-          root: {
-            top: "27px !important",
-            "& .MuiPaper-root": {
-              backgroundColor: "rgba(252, 240, 236, 1)",
-              color: "black",
-              boxShadow: "unset",
-              borderRadius: "16px",
-              justifyContent: "center",
-              minWidth: "120px !important",
-              maxWidth: "360px !important",
-              padding: "5px 18px !important",
-              width: "max-content !important",
-              boxSizing: "border-box !important",
-              "& .MuiSnackbarContent-message": {
-                padding: "0 !important",
-                wordBreak: "all !important",
-                fontSize: "12px !important",
-                linHeight: "22px !important",
-              }
-            }
-          }
-        }
-      },
       MuiFormControlLabel: {
         styleOverrides: {
           root: {

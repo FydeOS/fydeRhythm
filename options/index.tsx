@@ -37,6 +37,7 @@ import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import { $$, getFs, ImeSettings, kDefaultSettings } from "~utils";
 import Link from "@mui/material/Link";
+import { Settings } from "@mui/icons-material";
 
 const kFuzzyMap = [
     {
@@ -83,7 +84,13 @@ const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
 function OptionsPage() {
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
-    const [settingsDirty, setSettingsDirty] = useState(false);
+    enum SettingsDirtyStatus {
+        NotDirty = 0,
+        Dirty = 1,
+        Reloading = 2
+    }
+    // Settings dirty = 0: not dirty, = 1: dirty, = 2: reloading
+    const [settingsDirty, setSettingsDirty] = useState(SettingsDirtyStatus.NotDirty);
 
     const [schemaList, setSchemaList] = useState<SchemaListFile>({ schemas: [] });
     const [fetchingList, setFetchingList] = useState<boolean>(false);
@@ -108,7 +115,7 @@ function OptionsPage() {
         const obj = await chrome.storage.sync.get(["settings"]);
         if (obj.settings) {
             setImeSettings(obj.settings);
-            setSettingsDirty(false);
+            setSettingsDirty(SettingsDirtyStatus.NotDirty);
         }
     }
 
@@ -177,16 +184,17 @@ function OptionsPage() {
     async function loadRime() {
         await chrome.storage.sync.set({ settings: imeSettings });
         if (!engineStatus.loading) {
+            setSettingsDirty(SettingsDirtyStatus.Reloading);
             await sendToBackground({
                 name: "ReloadRime",
             });
-            setSettingsDirty(false);
+            setSettingsDirty(SettingsDirtyStatus.NotDirty);
         }
     }
 
     function changeSettings(change: any) {
         const newSettings = Object.assign({}, imeSettings, change);
-        setSettingsDirty(true);
+        setSettingsDirty(SettingsDirtyStatus.Dirty);
         setImeSettings(newSettings);
     }
 
@@ -359,14 +367,14 @@ function OptionsPage() {
     }
 
     const settingsDirtySnackbarActions = (
-        <React.Fragment>
-            <Button color="primary" size="small" onClick={() => loadRime()}>
-                {engineStatus.loading ?
+        <div style={{ padding: '8px' }}>
+            <Button color="primary" variant="contained" size="small" onClick={() => loadRime()}>
+                {settingsDirty == SettingsDirtyStatus.Reloading ?
                     $$("rime_engine_starting_button") :
                     $$("save_settings_and_apply_button")
                 }
             </Button>
-        </React.Fragment>
+        </div>
     );
 
     return <ThemeProvider theme={theme}>
@@ -512,7 +520,7 @@ function OptionsPage() {
                     vertical: 'bottom',
                     horizontal: 'center',
                 }}
-                open={settingsDirty}
+                open={settingsDirty == SettingsDirtyStatus.Dirty || settingsDirty == SettingsDirtyStatus.Reloading}
                 message={$$("settings_changed_snackbar")}
                 action={settingsDirtySnackbarActions}
             />
