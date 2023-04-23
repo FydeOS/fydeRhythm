@@ -398,7 +398,7 @@ function OptionsPage() {
                                         <ListItemIcon>
                                             {localSchemaList.includes(schema.id) ? <Radio value={schema.id} /> :
                                                 downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
-                                                    <IconButton onClick={() => downloadSchema(schema.id)}>
+                                                    <IconButton onClick={() => downloadSchema(schema.id)} disabled={downloadSchemaId != null}>
                                                         <CloudDownloadIcon />
                                                     </IconButton>}
                                         </ListItemIcon>
