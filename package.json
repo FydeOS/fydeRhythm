@@ -47,7 +47,6 @@
     "name": "__MSG_extension_name__",
     "description": "__MSG_description__",
     "default_locale": "zh",
-    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmjwmTydsjAiSTDMUI6KTjiuzCToPm7GsgdfdgVMdeO+/tY7Yd10mUhx6xdGBU/39IWMUljwtx3sTDnZ5fKno/cHTMZt8fesC6eS1banWuu4shFT6n29RdIMB4P24Fn0jdgX5iTHWArYiGsth6japdpH66G6gPTVmDzMBhqdhnECdtAbQ/iN3k5J1P1/nQ5p2G5ABHxBzOZ9fp9qbk+eNwrfsvupsGbOhPiy+6QVdachfxGNOFehMNHxBM62ybTdHfCbhS8eghzsTyHQfVertVc9BKwlztc4zusRCyYTPS15RKSMMxfQhItnQZNBoWsUu3cT2QQgTL+x+53zDxE0QCwIDAQAB",
     "web_accessible_resources": [
       {
         "resources": [
