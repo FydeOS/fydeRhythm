@@ -185,7 +185,7 @@ export class InputController {
 
             const config = await this.loadRimeConfig(settings);
             const fs = await getFs();
-            const dirs = ['/root/build', '/root/shared', '/root/user'];
+            const dirs = ['/root/build', '/root/shared', '/root/user', '/root/shared/opencc'];
             for (const d of dirs) {
                 if (!await fs.readEntryRaw(d)) {
                     await fs.createDirectory(d);
