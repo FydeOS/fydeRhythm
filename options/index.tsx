@@ -377,6 +377,8 @@ function OptionsPage() {
         </div>
     );
 
+    const manifest = chrome.runtime.getManifest();
+
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
             <div style={{ position: 'absolute', top: 30, left: 30 }}>
@@ -514,7 +516,12 @@ function OptionsPage() {
                 </div>
             </div>
 
-            <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
+            <div className={styles.footer}>
+                {manifest.name} v{manifest.version}
+                <br />
+                FydeOS is made possible by gentle souls with real ❤️
+            </div>
+
             <Snackbar
                 anchorOrigin={{
                     vertical: 'bottom',
