@@ -60,5 +60,11 @@
     },
     "settings_changed_snackbar": {
         "message": "设置已更改。"
+    },
+    "error_downloading_schema": {
+        "message": "下载方案时发生错误："
+    },
+    "error_fetch_schema_list": {
+        "message": "获取方案列表时发生错误："
     }
 }

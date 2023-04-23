@@ -60,5 +60,11 @@
      },
      "settings_changed_snackbar": {
         "message": "Settings Changed." 
+     },
+     "error_downloading_schema": {
+        "message": "Error while downloading schema: "
+     },
+     "error_fetch_schema_list": {
+        "message": "Error while fetching schema list:"
      }
 }

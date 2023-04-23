@@ -138,8 +138,7 @@ function OptionsPage() {
             })).data;
             newData = parse(text);
         } catch (error) {
-            console.log(error.toString());
-            setFetchListError(error.toString());
+            setFetchListError($$("error_fetch_schema_list") + error.toString());
             return;
         } finally {
             setFetchingList(false);
@@ -352,6 +351,7 @@ function OptionsPage() {
             changeSettings({ schema: id });
         } catch (ex) {
             console.log(ex);
+            setFetchListError($$("error_downloading_schema") + ex.toString());
         } finally {
             await loadLocalSchemaList();
             setDownloadSchemaId(null);
@@ -410,6 +410,7 @@ function OptionsPage() {
                                     </ListItem>)}
                             </List>
                         </RadioGroup>
+                        <p>{fetchListError && <Box sx={{ color: "error.main" }}>{fetchListError}</Box>}</p>
                     </FormControl>
                 </div>
             </div>
@@ -489,7 +490,7 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.formLabel}>{$$("rime_engine_logs")}</div>
-                        <div className={styles.formLabel}>{$$("rime_engine_status")}<Box sx={{ color: engineColor, display: 'inline'}}>
+                        <div className={styles.formLabel}>{$$("rime_engine_status")}<Box sx={{ color: engineColor, display: 'inline' }}>
                             {engineStatusString}</Box></div>
                         <RimeLogDisplay />
                     </FormControl>
