@@ -116,8 +116,6 @@ function OptionsPage() {
         const fs = await getFs();
         const content = await fs.readAll();
         const schemaRegex = /\/root\/build\/(\w+)\.schema\.yaml/g;
-        console.log(content.map(c => c.fullPath));
-        console.log(content.map(c => [...c.fullPath.matchAll(schemaRegex)]));
         const list = content.map(c => [...c.fullPath.matchAll(schemaRegex)]).filter(c => c.length == 1).map(c => c[0][1].toString());
         setLocalSchemaList(list);
         return list;
