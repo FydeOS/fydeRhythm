@@ -35,14 +35,7 @@ function RimeLogDisplay() {
         }
     }, []);
 
-    return <div className={styles.formGroup}>
-        <div className={styles.formBox}>
-            <FormControl className={styles.formControl}>
-                <div className={styles.formLabel}>{chrome.i18n.getMessage("rime_logs")}</div>
-                <textarea readOnly value={rimeLogs.join("\n")} rows={14} ref={logTextArea}></textarea>
-            </FormControl>
-        </div>
-    </div>;
+    return <textarea readOnly value={rimeLogs.join("\n")} rows={14} ref={logTextArea}></textarea>;
 }
 
 export default RimeLogDisplay

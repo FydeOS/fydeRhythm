@@ -108,6 +108,7 @@ function OptionsPage() {
         const obj = await chrome.storage.sync.get(["settings"]);
         if (obj.settings) {
             setImeSettings(obj.settings);
+            setSettingsDirty(false);
         }
     }
 
@@ -173,11 +174,13 @@ function OptionsPage() {
     }, []);
 
     async function loadRime() {
-        setSettingsDirty(false);
         await chrome.storage.sync.set({ settings: imeSettings });
-        await sendToBackground({
-            name: "ReloadRime",
-        });
+        if (!engineStatus.loading) {
+            await sendToBackground({
+                name: "ReloadRime",
+            });
+            setSettingsDirty(false);
+        }
     }
 
     function changeSettings(change: any) {
@@ -343,7 +346,7 @@ function OptionsPage() {
             }
             // Schema should be the last file to be written, in case an error is encountered while downloading
             await fs.writeWholeFile(`/root/${schemaFile}`, new TextEncoder().encode(schemaYaml));
-            changeSettings({schema: id});
+            changeSettings({ schema: id });
         } catch (ex) {
             console.log(ex);
         } finally {
@@ -351,6 +354,17 @@ function OptionsPage() {
             setDownloadSchemaId(null);
         }
     }
+
+    const settingsDirtySnackbarActions = (
+        <React.Fragment>
+            <Button color="primary" size="small" onClick={() => loadRime()}>
+                {engineStatus.loading ? "正在重启 RIME 引擎" : "保存并应用"}
+            </Button>
+            <Button color="secondary" size="small" onClick={() => loadSettings()} disabled={engineStatus.loading}>
+                撤销
+            </Button>
+        </React.Fragment>
+    );
 
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
@@ -370,18 +384,6 @@ function OptionsPage() {
                     width={500}
                     height={180}
                 />
-            </div>
-            <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
-                        <Stack spacing={2} direction="row">
-                            <Button variant="contained" onClick={() => loadRime()} disabled={engineStatus.loading}>保存设置，重新启动 RIME 引擎</Button>
-                            <FileEditorButton />
-                        </Stack>
-                    </FormControl>
-                    {settingsDirty && <p style={{ color: "red" }}>设置已经修改，请点击保存按钮（这个后面可以改成这样：修改设置后在页面底部弹出一条提示保存的横条，把保存按钮移动到里面去）</p>}
-                </div>
             </div>
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
@@ -480,21 +482,25 @@ function OptionsPage() {
                 </div>
             </div>}
 
-            <RimeLogDisplay />
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <div className={styles.formLabel}>{chrome.i18n.getMessage("rime_logs")}</div>
+                        <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
+                        <RimeLogDisplay />
+                    </FormControl>
+                </div>
+            </div>;
 
             <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
             <Snackbar
                 anchorOrigin={{
-                    vertical: 'top',
+                    vertical: 'bottom',
                     horizontal: 'center',
                 }}
-                open={snackbarOpen}
-                autoHideDuration={3000}
-                ContentProps={{
-                    'aria-describedby': 'message-id',
-                }}
-                onClose={() => this.setState({ snackbarOpen: false, snackbarText: "" })}
-                message={<span id="message-id">{snackbarText}</span>}
+                open={settingsDirty}
+                message="设置已更改。"
+                action={settingsDirtySnackbarActions}
             />
         </div>
     </ThemeProvider>
