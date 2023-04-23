@@ -1,7 +1,7 @@
 {
   "name": "fyde-rhythm",
-  "displayName": "FydeRhythm 2",
-  "version": "0.1.3",
+  "displayName": "FydeRhythm",
+  "version": "2.0.3",
   "description": "The FydeRhythm input method",
   "author": "fydeos",
   "packageManager": "npm@8.19.3",
