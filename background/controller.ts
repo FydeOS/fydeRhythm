@@ -214,7 +214,20 @@ export class InputController {
             this.session = session;
             this.session.addListener('optionChanged', (name: string, val: boolean) => {
                 if (name == "ascii_mode") {
-                    chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
+                    // Send status to virtual keyboard
+                    if (this.inputViewVisible) {
+                        chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
+                    }
+
+                }
+                // Send status to fyde
+                const fydeLanguageStateFunction: (string) => void = (chrome.input.ime as any).showFydeLanguageState;
+                if (fydeLanguageStateFunction) {
+                    if (this.session) {
+                        this.session.getOptionLabel(name, val).then((v) => {
+                            fydeLanguageStateFunction(v);
+                        })
+                    }
                 }
             });
             await this.refreshAsciiMode();
