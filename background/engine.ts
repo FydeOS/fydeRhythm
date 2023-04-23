@@ -45,7 +45,12 @@ export class RimeSession extends EventEmitter {
 
     async processKey(keyId: number, mask: number): Promise<boolean> {
         return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.processKey(keyId, mask);
+            try {
+                return await this.wasmSession.processKey(keyId, mask);
+            } catch (ex) {
+                console.error("Error processing key: ", ex);
+                return false;
+            }
         });
     }
 
