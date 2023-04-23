@@ -25,7 +25,40 @@
     "candidate_page_last": {
         "message": " (Last)"
     },
-    "rime_logs": {
-        "message": "RIME Engine Logs"
-    }
+    "rime_engine_logs": {
+        "message": "RIME Engine Logs"  
+     },
+     "rime_engine_not_started": {
+        "message": "Not Started"
+     },
+     "rime_engine_starting": {
+        "message": "Starting" 
+     },
+     "rime_engine_ready": {
+        "message": "Ready"
+     }, 
+     "rime_engine_starting_button": {
+        "message": "Restarting RIME Engine"
+     },
+     "save_settings_and_apply_button": {
+        "message": "Save and Apply"
+     },
+     "select_schema": {
+        "message": "Select Input Schema" 
+     },  
+     "fetching_schema_list": {
+        "message": " (Refreshing List)"
+     },
+     "candidate_count": {
+        "message": "Candidates per Page"
+     }, 
+     "fuzzy_pinyin": {
+        "message": "Fuzzy Pinyin" 
+     },
+     "rime_engine_status": {
+        "message": "Engine Status: "
+     },
+     "settings_changed_snackbar": {
+        "message": "Settings Changed." 
+     }
 }

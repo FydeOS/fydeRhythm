@@ -25,7 +25,40 @@
     "candidate_page_last": {
         "message": " (末)"
     },
-    "rime_logs": {
-        "message": "RIME 引擎日志"
+    "rime_engine_logs": {
+        "message": "RIME 服务日志"
+    },
+    "rime_engine_not_started": {
+        "message": "未启动"
+    },
+    "rime_engine_starting": {
+        "message": "启动中"
+    },
+    "rime_engine_ready": {
+        "message": "就绪"
+    },
+    "rime_engine_starting_button": {
+        "message": "正在重启 RIME"
+    },
+    "save_settings_and_apply_button": {
+        "message": "保存并应用"
+    },
+    "select_schema": {
+        "message": "选择输入方案"
+    },
+    "fetching_schema_list": {
+        "message": "（正在刷新列表）"
+    },
+    "candidate_count": {
+        "message": "单页候选词数量"
+    },
+    "fuzzy_pinyin": {
+        "message": "模糊音"
+    },
+    "rime_engine_status": {
+        "message": "服务状态："
+    },
+    "settings_changed_snackbar": {
+        "message": "设置已更改。"
     }
 }

@@ -32,8 +32,9 @@ import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { getFs, ImeSettings, kDefaultSettings } from "~utils";
+import { $$, getFs, ImeSettings, kDefaultSettings } from "~utils";
 import CircularProgress from "@mui/material/CircularProgress";
+import Box from "@mui/material/Box";
 
 const kFuzzyMap = [
     {
@@ -78,9 +79,6 @@ interface SchemaListFile {
 const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
 
 function OptionsPage() {
-    let snackbarOpen = false;
-    let snackbarText = "";
-
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
     const [settingsDirty, setSettingsDirty] = useState(false);
@@ -197,13 +195,14 @@ function OptionsPage() {
         }
     }
 
-    let engineStatusString: string = "未启动";
+    let engineStatusString: string = $$("rime_engine_not_started");
+    let engineColor = "error.main";
     if (engineStatus.loading) {
-        engineStatusString = "启动中";
-        snackbarText = "正在启动 RIME 引擎...";
-        snackbarOpen = true;
+        engineStatusString = $$("rime_engine_starting");
+        engineColor = "warning.main";
     } else if (engineStatus.loaded) {
-        engineStatusString = "就绪";
+        engineStatusString = $$("rime_engine_ready");
+        engineColor = "success.main";
     }
 
     const kMinPageSize = 3, kMaxPageSize = 9;
@@ -358,10 +357,10 @@ function OptionsPage() {
     const settingsDirtySnackbarActions = (
         <React.Fragment>
             <Button color="primary" size="small" onClick={() => loadRime()}>
-                {engineStatus.loading ? "正在重启 RIME 引擎" : "保存并应用"}
-            </Button>
-            <Button color="secondary" size="small" onClick={() => loadSettings()} disabled={engineStatus.loading}>
-                撤销
+                {engineStatus.loading ?
+                    $$("rime_engine_starting_button") :
+                    $$("save_settings_and_apply_button")
+                }
             </Button>
         </React.Fragment>
     );
@@ -388,7 +387,7 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>选择输入方案{fetchingList ? "（正在刷新列表）" : ""}</div>
+                        <div className={styles.formLabel}>{$$("select_schema")}{fetchingList ? $$("fetching_schema_list") : ""}</div>
                         <RadioGroup
                             value={imeSettings.schema}
                             onChange={(e, v) => changeSettings({ schema: v })}
@@ -415,7 +414,7 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <div className={styles.pageSize}>
-                            <div className={styles.formLabel}>单页候选词数量</div>
+                            <div className={styles.formLabel}>{$$("candidate_count")}</div>
 
                             <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
                                 <IconButton onClick={() => {
@@ -459,7 +458,7 @@ function OptionsPage() {
             {currentSchemaInfo()?.fuzzy_pinyin && <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>设置模糊音</div>
+                        <div className={styles.formLabel}>{$$("fuzzy_pinyin")}</div>
                         <FormGroup row>
                             {
                                 kFuzzyMap.map((fuzzy) =>
@@ -485,12 +484,13 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>{chrome.i18n.getMessage("rime_logs")}</div>
-                        <div className={styles.formLabel}>RIME 引擎状态：{engineStatusString}</div>
+                        <div className={styles.formLabel}>{$$("rime_engine_logs")}</div>
+                        <div className={styles.formLabel}>{$$("rime_engine_status")}<Box sx={{ color: engineColor, display: 'inline'}}>
+                            {engineStatusString}</Box></div>
                         <RimeLogDisplay />
                     </FormControl>
                 </div>
-            </div>;
+            </div>
 
             <div className={styles.footer}>FydeOS is made possible by gentle souls with real ❤️</div>
             <Snackbar
@@ -499,7 +499,7 @@ function OptionsPage() {
                     horizontal: 'center',
                 }}
                 open={settingsDirty}
-                message="设置已更改。"
+                message={$$("settings_changed_snackbar")}
                 action={settingsDirtySnackbarActions}
             />
         </div>

@@ -47,3 +47,5 @@ export interface ImeSettings {
 }
 
 export const kDefaultSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [] };
+
+export const $$ = chrome.i18n.getMessage;
