@@ -131,6 +131,10 @@ function OptionsPage() {
         try {
             const text = (await axios.get(`${kRepoUrl}/schema-list.yaml`, {
                 responseType: 'text',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Expires': '0',
+                }
             })).data;
             newData = parse(text);
         } catch (error) {
