@@ -1,4 +1,5 @@
 import axios from "axios";
+import { config } from "process";
 import { parse } from "yaml";
 import { getFs, kDefaultSettings } from "~utils";
 import { InputController } from "./controller";
@@ -6,8 +7,13 @@ import { serviceWorkerKeepalive } from "./keepalive";
 
 
 self.controller = new InputController();
-// Load engine (no need to wait for it to complete)
-self.controller.loadRime(false);
+chrome.storage.sync.get(["settings"]).then((obj) => {
+    // Only load engine if settings exists
+    if (obj.settings) {
+        // Load engine (no need to wait for it to complete)
+        self.controller.loadRime(false);
+    }
+})
 
 chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     self.controller.engineId = engineId;
