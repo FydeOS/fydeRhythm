@@ -66,5 +66,8 @@
     },
     "error_fetch_schema_list": {
         "message": "获取方案列表时发生错误："
+    },
+    "schema_home_page": {
+        "message": "方案主页"
     }
 }

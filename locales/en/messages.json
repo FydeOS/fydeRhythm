@@ -66,5 +66,8 @@
      },
      "error_fetch_schema_list": {
         "message": "Error while fetching schema list:"
+     },
+     "schema_home_page": {
+        "message": "Schema Homepage"
      }
 }

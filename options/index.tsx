@@ -23,18 +23,20 @@ import ListItem from '@mui/material/ListItem';
 import List from '@mui/material/List';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import CircularProgress from "@mui/material/CircularProgress";
+import Box from "@mui/material/Box";
 
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import { $$, getFs, ImeSettings, kDefaultSettings } from "~utils";
-import CircularProgress from "@mui/material/CircularProgress";
-import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
 
 const kFuzzyMap = [
     {
@@ -406,7 +408,16 @@ function OptionsPage() {
                                                         <CloudDownloadIcon />
                                                     </IconButton>}
                                         </ListItemIcon>
-                                        <ListItemText primary={schema.name} secondary={schema.description} />
+                                        <ListItemText primary={schema.name}
+                                            secondary={<>
+                                                {schema.description}
+                                                {schema.website &&
+                                                    <Link href={schema.website} target="_blank" underline="hover">
+                                                        {$$("schema_home_page")}
+                                                    </Link>
+                                                }
+                                            </>}
+                                        />
                                     </ListItem>)}
                             </List>
                         </RadioGroup>
