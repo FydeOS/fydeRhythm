@@ -47,6 +47,7 @@
     "name": "__MSG_extension_name__",
     "description": "__MSG_description__",
     "default_locale": "zh",
+    "update_url": "https://store.fydeos.com/update/nfglebjgiflmmcdddkbcbgmdkomlfcpa/updates.xml",
     "web_accessible_resources": [
       {
         "resources": [
