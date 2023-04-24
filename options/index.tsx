@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import _ from "lodash";
-import axios from "axios";
 import { parse, stringify } from 'yaml'
 import { ThemeProvider } from '@mui/material/styles';
 
@@ -136,13 +135,11 @@ function OptionsPage() {
         setFetchingList(true);
         let newData: SchemaListFile;
         try {
-            const text = (await axios.get(`${kRepoUrl}/schema-list.yaml`, {
-                responseType: 'text',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'Expires': '0',
-                }
-            })).data;
+            const text = await fetch(`${kRepoUrl}/schema-list.yaml`, {
+                method: "GET",
+                mode: "cors",
+                cache: "no-cache",
+            }).then(x => x.text());
             newData = parse(text);
         } catch (error) {
             setFetchListError($$("error_fetch_schema_list") + error.toString());
@@ -226,9 +223,7 @@ function OptionsPage() {
             setDownloadSchemaId(id);
             setDownloadProgress(0);
             const schemaFile = `build/${id}.schema.yaml`;
-            const schemaYaml: string = (await axios.get(`${kRepoUrl}/${schemaFile}`, {
-                responseType: 'text',
-            })).data;
+            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`).then(x => x.text());
             const schema = parse(schemaYaml);
 
             const dependencies: Set<string> = new Set();
@@ -244,9 +239,7 @@ function OptionsPage() {
                         const opencc = schema[tn[1] ?? "simplifier"];
                         const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
                         dependencies.add(configPath);
-                        const opencc_config = (await axios.get(`${kRepoUrl}/${configPath}`, {
-                            responseType: 'text',
-                        })).data;
+                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`).then(x => x.text());
                         const config = JSON.parse(opencc_config);
 
                         function parseDict(dict) {
