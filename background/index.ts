@@ -1,5 +1,3 @@
-import axios from "axios";
-import { config } from "process";
 import { parse } from "yaml";
 import { getFs, kDefaultSettings } from "~utils";
 import { InputController } from "./controller";
