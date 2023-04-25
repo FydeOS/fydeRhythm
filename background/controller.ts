@@ -196,11 +196,11 @@ export class InputController {
                     const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
                     await fs.writeWholeFile("/root/user/rime.lua", luaContent);
                 }
-                // TODO: add GUI for switch key config
-                await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
-                    { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
-                )));
             }
+            // TODO: add GUI for switch key config
+            await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
+                { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
+            )));
 
             const engine = new RimeEngine();
             await engine.initialize(this.printErr.bind(this), fs);
