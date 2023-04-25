@@ -362,7 +362,13 @@ function OptionsPage() {
     const settingsDirtySnackbarActions = (
         <div style={{ padding: '8px' }}>
             <Button color="primary" variant="contained" size="small" onClick={() => loadRime()}>
-                {settingsDirty == SettingsDirtyStatus.Reloading ?
+                { (settingsDirty == SettingsDirtyStatus.Reloading ||
+                   // Generally, the snackbar should be invisible if settingsDirty == SettingsDirtyStatus.NotDirty,
+                   // so it may seem to be needless to check for NotDirty here.
+                   // However, when the settings is just applied, and the disappearance animation is being
+                   // played, it will be visible. In this case, we continue to display restarting status to maintain a
+                   // consistent user experience (i.e. the button won't jump back to "Save" in animation).
+                   settingsDirty == SettingsDirtyStatus.NotDirty) ?
                     $$("rime_engine_starting_button") :
                     $$("save_settings_and_apply_button")
                 }
