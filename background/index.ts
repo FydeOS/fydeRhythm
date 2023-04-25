@@ -18,7 +18,9 @@ chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     serviceWorkerKeepalive();
 });
 
-chrome.input.ime.onDeactivated.addListener((engineId) => { });
+chrome.input.ime.onDeactivated.addListener((engineId) => { 
+    self.controller.inputViewVisible = false;
+});
 
 chrome.input.ime.onFocus.addListener(async (context) => {
     // Todo: in incoginto tab, context.shouldDoLearning = false, 
