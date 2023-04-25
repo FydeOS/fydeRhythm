@@ -225,7 +225,12 @@ export class InputController {
                     if (fydeLanguageStateFunction) {
                         if (this.session) {
                             this.session.getOptionLabel(name, val).then((v) => {
-                                fydeLanguageStateFunction(v);
+                                const empty = v == null || v.trim() == "";
+                                if (!empty) {
+                                    fydeLanguageStateFunction(v);
+                                } else if (name == "ascii_mode") {
+                                    fydeLanguageStateFunction(val ? "EN" : "中");
+                                }
                             })
                         }
                     }
