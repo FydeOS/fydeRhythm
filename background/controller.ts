@@ -163,77 +163,81 @@ export class InputController {
                 return;
             }
         }
-        console.log("Loading RIME engine...");
-        const configObj = await chrome.storage.sync.get(["settings"]);
-        if (!configObj.settings) {
-            console.error("Could not find RIME settings.");
-            return;
-        }
-        const settings = configObj.settings as ImeSettings;
-        await this.loadMutex.runExclusive(async () => {
-            if (this.engine) {
-                if (this.session) {
-                    this.session.destroy();
-                    this.session = null;
-                }
-                this.engine.destroy();
-                this.engine = null;
-                this.notifyRimeStatusChanged();
+        try {
+            console.log("Loading RIME engine...");
+            const configObj = await chrome.storage.sync.get(["settings"]);
+            if (!configObj.settings) {
+                throw Error("Could not find RIME settings, refusing to launch.");
             }
-
-            await new Promise(r => setTimeout(r, 10));
-
-            const config = await this.loadRimeConfig(settings);
-            const fs = await getFs();
-            const dirs = ['/root/build', '/root/shared', '/root/user', '/root/shared/opencc'];
-            for (const d of dirs) {
-                if (!await fs.readEntryRaw(d)) {
-                    await fs.createDirectory(d);
-                }
-            }
-            if (maintenance) {
-                if (config.includes("lua_")) {
-                    const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
-                    await fs.writeWholeFile("/root/user/rime.lua", luaContent);
-                }
-            }
-            // TODO: add GUI for switch key config
-            await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
-                { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
-            )));
-
-            const engine = new RimeEngine();
-            await engine.initialize(this.printErr.bind(this), fs);
-            if (maintenance) {
-                await engine.rebuildPrism(settings.schema, config);
-            }
-
-            const session = await engine.createSession(settings.schema, config);
-            await this.flushInputCacheToSession(session);
-            this.engine = engine;
-            this.session = session;
-            this.session.addListener('optionChanged', (name: string, val: boolean) => {
-                if (name == "ascii_mode") {
-                    // Send status to virtual keyboard
-                    if (this.inputViewVisible) {
-                        chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
-                    }
-
-                }
-                // Send status to fyde
-                const fydeLanguageStateFunction: (string) => void = (chrome.input.ime as any).showFydeLanguageState;
-                if (fydeLanguageStateFunction) {
+            const settings = configObj.settings as ImeSettings;
+            await this.loadMutex.runExclusive(async () => {
+                if (this.engine) {
                     if (this.session) {
-                        this.session.getOptionLabel(name, val).then((v) => {
-                            fydeLanguageStateFunction(v);
-                        })
+                        this.session.destroy();
+                        this.session = null;
+                    }
+                    this.engine.destroy();
+                    this.engine = null;
+                    this.notifyRimeStatusChanged();
+                }
+
+                await new Promise(r => setTimeout(r, 10));
+
+                const config = await this.loadRimeConfig(settings);
+                const fs = await getFs();
+                const dirs = ['/root/build', '/root/shared', '/root/user', '/root/shared/opencc'];
+                for (const d of dirs) {
+                    if (!await fs.readEntryRaw(d)) {
+                        await fs.createDirectory(d);
                     }
                 }
+                if (maintenance) {
+                    if (config.includes("lua_")) {
+                        const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
+                        await fs.writeWholeFile("/root/user/rime.lua", luaContent);
+                    }
+                }
+                // TODO: add GUI for switch key config
+                await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
+                    { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
+                )));
+
+                const engine = new RimeEngine();
+                await engine.initialize(this.printErr.bind(this), fs);
+                if (maintenance) {
+                    await engine.rebuildPrism(settings.schema, config);
+                }
+
+                const session = await engine.createSession(settings.schema, config);
+                await this.flushInputCacheToSession(session);
+                this.engine = engine;
+                this.session = session;
+                this.session.addListener('optionChanged', (name: string, val: boolean) => {
+                    if (name == "ascii_mode") {
+                        // Send status to virtual keyboard
+                        if (this.inputViewVisible) {
+                            chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
+                        }
+
+                    }
+                    // Send status to fyde
+                    const fydeLanguageStateFunction: (string) => void = (chrome.input.ime as any).showFydeLanguageState;
+                    if (fydeLanguageStateFunction) {
+                        if (this.session) {
+                            this.session.getOptionLabel(name, val).then((v) => {
+                                fydeLanguageStateFunction(v);
+                            })
+                        }
+                    }
+                });
+                await this.refreshAsciiMode();
+                this.notifyRimeStatusChanged();
             });
-            await this.refreshAsciiMode();
-            this.notifyRimeStatusChanged();
-        });
-        await this.refreshContext();
+            await this.refreshContext();
+        } catch (ex) {
+            console.error("Error while loading RIME engine: ", ex);
+            this.printErr(`Error while loading RIME engine: ${ex.toString()}`);
+        }
     }
 
     resetUI() {
