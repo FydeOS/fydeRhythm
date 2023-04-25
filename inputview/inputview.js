@@ -13883,14 +13883,6 @@ Adapter.prototype.onContextFocus_ = function(message) {
   this.dispatchEvent(new goog.events.Event(
       i18n.input.chrome.inputview.events.EventType.CONTEXT_FOCUS));
 };
-Adapter.prototype.initBackground_ = function() {
-  chrome.runtime.getBackgroundPage((function() {
-    this.isBgControllerSwitching_ = true;
-    chrome.runtime.sendMessage(goog.object.create(
-        Name.TYPE, Type.CONNECT,
-        Name.VISIBILITY, this.isVisible));
-  }).bind(this));
-};
 Adapter.prototype.initialize = function() {
   if (chrome.accessibilityFeatures &&
       chrome.accessibilityFeatures.spokenFeedback) {
@@ -13906,7 +13898,6 @@ Adapter.prototype.initialize = function() {
           this.isChromeVoxOn = details['value'];
         }).bind(this));
   }
-  this.initBackground_();
   if (window.inputview) {
     inputview.getKeyboardConfig((function(config) {
       this.isA11yMode = !!config['a11ymode'];
