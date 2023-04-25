@@ -14005,16 +14005,7 @@ Adapter.prototype.onGesturesBack_ = function(message) {
   this.dispatchEvent(new GesturesBackEvent(results));
 };
 Adapter.prototype.hideKeyboard = function() {
-  // When the keyboard is launched using the handwriting button,
-  // 'webkitvisibilitychange' event won't be delivered to keyboard
-  // when the keyboard is being hidden (probably because the page 
-  // will be closed).
-  // We have to send the event explicitly to ensure visibility change
-  // is delivered to the background worker.
-  chrome.runtime.sendMessage(goog.object.create(
-      Name.TYPE, Type.VISIBILITY_CHANGE,
-      Name.VISIBILITY, false));
-  setTimeout(() => chrome.input.ime.hideInputView(), 50);
+  chrome.input.ime.hideInputView();
 };
 Adapter.prototype.doubleClickOnSpaceKey = function() {
   chrome.runtime.sendMessage(
