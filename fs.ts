@@ -320,6 +320,9 @@ export class FastIndexedDbFsController {
         if (!file) {
             file = await this.readEntryRaw(path);
         }
+        if (!file) {
+            throw Error(`File ${path} is not found, cannot read from it`);
+        }
         const totalSize = _.sumBy(file.blobs, b => b.size);
         const buf = new Uint8Array(totalSize);
         let pos = 0;
