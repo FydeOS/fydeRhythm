@@ -22864,14 +22864,17 @@ KeyboardView.prototype.setUpNearbyKeys_ = function() {
   for (var i = 0; i < softKeys.length; i++) {
     var key = softKeys[i];
     key.nearbyKeys = [];
-    key.topLeftCoordinate = goog.style.getClientPosition(key.getElement());
-    key.centerCoordinate = new goog.math.Coordinate(
-        key.topLeftCoordinate.x + key.availableWidth / 2,
-        key.topLeftCoordinate.y + key.availableHeight / 2);
-    key.estimator = new i18n.input.chrome.inputview.elements.content.
-        GaussianEstimator(key.centerCoordinate,
-            covariance.getValue(key.type),
-            key.availableHeight / key.availableWidth);
+    var kelem = key.getElement();
+    if (kelem) {
+      key.topLeftCoordinate = goog.style.getClientPosition(kelem);
+      key.centerCoordinate = new goog.math.Coordinate(
+          key.topLeftCoordinate.x + key.availableWidth / 2,
+          key.topLeftCoordinate.y + key.availableHeight / 2);
+      key.estimator = new i18n.input.chrome.inputview.elements.content.
+          GaussianEstimator(key.centerCoordinate,
+              covariance.getValue(key.type),
+              key.availableHeight / key.availableWidth);
+    }
   }
   for (var i = 0; i < softKeys.length; i++) {
     var key1 = softKeys[i];
