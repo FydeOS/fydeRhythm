@@ -15,6 +15,7 @@ console.htmlLog('>>>load inputview_adapter.js');
 var CLOSURE_NO_DEPS=true;
 
 var controller;
+const port = chrome.runtime.connect(null, {name: "inputviewMessages"});
 
 /**
  * Armed callback to be triggered when a keyset changes.
@@ -359,16 +360,13 @@ function registerInputviewApi() {
     chrome.virtualKeyboardPrivate.lockKeyboard(false);
   });
 
-  // core implement
-  // connect to rime extention backgroundWindow
-  var defaultSendMessage = chrome.runtime.sendMessage;
   registerFunction('chrome.runtime.sendMessage', function(message) {
     if (message.name == 'send_key_event') {
       sendKeyEvent_(message.keyData);
     } else if (message.name == 'commit_text') {
       commitText_(message.text);
     } else {
-      defaultSendMessage(message);
+      port.postMessage(message);
     }
     return true;
   });
@@ -463,4 +461,9 @@ window.initializeVirtualKeyboard = function(keyset, languageCode, passwordLayout
   else {
     controller = new Controller(keyset, languageCode, passwordLayout, name);
   }
+
+  port.onMessage.addListener((msg) => {
+    console.log("Got message from background: ", msg);
+    controller.adapter_.onMessage_(msg, null, null);
+  });
 };

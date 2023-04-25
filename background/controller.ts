@@ -3,7 +3,7 @@ import { getFs, ImeSettings } from "~utils";
 import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
 import type { RimeCandidate } from "~shared-types";
-import { ConstructionOutlined } from "@mui/icons-material";
+import EventEmitter from "events";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -25,7 +25,7 @@ const kSpecialKeys = {
     'ShiftRight': 0xffe2
 }
 
-export class InputController {
+export class InputController extends EventEmitter {
     context?: chrome.input.ime.InputContext;
     session?: RimeSession;
     engineId?: string;
@@ -37,6 +37,7 @@ export class InputController {
     rimeLogBufferPos: number;
 
     constructor() {
+        super();
         this.rimeLogBuffer = new Array<string>(400);
         this.rimeLogBufferPos = 0;
         this.engineId = null;
@@ -150,6 +151,10 @@ export class InputController {
         return stringify(schemaConfig);
     }
 
+    onToggleLanguageState(asciiMode: boolean) {
+        this.emit("toggleLanguageState", asciiMode);
+    }
+
     async loadRime(maintenance: boolean) {
         if (this.engineId) {
             this.resetUI();
@@ -214,11 +219,7 @@ export class InputController {
                 this.session = session;
                 this.session.addListener('optionChanged', (name: string, val: boolean) => {
                     if (name == "ascii_mode") {
-                        // Send status to virtual keyboard
-                        if (this.inputViewVisible) {
-                            chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !val });
-                        }
-
+                        this.onToggleLanguageState(val);
                     }
                     // Send status to fyde
                     const fydeLanguageStateFunction: (string) => void = (chrome.input.ime as any).showFydeLanguageState;
@@ -292,14 +293,7 @@ export class InputController {
     }
 
     sendCandidatesToInputView(candidates: Array<{ candidate: string, ix: number }>) {
-        const msg = {
-            name: "candidates_back",
-            msg: {
-                source: "source",
-                candidates
-            }
-        };
-        chrome.runtime.sendMessage(msg);
+        this.emit("candidatesBack", candidates);
     }
 
     sendCandidateCacheToInputView() {
@@ -557,8 +551,7 @@ export class InputController {
         // TODO: show ascii mode in menu
         if (this.inputViewVisible) {
             const asciiMode = await this.session?.getOption("ascii_mode");
-            console.log("Set keyboard ascii to", asciiMode);
-            chrome.runtime.sendMessage({ name: 'front_toggle_language_state', msg: !asciiMode });
+            this.onToggleLanguageState(asciiMode);
         }
     }
 
@@ -569,11 +562,11 @@ export class InputController {
     async handleInputViewVisibilityChanged(visible: boolean) {
         this.inputViewVisible = visible;
         if (!visible) {
-            this.clearContext();
+            this.session?.clearComposition();
         } else {
-            this.refreshContext();
             this.refreshAsciiMode();
         }
+        this.refreshContext();
     }
 
     // Only used in input view

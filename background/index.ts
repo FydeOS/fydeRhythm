@@ -18,10 +18,6 @@ chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     serviceWorkerKeepalive();
 });
 
-chrome.input.ime.onDeactivated.addListener((engineId) => { 
-    self.controller.inputViewVisible = false;
-});
-
 chrome.input.ime.onFocus.addListener(async (context) => {
     // Todo: in incoginto tab, context.shouldDoLearning = false, 
     // we should disable rime learning in such context
@@ -75,6 +71,42 @@ chrome.runtime.onInstalled.addListener(async (d) => {
         }
         await chrome.storage.local.set({ schemaList: parse(await (await fetch("/assets/builtin/schema-list.yaml")).text()) });
         await self.controller.loadRime(true);
+    }
+})
+
+chrome.runtime.onConnect.addListener((p) => {
+    if (p.name == "inputviewMessages") {
+        console.log("InputView Port Connecting");
+        p.onMessage.addListener((msg) => {
+            console.log("Message from inputview:", msg);
+            if (msg.name == "visibility_change") {
+                self.controller.handleInputViewVisibilityChanged(msg.visibility);
+            } else if (msg.name == "toggle_language_state") {
+                self.controller.setAsciiMode(!msg.msg);
+            } else if (msg.name == "select_candidate") {
+                self.controller.selectCandidate(msg.candidate.ix, false);
+            } else if (msg.name == "load_more_candidate") {
+                self.controller.fetchMoreCandidates(msg.more_candidate_count);
+            }
+        });
+
+        const onToggleLanguageState = function(asciiMode: boolean) {
+            p.postMessage({ name: 'front_toggle_language_state', msg: !asciiMode });
+        }
+
+        const onCandidatesBack = function(candidates: Array<{ candidate: string, ix: number }>) {
+            p.postMessage({ name: "candidates_back", msg: { source: "source", candidates }});
+        }
+
+        self.controller.addListener("toggleLanguageState", onToggleLanguageState);
+        self.controller.addListener("candidatesBack", onCandidatesBack);
+
+        p.onDisconnect.addListener(() => { 
+            console.log("InputView disconnected");
+            self.controller.removeListener("toggleLanguageState", onToggleLanguageState);
+            self.controller.removeListener("candidatesBack", onCandidatesBack);
+            self.controller.handleInputViewVisibilityChanged(false);
+        });
     }
 })
 

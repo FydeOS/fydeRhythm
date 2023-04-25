@@ -13692,7 +13692,6 @@ i18n.input.chrome.inputview.Adapter = function(readyState) {
   this.modifierState_ = {};
   this.features = new FeatureTracker();
   this.readyState_ = readyState;
-  chrome.runtime.onMessage.addListener(this.onMessage_.bind(this));
   this.handler_ = new goog.events.EventHandler(this);
   this.handler_.
       listen(document, 'webkitvisibilitychange', this.onVisibilityChange_).
