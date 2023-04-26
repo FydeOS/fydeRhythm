@@ -3,15 +3,7 @@
 // found in the LICENSE file.
 //
 
-console.htmlLog = function (s) {
-  const containerConsole = document.getElementById("console");
-  const containerLog = document.createElement("div");
-  const text = document.createTextNode(s);
-  containerLog.appendChild(text);
-  containerConsole.appendChild(containerLog);
-}
-
-console.htmlLog('>>>load inputview_adapter.js');
+console.log('>>>load inputview_adapter.js');
 var CLOSURE_NO_DEPS=true;
 
 var controller;
@@ -383,9 +375,9 @@ if (!chrome.i18n) {
  * Trigger loading the virtual keyboard on completion of page load.
  */
 window.onload = function() {
-  console.htmlLog(">>>inputview_adapter onload");
+  console.log(">>>inputview_adapter onload");
   chrome.virtualKeyboardPrivate.setContainerBehavior({mode: "FULL_WIDTH", bounds: {left: 0, top: 0, width: window.screen.width, height: 0}}, function () {
-    console.htmlLog(">>>chrome.virtualKeyboardPrivate.setContainerBehavior");
+    console.log(">>>chrome.virtualKeyboardPrivate.setContainerBehavior");
     var params = {};
     var matches = window.location.href.match(/[#?].*$/);
     if (matches && matches.length > 0) {
@@ -436,11 +428,11 @@ window.onbeforeunload = function() {
  * @param {Object=} opt_config Optional configuration settings.
  */
 window.initializeVirtualKeyboard = function(keyset, languageCode, passwordLayout, name, opt_config) {
-  console.htmlLog(">>>initializeVirtualKeyboard");
+  console.log(">>>initializeVirtualKeyboard");
 
   // override createWindow for workaround
   inputview.createWindow = function (url, options, callback) {
-    console.htmlLog(">>>inputview.createWindow");
+    console.log(">>>inputview.createWindow");
   }
 
   var Controller = i18n.input.chrome.inputview.Controller;
