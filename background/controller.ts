@@ -474,7 +474,7 @@ export class InputController extends EventEmitter {
                     return false;
                 }
             } else {
-                code = keyData.key.toLowerCase().charCodeAt(0);
+                code = keyData.key.charCodeAt(0);
             }
             this.invalidateCandidateCache();
             return (async () => {
@@ -504,7 +504,7 @@ export class InputController extends EventEmitter {
                         return false;
                     }
                 } else {
-                    const char = keyData.key.toLowerCase();
+                    const char = keyData.key;
                     if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
                         // If buffer is empty and input is not letter, just put it to screen directly
                         return false;
