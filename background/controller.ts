@@ -11,6 +11,7 @@ const kMod1Mask = 1 << 3;
 const kAltMask = kMod1Mask;
 const kReleaseMask = 1 << 30;
 
+// Definitions from librime/include/X11/keysymdef.h
 const kSpecialKeys = {
     'ArrowUp': 0xff52,
     'ArrowDown': 0xff54,
@@ -22,7 +23,12 @@ const kSpecialKeys = {
     'ArrowLeft': 0xff51,
     'Escape': 0xff1b,
     'ShiftLeft': 0xffe1,
-    'ShiftRight': 0xffe2
+    'ShiftRight': 0xffe2,
+    'CapsLock': 0xffe5,
+    'ControlLeft': 0xffe3,
+    'ControlRight': 0xffe4,
+    'AltLeft': 0xffe9,
+    'AltRight': 0xffea,
 }
 
 export class InputController extends EventEmitter {
