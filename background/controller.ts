@@ -249,6 +249,8 @@ export class InputController extends EventEmitter {
                                     fydeLanguageStateFunction(v);
                                 } else if (name == "ascii_mode") {
                                     fydeLanguageStateFunction(val ? "EN" : "中");
+                                } else {
+                                    fydeLanguageStateFunction(`${name}: ${val}`);
                                 }
                             })
                         }
