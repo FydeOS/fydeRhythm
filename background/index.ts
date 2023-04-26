@@ -59,8 +59,7 @@ chrome.runtime.onMessage.addListener((m, s, resp) => {
 });
 
 chrome.runtime.onInstalled.addListener(async (d) => {
-    if (d.reason == chrome.runtime.OnInstalledReason.INSTALL || 
-        d.reason == chrome.runtime.OnInstalledReason.UPDATE) {
+    if (d.reason == chrome.runtime.OnInstalledReason.INSTALL) {
         await chrome.storage.sync.set({ settings: kDefaultSettings });
         const fileList = ["aurora_pinyin.prism.bin", "aurora_pinyin.reverse.bin", "aurora_pinyin.table.bin", "aurora_pinyin.schema.yaml"];
         const fs = await getFs();
