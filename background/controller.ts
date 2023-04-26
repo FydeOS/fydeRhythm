@@ -31,6 +31,15 @@ const kSpecialKeys = {
     'AltRight': 0xffea,
 }
 
+const kConventionalKeys = {};
+for (let i = 0; i <= 9; i++) {
+    kConventionalKeys[`Digit${i}`] = i.toString().charCodeAt(0);
+}
+
+for (let i = 'A'.charCodeAt(0); i <= 'Z'.charCodeAt(0); i++) {
+    kConventionalKeys[`Key${String.fromCharCode(i)}`] = i;
+}
+
 export class InputController extends EventEmitter {
     context?: chrome.input.ime.InputContext;
     session?: RimeSession;
@@ -476,11 +485,21 @@ export class InputController extends EventEmitter {
                 if (keyData.code in kSpecialKeys) {
                     code = kSpecialKeys[keyData.code];
                 } else {
-                    console.log("Unhandled key %s", keyData.key);
+                    this.printErr("Unhandled key " + keyData.key);
                     return false;
                 }
             } else {
-                code = keyData.key.charCodeAt(0);
+                // If Alt key or Ctrl key is pressed, then it should be a shortcut key,
+                // and we should pass the original key to RIME, instead of modified key.
+                // For example, if user pressed Ctrl+Shift+3, key is '#' (because shift is
+                // pressed) and code is 'Digit3'. In order for RIME to recognize this shortcut, 
+                // the value sent to RIME should be 51 ('3') instead of 35 ('#'). So we get code
+                // from the 'code' field instead of 'key' field.
+                if ((keyData.altKey || keyData.ctrlKey) && keyData.code in kConventionalKeys) {
+                    code = kConventionalKeys[keyData.code];
+                } else {
+                    code = keyData.key.charCodeAt(0);
+                }
             }
             this.invalidateCandidateCache();
             return (async () => {
