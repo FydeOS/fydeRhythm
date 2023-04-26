@@ -176,8 +176,10 @@ export class InputController extends EventEmitter {
             }
             const settings = configObj.settings as ImeSettings;
             await this.loadMutex.runExclusive(async () => {
+                let asciiMode = false;
                 if (this.engine) {
                     if (this.session) {
+                        asciiMode = await this.session?.getOption("ascii_mode");
                         this.session.destroy();
                         this.session = null;
                     }
@@ -217,6 +219,7 @@ export class InputController extends EventEmitter {
                 await this.flushInputCacheToSession(session);
                 this.engine = engine;
                 this.session = session;
+                await this.session.setOption("ascii_mode", asciiMode);
                 this.session.addListener('optionChanged', (name: string, val: boolean) => {
                     if (name == "ascii_mode") {
                         this.onToggleLanguageState(val);
