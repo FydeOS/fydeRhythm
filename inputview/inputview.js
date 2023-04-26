@@ -30747,7 +30747,7 @@ Controller.prototype.onUpdateToggleLanguageState_ = function(e) {
     if (this.model_.stateManager.isEnMode == e.msg) {
       this.model_.stateManager.isEnMode = !e.msg;
       this.updateToggleLanguageKeyset_();
-      this.container_.currentKeysetView.update();
+      this.container_.update();
     }
   } else {
     var pos = this.currentKeyset_.indexOf('en.compact');
