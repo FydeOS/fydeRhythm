@@ -1,33 +1,17 @@
-This is a [Plasmo extension](https://docs.plasmo.com/) project bootstrapped with [`plasmo init`](https://www.npmjs.com/package/plasmo).
+# 真文韵输入法
 
-## Getting Started
+真文韵输入法是 FydeOS 团队为 ChromeOS 和 FydeOS 操作系统设计的输入法扩展，其内部基于 [RIME 引擎](https://rime.im/)。
 
-First, run the development server:
+## 构建
 
-```bash
-pnpm dev
-# or
-npm run dev
-```
+本项目使用 pnpm 来管理依赖，因此需要你[安装 pnpm](https://pnpm.io/installation)。推荐使用 Node.js v18，更老的版本可能会出现编译错误。
 
-Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
+项目的构建流程：
 
-You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
+1. 将 librime 项目编译出的 rime_emscripten.js 文件放在插件的 background 目录下，rime_emscripten.wasm 文件放在插件的 assets 目录下。
+2. 运行 `pnpm install` 来安装所有依赖项。
+3. 运行 `pnpm build` 来构建插件，构建后的文件将存放于 build/chrome-mv3-prod 目录下。
+4. 如需虚拟键盘的支持，则还需要手动将源代码根目录下的 inputview 目录（虚拟键盘）整体复制到 build/chrome-mv3-prod 目录中。
+5. 使用 `google-chrome --pack-extension=build/chrome-mv3-prod --pack-extension-key=key.pem` 来打包插件。
 
-For further guidance, [visit our Documentation](https://docs.plasmo.com/)
-
-## Making production build
-
-Run the following:
-
-```bash
-pnpm build
-# or
-npm run build
-```
-
-This should create a production bundle for your extension, ready to be zipped and published to the stores.
-
-## Submit to the webstores
-
-The easiest way to deploy your Plasmo extension is to use the built-in [bpp](https://bpp.browser.market) GitHub action. Prior to using this action however, make sure to build your extension and upload the first version to the store to establish the basic credentials. Then, simply follow [this setup instruction](https://docs.plasmo.com/framework/workflows/submit) and you should be on your way for automated submission!
+> :warning: 如果你自行编译 librime，并且运行了 emscripten SDK 的 `emsdk_env` 环境脚本，则 node 会使用 emsdk 自带的 v14 版本的 node（而非系统安装的版本），老版本 node 在 build 的时候会报错。因此，编译插件时不要在 emsdk 环境下进行。
