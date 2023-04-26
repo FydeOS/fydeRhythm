@@ -395,14 +395,14 @@ window.onload = function() {
       });
     }
 
-    var keyset = "pinyin-zh-CN.compact.qwerty";
-    var languageCode = 'zh-CN';
-    var passwordLayout = 'pinyin-zh-CN.en.compact.qwerty';
-    var name = params['inputmethod_pinyin'];
-
-    
     window.resizeTo(window.screen.width, 372);
     window.moveTo(0, window.screen.height - 372);
+
+    chrome.runtime.sendMessage({name: "GetAsciiMode"}, function(resp) {
+      var keyset = resp.asciiMode ? "pinyin-zh-CN.en.compact.qwerty" : "pinyin-zh-CN.compact.qwerty";
+      var languageCode = 'zh-CN';
+      var passwordLayout = 'pinyin-zh-CN.en.compact.qwerty';
+      var name = params['inputmethod_pinyin'];
     
       overrideSwitchToKeyset();
       overrideGetSpatialData();
@@ -412,10 +412,8 @@ window.onload = function() {
         return false;
       };
 
-      if (keyset != 'none') {
-        window.initializeVirtualKeyboard(keyset, languageCode, passwordLayout,
-            name);
-      }
+      window.initializeVirtualKeyboard(keyset, languageCode, passwordLayout, name);
+    });
   });
 };
 

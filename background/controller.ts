@@ -236,7 +236,6 @@ export class InputController extends EventEmitter {
                         }
                     }
                 });
-                await this.refreshAsciiMode();
                 this.notifyRimeStatusChanged();
             });
             await this.refreshContext();
@@ -547,14 +546,6 @@ export class InputController extends EventEmitter {
 
     inputViewVisible: boolean;
 
-    async refreshAsciiMode() {
-        // TODO: show ascii mode in menu
-        if (this.inputViewVisible) {
-            const asciiMode = await this.session?.getOption("ascii_mode");
-            this.onToggleLanguageState(asciiMode);
-        }
-    }
-
     async setAsciiMode(isAscii: boolean) {
         await this.session?.setOption("ascii_mode", isAscii);
     }
@@ -563,8 +554,6 @@ export class InputController extends EventEmitter {
         this.inputViewVisible = visible;
         if (!visible) {
             this.session?.clearComposition();
-        } else {
-            this.refreshAsciiMode();
         }
         this.refreshContext();
     }
