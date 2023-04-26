@@ -485,7 +485,13 @@ export class InputController extends EventEmitter {
             this.invalidateCandidateCache();
             return (async () => {
                 let handled = false;
-                handled = await this.session.processKey(code, mask);
+                try {
+                    handled = await this.session.processKey(code, mask);
+                } catch (ex) {
+                    this.printErr("Error while processing key " + ex.toString());
+                    console.error(ex);
+                    handled = false;
+                }
                 await this.refreshContext();
                 await this.commitIfAvailable();
                 return handled;
