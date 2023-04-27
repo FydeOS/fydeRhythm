@@ -515,6 +515,11 @@ export class InputController extends EventEmitter {
                 }
                 await this.refreshContext();
                 await this.commitIfAvailable();
+                if (!this.preeditEmpty && (keyData.code == "PageUp" || keyData.code == "PageDown")) {
+                    // Chrome will crash if PageUp or PageDown is sent while user is typing in OmniBar and candidate box is shown
+                    // So we always return handled = true in this case, to prevent key event being sent to Chrome
+                    return true;
+                }
                 return handled;
             })();
         } else {
