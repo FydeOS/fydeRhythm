@@ -69,5 +69,11 @@
     },
     "schema_home_page": {
         "message": "方案主页"
+    },
+    "privacy_statement": {
+        "message": "隐私声明"
+    },
+    "privacy_statement_url": {
+        "message": "https://fydeos.com/privacy/fyderhythm/"
     }
 }

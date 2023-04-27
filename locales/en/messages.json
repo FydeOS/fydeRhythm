@@ -69,5 +69,11 @@
      },
      "schema_home_page": {
         "message": "Schema Homepage"
-     }
+     },
+    "privacy_statement": {
+        "message": "Privacy Statement"
+    },
+    "privacy_statement_url": {
+        "message": "https://fydeos.io/privacy/fyderhythm/"
+    }
 }

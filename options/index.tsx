@@ -517,6 +517,9 @@ function OptionsPage() {
 
             <div className={styles.footer}>
                 {manifest.name} v{manifest.version}
+                <Link href={$$("privacy_statement_url")} target="_blank" underline="hover" style={{marginLeft: "5px"}}>
+                    {$$("privacy_statement")}
+                </Link>
                 <br />
                 FydeOS is made possible by gentle souls with real ❤️
             </div>
