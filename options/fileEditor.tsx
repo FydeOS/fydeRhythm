@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { formatBytes, getFileName, getFs } from "~utils";
+import { $$, formatBytes, getFileName, getFs } from "~utils";
 import { ExpandMore, ChevronRight } from '@mui/icons-material';
 import { AiFillSetting } from '@react-icons/all-files/ai/AiFillSetting'
 import { AiFillFileText } from '@react-icons/all-files/ai/AiFillFileText'
@@ -35,7 +35,11 @@ const Transition = React.forwardRef(function Transition(
     return <Slide direction="up" ref={ref} {...props} />;
 });
 
-function FileEditorButton() {
+interface FileEditorButtonProps {
+    onEdit: () => void;
+}
+
+function FileEditorButton(props: FileEditorButtonProps) {
     const [data, setData] = useState([{ name: "", id: "", parent: null, isDir: true, size: 0 }]);
     useEffect(() => {
         async function load() {
@@ -101,6 +105,7 @@ function FileEditorButton() {
         const path = filePath;
         const fs = await getFs();
         await fs.writeWholeFile(path, new TextEncoder().encode(value));
+        props.onEdit();
         console.log(`Changes to ${path} is saved!`);
     }
     function handleEditorChange() {
@@ -152,7 +157,7 @@ function FileEditorButton() {
 
     return <>
         <Button variant="contained" onClick={() => setOpen(true)}>
-            编辑 RIME 配置文件
+            {$$("edit_rime_config")}
         </Button>
         <Dialog
             fullScreen
@@ -176,7 +181,7 @@ function FileEditorButton() {
                 </Toolbar>
             </AppBar>
             <div style={{ display: 'flex' }}>
-                <div>
+                <div style={{ height: "calc(100vh - 64px)", overflow: "scroll", minWidth: "250px", borderRight: "solid 1px gray" }}>
                     <TreeView
                         aria-label="multi-select"
                         defaultCollapseIcon={<ExpandMore />}
@@ -194,7 +199,7 @@ function FileEditorButton() {
                             path={filePath}
                             onMount={handleEditorDidMount}
                             onChange={handleEditorChange}
-                        /> : "Cannot edit this one"
+                        /> : <div style={{ margin: "20px" }}>Cannot edit this file</div>
                     }
                 </div>
             </div>

@@ -75,5 +75,8 @@
     },
     "privacy_statement_url": {
         "message": "https://fydeos.io/privacy/fyderhythm/"
+    },
+    "edit_rime_config": {
+        "message": "Edit RIME config (only for advanced users)"
     }
 }

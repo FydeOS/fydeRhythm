@@ -512,6 +512,9 @@ function OptionsPage() {
                             <Box sx={{ color: engineColor, display: 'inline' }}> {engineStatusString}</Box>
                         </div>
                         <RimeLogDisplay />
+                        <div className={styles.formLabel} style={{marginTop: "10px"}}>
+                            <FileEditorButton onEdit={() => setSettingsDirty(SettingsDirtyStatus.Dirty)}/>
+                        </div>
                     </FormControl>
                 </div>
             </div>
