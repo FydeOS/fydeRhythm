@@ -41,6 +41,7 @@ interface FileEditorButtonProps {
 
 function FileEditorButton(props: FileEditorButtonProps) {
     const [data, setData] = useState([{ name: "", id: "", parent: null, isDir: true, size: 0 }]);
+    const [open, setOpen] = useState(false);
     useEffect(() => {
         async function load() {
             const fs = await getFs();
@@ -58,8 +59,10 @@ function FileEditorButton(props: FileEditorButtonProps) {
             }
             setData(newData);
         }
-        load();
-    }, []);
+        if (open) {
+            load();
+        }
+    }, [open]);
 
     function RenderDirectory(id: string) {
         return data.filter(d => d.parent === id).map(function (d) {
@@ -153,7 +156,6 @@ function FileEditorButton(props: FileEditorButtonProps) {
     }
 
     const [currentChangeTimer, setCurrentChangeTimer] = useState(null);
-    const [open, setOpen] = useState(false);
 
     return <>
         <Button variant="contained" onClick={() => setOpen(true)}>
