@@ -11,8 +11,8 @@ for component in manifest['input_components']:
 # Remove private permissions
 manifest['permissions'] = [p for p in manifest['permissions'] if not p.endswith('Private')]
 
-# Remove key 
 manifest.pop('key')
+manifest.pop('update_url')
 
 with open('manifest.json', 'w') as f:
     json.dump(manifest, f, indent=4)
