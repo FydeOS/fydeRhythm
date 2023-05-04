@@ -512,8 +512,8 @@ function OptionsPage() {
                             <Box sx={{ color: engineColor, display: 'inline' }}> {engineStatusString}</Box>
                         </div>
                         <RimeLogDisplay />
-                        <div className={styles.formLabel} style={{marginTop: "10px"}}>
-                            <FileEditorButton onEdit={() => setSettingsDirty(SettingsDirtyStatus.Dirty)}/>
+                        <div className={styles.formLabel} style={{ marginTop: "10px" }}>
+                            <FileEditorButton onEdit={() => setSettingsDirty(SettingsDirtyStatus.Dirty)} />
                         </div>
                     </FormControl>
                 </div>
@@ -523,6 +523,9 @@ function OptionsPage() {
                 {manifest.name} v{manifest.version}
                 <Link href={$$("privacy_statement_url")} target="_blank" underline="hover" style={{ marginLeft: "5px" }}>
                     {$$("privacy_statement")}
+                </Link>
+                <Link href="https://github.com/FydeOS/fydeRhythm" target="_blank" underline="hover" style={{ marginLeft: "5px" }}>
+                    {$$("open_source")}
                 </Link>
                 <br />
                 FydeOS is made possible by gentle souls with real ❤️

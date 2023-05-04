@@ -78,5 +78,8 @@
     },
     "edit_rime_config": {
         "message": "编辑 RIME 配置文件（仅供熟悉 RIME 引擎的用户使用）"
+    },
+    "open_source": {
+        "message": "源代码"
     }
 }

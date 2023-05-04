@@ -78,5 +78,8 @@
     },
     "edit_rime_config": {
         "message": "Edit RIME config (only for advanced users)"
+    },
+    "open_source": {
+        "message": "View on GitHub"
     }
 }
