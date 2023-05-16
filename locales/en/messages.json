@@ -81,5 +81,8 @@
     },
     "open_source": {
         "message": "View on GitHub"
+    },
+    "update_schema": {
+        "message": "Update"
     }
 }

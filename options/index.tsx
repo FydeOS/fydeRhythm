@@ -34,7 +34,7 @@ import Animation from "./utils/animation";
 import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { $$, getFs, ImeSettings, kDefaultSettings } from "~utils";
+import { $$, getFs, type ImeSettings, kDefaultSettings } from "~utils";
 import Link from "@mui/material/Link";
 import { Settings } from "@mui/icons-material";
 
@@ -409,13 +409,24 @@ function OptionsPage() {
                                 {schemaList.schemas.map((schema) =>
                                     <ListItem key={schema.id} disablePadding>
                                         <ListItemIcon>
-                                            {localSchemaList.includes(schema.id) ? <Radio value={schema.id} /> :
-                                                downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
+                                            {downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
+                                                localSchemaList.includes(schema.id) ? <Radio value={schema.id} /> :
                                                     <IconButton onClick={() => downloadSchema(schema.id)} disabled={downloadSchemaId != null}>
                                                         <CloudDownloadIcon />
                                                     </IconButton>}
+
                                         </ListItemIcon>
-                                        <ListItemText primary={schema.name}
+                                        <ListItemText
+                                            primary={<>{schema.name}
+                                                {localSchemaList.includes(schema.id) &&
+                                                    <Link component="button" underline="hover"
+                                                        onClick={() => downloadSchema(schema.id)}
+                                                        style={{ marginLeft: "8px" }}
+                                                        disabled={downloadSchemaId != null}>
+                                                        {$$("update_schema")}
+                                                    </Link>
+                                                }
+                                            </>}
                                             secondary={<>
                                                 {schema.description}
                                                 {schema.website &&

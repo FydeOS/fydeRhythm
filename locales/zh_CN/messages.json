@@ -81,5 +81,8 @@
     },
     "open_source": {
         "message": "源代码"
+    },
+    "update_schema": {
+        "message": "更新"
     }
 }
