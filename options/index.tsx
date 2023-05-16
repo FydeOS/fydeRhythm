@@ -218,12 +218,13 @@ function OptionsPage() {
         return schemaList.schemas.filter(x => x.id == imeSettings.schema)[0] || null;
     }
 
-    async function downloadSchema(id: string) {
+    async function downloadSchema(id: string, update: boolean = false) {
         try {
+            const fetchInit: RequestInit = { cache: "no-cache" };
             setDownloadSchemaId(id);
             setDownloadProgress(0);
             const schemaFile = `build/${id}.schema.yaml`;
-            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`).then(x => x.text());
+            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`, fetchInit).then(x => x.text());
             const schema = parse(schemaYaml);
 
             const dependencies: Set<string> = new Set();
@@ -239,7 +240,7 @@ function OptionsPage() {
                         const opencc = schema[tn[1] ?? "simplifier"];
                         const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
                         dependencies.add(configPath);
-                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`).then(x => x.text());
+                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`, fetchInit).then(x => x.text());
                         const config = JSON.parse(opencc_config);
 
                         function parseDict(dict) {
@@ -296,12 +297,12 @@ function OptionsPage() {
             const fs = await getFs();
             // Phase 1: Download small files and get size of big files
             for (const f of dependencies) {
-                if (await fs.readEntry(`/root/${f}`)) {
+                if (await fs.readEntry(`/root/${f}`) && !update) {
                     // file already exists
                     console.log(`${f} already exists, skipped`);
                 } else {
                     let controller = new AbortController();
-                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal });
+                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal }, fetchInit);
                     const size = parseInt(res.headers.get('Content-Length'));
                     if ((size && size < 70 * 1024) ||
                         // If response is gzipped, size = NaN
@@ -327,7 +328,7 @@ function OptionsPage() {
             let phase2TotalSize = _.sum(phase2Sizes);
             for (let i = 0; i < phase2Files.length; i++) {
                 const f = phase2Files[i];
-                const res = await fetch(`${kRepoUrl}/${f}`);
+                const res = await fetch(`${kRepoUrl}/${f}`, fetchInit);
                 const reader = res.body.getReader();
                 const buf = new ArrayBuffer(phase2Sizes[i]);
                 let offset = 0;
@@ -420,7 +421,7 @@ function OptionsPage() {
                                             primary={<>{schema.name}
                                                 {localSchemaList.includes(schema.id) &&
                                                     <Link component="button" underline="hover"
-                                                        onClick={() => downloadSchema(schema.id)}
+                                                        onClick={() => downloadSchema(schema.id, true)}
                                                         style={{ marginLeft: "8px" }}
                                                         disabled={downloadSchemaId != null}>
                                                         {$$("update_schema")}
