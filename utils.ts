@@ -44,8 +44,9 @@ export interface ImeSettings {
     schema: string;
     pageSize: number;
     algebraList: string[];
+    horizontal?: boolean;
 }
 
-export const kDefaultSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [] };
+export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [], horizontal: false };
 
 export const $$ = chrome.i18n.getMessage;

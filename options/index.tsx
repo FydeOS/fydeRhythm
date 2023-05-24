@@ -36,7 +36,7 @@ import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import { $$, getFs, type ImeSettings, kDefaultSettings } from "~utils";
 import Link from "@mui/material/Link";
-import { Settings } from "@mui/icons-material";
+import { Settings, Visibility } from "@mui/icons-material";
 
 const kFuzzyMap = [
     {
@@ -190,6 +190,7 @@ function OptionsPage() {
     }
 
     function changeSettings(change: any) {
+        console.log("Change:", change)
         const newSettings = Object.assign({}, imeSettings, change);
         setSettingsDirty(SettingsDirtyStatus.Dirty);
         setImeSettings(newSettings);
@@ -486,6 +487,29 @@ function OptionsPage() {
                                 </IconButton>
                             </div>
                         </div>
+                    </FormControl>
+
+                    <FormControl className={styles.formControl} style={{ display: "none" }}>
+                        <div className={styles.formLabel}>{$$("candidates_layout")}</div>
+                        <FormGroup>
+                            <RadioGroup
+                                value={imeSettings.horizontal ?? false}
+                                onChange={(e) => changeSettings({ horizontal: e.target.value === "true" ? true : false })}
+                                name="layoutHorizontal"
+                                row
+                            >
+                                <FormControlLabel
+                                    control={<Radio />}
+                                    value={false}
+                                    label={$$("layout_vertical")}
+                                />
+                                <FormControlLabel
+                                    control={<Radio />}
+                                    value={true}
+                                    label={$$("layout_horizontal")}
+                                />
+                            </RadioGroup>
+                        </FormGroup>
                     </FormControl>
                 </div>
             </div>

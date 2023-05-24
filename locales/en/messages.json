@@ -93,5 +93,14 @@
     },
     "config_editor_title": {
         "message": "RIME Config Editor"
+    },
+    "candidates_layout": {
+        "message": "Candidate List Layout"
+    },
+    "layout_vertical": {
+        "message": "Vertical"
+    },
+    "layout_horizontal": {
+        "message": "Horizontal (Only available for ChromeOS, unavailable for FydeOS)"
     }
 }

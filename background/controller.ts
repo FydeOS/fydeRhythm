@@ -50,6 +50,7 @@ export class InputController extends EventEmitter {
 
     rimeLogBuffer: string[];
     rimeLogBufferPos: number;
+    activeSettings: ImeSettings;
 
     constructor() {
         super();
@@ -189,7 +190,8 @@ export class InputController extends EventEmitter {
             if (!configObj.settings) {
                 throw Error("Could not find RIME settings, refusing to launch.");
             }
-            const settings = configObj.settings as ImeSettings;
+            this.activeSettings = configObj.settings as ImeSettings;
+            console.log("Settings: ", JSON.stringify(this.activeSettings));
             await this.loadMutex.runExclusive(async () => {
                 let asciiMode = false;
                 if (this.engine) {
@@ -205,7 +207,7 @@ export class InputController extends EventEmitter {
 
                 await new Promise(r => setTimeout(r, 10));
 
-                const config = await this.loadRimeConfig(settings);
+                const config = await this.loadRimeConfig(this.activeSettings);
                 const fs = await getFs();
                 const dirs = ['/root/build', '/root/shared', '/root/user', '/root/shared/opencc'];
                 for (const d of dirs) {
@@ -215,7 +217,7 @@ export class InputController extends EventEmitter {
                 }
                 if (maintenance) {
                     if (config.includes("lua_")) {
-                        const luaContent = await fs.readWholeFile(`/root/shared/${settings.schema}.rime.lua`);
+                        const luaContent = await fs.readWholeFile(`/root/shared/${this.activeSettings.schema}.rime.lua`);
                         await fs.writeWholeFile("/root/user/rime.lua", luaContent);
                     }
                 }
@@ -227,10 +229,10 @@ export class InputController extends EventEmitter {
                 const engine = new RimeEngine();
                 await engine.initialize(this.printErr.bind(this), fs);
                 if (maintenance) {
-                    await engine.rebuildPrism(settings.schema, config);
+                    await engine.rebuildPrism(this.activeSettings.schema, config);
                 }
 
-                const session = await engine.createSession(settings.schema, config);
+                const session = await engine.createSession(this.activeSettings.schema, config);
                 await this.flushInputCacheToSession(session);
                 this.engine = engine;
                 this.session = session;
@@ -345,6 +347,8 @@ export class InputController extends EventEmitter {
                     // Virtual keyboard is not visible, candidiates are displayed in system candidate window
                     if (rimeContext.menu.candidates.length > 0) {
                         promises.push(new Promise((res, rej) => {
+                            console.log("S", this.activeSettings);
+                            console.log("V:", !this.activeSettings.horizontal);
                             chrome.input.ime.setCandidateWindowProperties({
                                 engineID: this.engineId,
                                 properties: {
@@ -355,7 +359,7 @@ export class InputController extends EventEmitter {
                                     auxiliaryText: chrome.i18n.getMessage("candidate_page", (rimeContext.menu.pageNumber + 1).toString())
                                         + (rimeContext.menu.isLastPage ? chrome.i18n.getMessage("candidate_page_last") : ""),
                                     windowPosition: 'composition',
-                                    vertical: true
+                                    vertical: !this.activeSettings.horizontal
                                 }
                             }, (ok) => ok ? res(null) : rej());
                         }));

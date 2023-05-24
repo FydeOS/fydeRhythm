@@ -93,5 +93,14 @@
     },
     "config_editor_title": {
         "message": "RIME 配置编辑器"
+    },
+    "candidates_layout": {
+        "message": "候选词布局"
+    },
+    "layout_vertical": {
+        "message": "纵向"
+    },
+    "layout_horizontal": {
+        "message": "横向（目前不能在 FydeOS 使用，只能在 ChromeOS 使用）"
     }
 }
