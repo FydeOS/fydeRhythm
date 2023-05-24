@@ -1,5 +1,5 @@
 import { Mutex } from "async-mutex";
-import { getFs, ImeSettings } from "~utils";
+import { getFs, type ImeSettings } from "~utils";
 import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
 import type { RimeCandidate } from "~shared-types";
