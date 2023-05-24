@@ -302,7 +302,7 @@ function OptionsPage() {
                     console.log(`${f} already exists, skipped`);
                 } else {
                     let controller = new AbortController();
-                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal }, fetchInit);
+                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal, ...fetchInit });
                     const size = parseInt(res.headers.get('Content-Length'));
                     if ((size && size < 70 * 1024) ||
                         // If response is gzipped, size = NaN
