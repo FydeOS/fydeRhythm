@@ -178,7 +178,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                         <CloseIcon />
                     </IconButton>
                     <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
-                        编辑 RIME 配置
+                        {$$("config_editor_title")}
                     </Typography>
                 </Toolbar>
             </AppBar>
@@ -201,7 +201,8 @@ function FileEditorButton(props: FileEditorButtonProps) {
                             path={filePath}
                             onMount={handleEditorDidMount}
                             onChange={handleEditorChange}
-                        /> : <div style={{ margin: "20px" }}>Cannot edit this file</div>
+                            loading={$$("loading_editor")}
+                        /> : <div style={{ margin: "20px" }}>{$$("cannot_edit_this_file")}</div>
                     }
                 </div>
             </div>

@@ -84,5 +84,14 @@
     },
     "update_schema": {
         "message": "更新"
+    },
+    "cannot_edit_this_file": {
+        "message": "请选择一个文本文件"
+    },
+    "loading_editor": {
+        "message": "正在加载编辑器..."
+    },
+    "config_editor_title": {
+        "message": "RIME 配置编辑器"
     }
 }

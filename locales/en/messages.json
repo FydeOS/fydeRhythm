@@ -84,5 +84,14 @@
     },
     "update_schema": {
         "message": "Update"
+    },
+    "cannot_edit_this_file": {
+        "message": "Please choose a text file"
+    },
+    "loading_editor": {
+        "message": "Loading editor..."
+    },
+    "config_editor_title": {
+        "message": "RIME Config Editor"
     }
 }
