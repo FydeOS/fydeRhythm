@@ -4,12 +4,29 @@ import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
 
 
+async function fallbackDefaultSettings() {
+    await chrome.storage.sync.set({ settings: kDefaultSettings });
+    await chrome.storage.local.set({ schemaList: parse(await (await fetch("/assets/builtin/schema-list.yaml")).text()) });
+    if (!self.controller.engine && !self.controller.engineLoading) {
+        const fileList = ["aurora_pinyin.prism.bin", "aurora_pinyin.reverse.bin", "aurora_pinyin.table.bin", "aurora_pinyin.schema.yaml"];
+        const fs = await getFs();
+        for (const f of fileList) {
+            const resp = await fetch(`/assets/builtin/${f}`);
+            const buf = await resp.arrayBuffer();
+            await fs.writeWholeFile(`/root/build/${f}`, new Uint8Array(buf));
+        }
+        await self.controller.loadRime(true);
+    }
+}
+
 self.controller = new InputController();
-chrome.storage.sync.get(["settings"]).then((obj) => {
+chrome.storage.sync.get(["settings"]).then(async (obj) => {
     // Only load engine if settings exists
     if (obj.settings) {
-        // Load engine (no need to wait for it to complete)
-        self.controller.loadRime(false);
+        const ok = await self.controller.loadRime(false);
+        if (!ok) {
+            await fallbackDefaultSettings();
+        }
     }
 })
 
@@ -60,18 +77,7 @@ chrome.runtime.onMessage.addListener((m, s, resp) => {
 
 chrome.runtime.onInstalled.addListener(async (d) => {
     if (d.reason == chrome.runtime.OnInstalledReason.INSTALL) {
-        await chrome.storage.sync.set({ settings: kDefaultSettings });
-        await chrome.storage.local.set({ schemaList: parse(await (await fetch("/assets/builtin/schema-list.yaml")).text()) });
-        if (!self.controller.engine && !self.controller.engineLoading) {
-            const fileList = ["aurora_pinyin.prism.bin", "aurora_pinyin.reverse.bin", "aurora_pinyin.table.bin", "aurora_pinyin.schema.yaml"];
-            const fs = await getFs();
-            for (const f of fileList) {
-                const resp = await fetch(`/assets/builtin/${f}`);
-                const buf = await resp.arrayBuffer();
-                await fs.writeWholeFile(`/root/build/${f}`, new Uint8Array(buf));
-            }
-            await self.controller.loadRime(true);
-        }
+        await fallbackDefaultSettings();
     }
 })
 

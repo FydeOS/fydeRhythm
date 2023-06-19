@@ -171,7 +171,7 @@ export class InputController extends EventEmitter {
         this.emit("toggleLanguageState", asciiMode);
     }
 
-    async loadRime(maintenance: boolean) {
+    async loadRime(maintenance: boolean): boolean {
         if (this.engineId) {
             this.resetUI();
         }
@@ -181,7 +181,7 @@ export class InputController extends EventEmitter {
             await this.loadMutex.waitForUnlock();
             // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
             if (!maintenance) {
-                return;
+                return true;
             }
         }
         try {
@@ -261,9 +261,11 @@ export class InputController extends EventEmitter {
                 this.notifyRimeStatusChanged();
             });
             await this.refreshContext();
+            return true;
         } catch (ex) {
             console.error("Error while loading RIME engine: ", ex);
             this.printErr(`Error while loading RIME engine: ${ex.toString()}`);
+            return false;
         }
     }
 
