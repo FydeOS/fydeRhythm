@@ -5,7 +5,7 @@
 </p>
 <p align="center">
     <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
-    <img src="https://img.shields.io/badge/%20-Chrome-red?logo=google-chrome&logoColor=white" alt="Download for Chrome" />
+    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png"raw=true width=138 alt="Download for Chrome" />
 
   </a>
 
@@ -22,8 +22,11 @@ We're proud to present the source code for the second iteration of FydeRhythm In
 - 🛠️ **Configurable Settings**: Grants users the freedom to modify configuration files, offering flexibility in adjusting the input method settings to their needs.
 
 ## Download Options
-- [![Chrome Web Store](https://img.shields.io/badge/%20-Chrome-red?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni) 
-- [GitHub Release](https://github.com/FydeOS/fydeRhythm)
+- <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
+    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png" alt="Chrome Web Store" width="138">
+</a>
+
+- [GitHub Release](https://github.com/FydeOS/fydeRhythm/releases)
 
 ## Discover More
 If you're interested in our project and want to learn more about it, such as the build process, internal structure, etc., please visit our [Wiki](https://github.com/FydeOS/fydeRhythm/wiki) page.
