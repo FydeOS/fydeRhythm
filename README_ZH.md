@@ -6,7 +6,7 @@
 </p>
 <p align="center">
     <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
-    <img src="https://img.shields.io/badge/%20-Chrome-red?logo=google-chrome&logoColor=white" alt="Download for Chrome" />
+    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png"raw=true width=138" alt="Download for Chrome" />
   </a>
     
 **真文韵输入法**是FydeOS团队倾心打造的一款专为 ChromeOS 和 FydeOS 操作系统量身定制的输入法，其基础建立在功能卓越、高度可定制的 [RIME](https://rime.im/) 输入法引擎上。
@@ -22,8 +22,11 @@
 - 🛠️ **配置文件修改权限**：提供配置文件修改权限，让你可以根据自身的需要自由调整输入法的设置。
 
 ## 下载
-- [![Chrome 商店](https://img.shields.io/badge/%20-Chrome-red?logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni) 
-- [GitHub Release](https://github.com/FydeOS/fydeRhythm)
+- <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
+    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png" alt="Chrome Web Store" width="138">
+</a>
+
+- [GitHub Release](https://github.com/FydeOS/fydeRhythm/releases)
 
 ## 更多信息
 如果你对我们的项目感兴趣，并希望了解更多关于本项目的信息，如构建流程、内部结构等，欢迎访问我们的 [Wiki](https://github.com/FydeOS/fydeRhythm/wiki) 页面。
