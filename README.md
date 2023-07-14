@@ -11,6 +11,12 @@
 
 **fydeRhythm** is a meticulously crafted keyboard input method, designed with precision by the FydeOS team. Specifically created for ChromeOS and FydeOS operating systems, it leverages the power and versatility of the [RIME](https://rime.im/) input method engine.
 
+<p align="center">
+<a >
+    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/fydeRhythm%20Demo.gif" alt="fydeRhythm Demo" width="500">
+</a>
+</p>
+
 We're proud to present the source code for the second iteration of FydeRhythm Input Method. This version marks a departure from the first, bringing a fresh design paradigm and architectural approach. Every component of the input method, inclusive of the RIME engine, is encapsulated within the plugin, thus eliminating the need for an independent server running within the system. We've successfully compiled the RIME engine into WebAssembly, courtesy of the emscripten toolchain, facilitating its execution directly within the plugin environment. Additionally, optimizations have been applied to the storage content and startup process to ensure swift launches and an enhanced user experience.
 
 ## Features
