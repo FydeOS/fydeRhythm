@@ -302,18 +302,37 @@ export class InputController extends EventEmitter {
     preeditEmpty: boolean;
     setComposition(param: chrome.input.ime.CompositionParameters): Promise<void> {
         return new Promise((res, rej) => {
+            // Check if param and param.text are valid
+            if (!param || (typeof param.text !== 'string')) {
+                rej(new Error('Invalid param or param.text is not a string'));
+                return;
+            }
+              // Replace all spaces in param.text with underscore
+              // Using spaces may cause problems with Chinese character input within some Linux applications (such as QQ).
+            param.text = param.text.replace(/\s+/g, '_');
             if (param.text.length == 0 && this.preeditEmpty) {
-                // If preedit is already empty, and new preedit is also empty, then do not call
+                //  If preedit is already empty, and new preedit is also empty, then do not call
                 // setComposition. This will mostly happen in ASCII mode (e.g. input method is 
                 // switched off by pressing Shift). If we still call setComposition in this case,
                 // Chrome omnibar autofill text will disappear, resulting in bad user experience
                 res(null);
             } else {
                 this.preeditEmpty = param.text.length == 0;
-                chrome.input.ime.setComposition(param, (ok) => ok ? res(null) : rej());
+                try {
+                    chrome.input.ime.setComposition(param, (ok) => {
+                        if (chrome.runtime.lastError) {
+                            rej(new Error(chrome.runtime.lastError.message));
+                        } else {
+                            ok ? res(null) : rej();
+                        }
+                    });
+                } catch (err) {
+                    rej(err);
+                }
             }
-        })
+        });
     }
+
 
     sendCandidatesToInputView(candidates: Array<{ candidate: string, ix: number }>) {
         this.emit("candidatesBack", candidates);
