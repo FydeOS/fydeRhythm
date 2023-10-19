@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  semver@>=7.0.0 <7.5.2: '>=7.5.2'
+  '@babel/traverse@<7.23.2': '>=7.23.2'
+
 dependencies:
   '@emotion/react':
     specifier: ^11.11.1
@@ -118,7 +122,7 @@ packages:
       '@babel/helpers': 7.23.2
       '@babel/parser': 7.21.2
       '@babel/template': 7.22.15
-      '@babel/traverse': 7.21.2
+      '@babel/traverse': 7.23.2
       '@babel/types': 7.21.2
       convert-source-map: 1.9.0
       debug: 4.3.4
@@ -303,24 +307,6 @@ packages:
       '@babel/code-frame': 7.22.13
       '@babel/parser': 7.23.0
       '@babel/types': 7.23.0
-
-  /@babel/traverse@7.21.2:
-    resolution: {integrity: sha512-ts5FFU/dSUPS13tv8XiEObDu9K+iagEKME9kAbaP7r0Y9KtZJZ+NGndDvWoRAYNpeWafbpFeki3q9QoMD6gxyw==}
-    engines: {node: '>=6.9.0'}
-    dependencies:
-      '@babel/code-frame': 7.22.13
-      '@babel/generator': 7.21.1
-      '@babel/helper-environment-visitor': 7.22.20
-      '@babel/helper-function-name': 7.23.0
-      '@babel/helper-hoist-variables': 7.22.5
-      '@babel/helper-split-export-declaration': 7.22.6
-      '@babel/parser': 7.21.2
-      '@babel/types': 7.21.2
-      debug: 4.3.4
-      globals: 11.12.0
-    transitivePeerDependencies:
-      - supports-color
-    dev: true
 
   /@babel/traverse@7.23.2:
     resolution: {integrity: sha512-azpe59SQ48qG6nu2CzcMLbxUudtN+dOM9kDbUqGq3HXUJRlo7i8fvPoxQUzYgLZ4cMVmuZgm8vvBpNeRhd6XSw==}
@@ -2522,7 +2508,7 @@ packages:
       '@plasmohq/consolidate': 0.17.0(lodash@4.17.21)(react-dom@18.2.0)(react@18.2.0)
       '@vue/compiler-sfc': 3.2.47
       nullthrows: 1.1.1
-      semver: 7.3.8
+      semver: 7.5.4
     transitivePeerDependencies:
       - arc-templates
       - atpl
@@ -2580,7 +2566,7 @@ packages:
       '@babel/core': 7.21.0
       '@babel/generator': 7.21.1
       '@babel/parser': 7.21.2
-      '@babel/traverse': 7.21.2
+      '@babel/traverse': 7.23.2
       '@babel/types': 7.21.2
       javascript-natural-sort: 0.7.1
       lodash.clone: 4.5.0
@@ -4793,7 +4779,7 @@ packages:
     resolution: {integrity: sha512-SQkEP4hmNWjlniS5zdnfIXTk1x7Ome85RDzHlTbBtzE97Gfwz/Ipw4v/Ryk20DWIy3yCNVLVlGKApCnmvYoJbA==}
     engines: {node: '>=10'}
     dependencies:
-      semver: 7.5.0
+      semver: 7.5.4
     dev: false
 
   /node-addon-api@3.2.1:
@@ -4914,7 +4900,7 @@ packages:
       got: 12.6.0
       registry-auth-token: 5.0.2
       registry-url: 6.0.1
-      semver: 7.5.0
+      semver: 7.5.4
     dev: false
 
   /param-case@3.0.4:
@@ -5030,7 +5016,7 @@ packages:
       node-object-hash: 3.0.0
       package-json: 8.1.0
       process: 0.11.10
-      semver: 7.5.0
+      semver: 7.5.4
       sharp: 0.32.0
       tempy: 3.0.0
       typescript: 5.0.4
@@ -5457,16 +5443,8 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  /semver@7.3.8:
-    resolution: {integrity: sha512-NB1ctGL5rlHrPJtFDVIVzTyQylMLu9N9VICA6HSFJo8MCGVTMW6gfpicwKmmK/dAjTOrqu5l63JJOpDSrAis3A==}
-    engines: {node: '>=10'}
-    hasBin: true
-    dependencies:
-      lru-cache: 6.0.0
-    dev: false
-
-  /semver@7.5.0:
-    resolution: {integrity: sha512-+XC0AD/R7Q2mPSRuy2Id0+CGTZ98+8f+KvwirxOKIEyid+XSx6HbC63p+O4IndTHuX5Z+JxQ0TghCkO5Cg/2HA==}
+  /semver@7.5.4:
+    resolution: {integrity: sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPt8uVjRrxAUt/nbswYc+tK6Y2btiULjd4+fnq15PX+nqQDC7Oft7WkwcA==}
     engines: {node: '>=10'}
     hasBin: true
     dependencies:
@@ -5490,7 +5468,7 @@ packages:
       detect-libc: 2.0.2
       node-addon-api: 6.1.0
       prebuild-install: 7.1.1
-      semver: 7.5.0
+      semver: 7.5.4
       simple-get: 4.0.1
       tar-fs: 2.1.1
       tunnel-agent: 0.6.0
