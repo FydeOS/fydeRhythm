@@ -171,7 +171,7 @@ export class InputController extends EventEmitter {
         this.emit("toggleLanguageState", asciiMode);
     }
 
-    async loadRime(maintenance: boolean): boolean {
+    async loadRime(maintenance: boolean): Promise<boolean> {
         if (this.engineId) {
             this.resetUI();
         }
