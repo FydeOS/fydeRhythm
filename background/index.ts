@@ -27,6 +27,7 @@ chrome.storage.sync.get(["settings"]).then(async (obj) => {
         if (!ok) {
             await fallbackDefaultSettings();
         }
+        await globalPrepare();
     }
 })
 
@@ -35,51 +36,54 @@ chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     serviceWorkerKeepalive();
 });
 
-chrome.input.ime.onFocus.addListener(async (context) => {
-    // Todo: in incoginto tab, context.shouldDoLearning = false, 
-    // we should disable rime learning in such context
-    console.log("Got focus event, context = ", context);
-    self.controller.context = context;
-});
-
-chrome.input.ime.onBlur.addListener((ctxId) => {
-    if (self.controller.context?.contextID == ctxId) {
-        self.controller.clearContext();
+chrome.runtime.onInstalled.addListener(async (d) => {
+    if (d.reason == chrome.runtime.OnInstalledReason.INSTALL) {
+        await fallbackDefaultSettings();
+        await globalPrepare();
     }
-});
+})
 
-chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
-    console.log("Processing key: ", JSON.stringify(keyData));
-    const result = self.controller.feedKey(keyData);
-    if (result === false || result === true) {
-        return result;
-    } else {
-        result.then((handled) => chrome.input.ime.keyEventHandled(requestId, handled));
-        return undefined;
-    }
-});
+const globalPrepare = async () => {
+  chrome.input.ime.onFocus.addListener(async (context) => {
+      // Todo: in incoginto tab, context.shouldDoLearning = false, 
+      // we should disable rime learning in such context
+      console.log("Got focus event, context = ", context);
+      self.controller.context = context;
+  });
 
-chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) => {
-    console.log(candidateId, button);
-    if (button == 'left') {
-        self.controller.selectCandidate(candidateId);
-        self.controller.lastRightClickItem = -1;
-    } else if (button == 'right') {
-        self.controller.rightClick(candidateId);
-    }
-});
+  chrome.input.ime.onBlur.addListener((ctxId) => {
+      if (self.controller.context?.contextID == ctxId) {
+          self.controller.clearContext();
+      }
+  });
+
+  chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
+      console.log("Processing key: ", JSON.stringify(keyData));
+      const result = self.controller.feedKey(keyData);
+      if (result === false || result === true) {
+          return result;
+      } else {
+          result.then((handled) => chrome.input.ime.keyEventHandled(requestId, handled));
+          return undefined;
+      }
+  });
+
+  chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) => {
+      console.log(candidateId, button);
+      if (button == 'left') {
+          self.controller.selectCandidate(candidateId);
+          self.controller.lastRightClickItem = -1;
+      } else if (button == 'right') {
+          self.controller.rightClick(candidateId);
+      }
+  });
+}
 
 chrome.runtime.onMessage.addListener((m, s, resp) => {
     if (m.name)
         return;
     console.log("BG Received message: ", m);
 });
-
-chrome.runtime.onInstalled.addListener(async (d) => {
-    if (d.reason == chrome.runtime.OnInstalledReason.INSTALL) {
-        await fallbackDefaultSettings();
-    }
-})
 
 chrome.runtime.onConnect.addListener((p) => {
     if (p.name == "inputviewMessages") {
