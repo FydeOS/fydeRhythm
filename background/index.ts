@@ -19,31 +19,29 @@ async function fallbackDefaultSettings() {
     }
 }
 
+let rimeLoaded = false;
 self.controller = new InputController();
 chrome.storage.sync.get(["settings"]).then(async (obj) => {
     // Only load engine if settings exists
     if (obj.settings) {
         const ok = await self.controller.loadRime(false);
-        if (!ok) {
-            await fallbackDefaultSettings();
-        }
-        await globalPrepare();
+        rimeLoaded = ok;
     }
-})
+}).catch((e) => {
+    console.error('load settings error', e);
+}).finally(async () => {
+    if (!rimeLoaded) {
+      await fallbackDefaultSettings();
+    }
+    await postLoad();
+});
 
 chrome.input.ime.onActivate.addListener(async (engineId, screen) => {
     self.controller.engineId = engineId;
     serviceWorkerKeepalive();
 });
 
-chrome.runtime.onInstalled.addListener(async (d) => {
-    if (d.reason == chrome.runtime.OnInstalledReason.INSTALL) {
-        await fallbackDefaultSettings();
-        await globalPrepare();
-    }
-})
-
-const globalPrepare = async () => {
+const postLoad = async () => {
   chrome.input.ime.onFocus.addListener(async (context) => {
       // Todo: in incoginto tab, context.shouldDoLearning = false, 
       // we should disable rime learning in such context
