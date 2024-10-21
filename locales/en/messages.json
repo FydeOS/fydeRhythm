@@ -64,6 +64,9 @@
      "error_downloading_schema": {
         "message": "Error while downloading schema: "
      },
+     "error_form": {
+        "message": "github repo url or schema_id error"
+     },
      "error_fetch_schema_list": {
         "message": "Error while fetching schema list:"
      },
@@ -82,8 +85,14 @@
     "open_source": {
         "message": "View on GitHub"
     },
+    "add_schema": {
+        "message": "Add"
+    },
     "update_schema": {
         "message": "Update"
+    },
+    "remove_schema": {
+        "message": "Remove"
     },
     "cannot_edit_this_file": {
         "message": "Please choose a text file"

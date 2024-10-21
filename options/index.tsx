@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import _ from "lodash";
+import _, { set } from "lodash";
 import { parse, stringify } from 'yaml'
 import { ThemeProvider } from '@mui/material/styles';
 
@@ -36,7 +36,8 @@ import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import { $$, getFs, type ImeSettings, kDefaultSettings } from "~utils";
 import Link from "@mui/material/Link";
-import { Settings, Visibility } from "@mui/icons-material";
+import { CompressTwoTone, Settings, Visibility } from "@mui/icons-material";
+import { Input } from "@mui/material";
 
 const kFuzzyMap = [
     {
@@ -70,6 +71,8 @@ interface SchemaDescription {
     name: string;
     description: string;
     website: string;
+    user: boolean | undefined;
+    realName: string | undefined;
     extra_data: boolean | undefined;
     fuzzy_pinyin: boolean | undefined;
 }
@@ -79,6 +82,7 @@ interface SchemaListFile {
 }
 
 const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
+const kConventerUrl = 'https://rime-conf-translator.fydeos.io'
 
 function OptionsPage() {
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
@@ -101,6 +105,11 @@ function OptionsPage() {
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [downloadSchemaId, setDownloadSchemaId] = useState(null);
 
+    const [personalRepoURL, setPersonalRepoURL] = useState<string>(null);
+    const [personalRepoSchemaId, setPersonalRepoSchemaId] = useState<string>(null);
+
+    const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
+
     // chrome.storage.local.get
 
     async function updateRimeStatus() {
@@ -121,17 +130,16 @@ function OptionsPage() {
     async function loadLocalSchemaList(): Promise<string[]> {
         const fs = await getFs();
         const content = await fs.readAll();
-        const schemaRegex = /\/root\/build\/(\w+)\.schema\.yaml/g;
+        const schemaRegex = /\/root\/build\/((\w|-)+)\.schema\.yaml/g;
         const list = content.map(c => [...c.fullPath.matchAll(schemaRegex)]).filter(c => c.length == 1).map(c => c[0][1].toString());
         setLocalSchemaList(list);
+        console.log("Local schema list:", list);
         return list;
     }
 
     async function loadSchemaList() {
         const l = await chrome.storage.local.get(["schemaList"]);
-        if (l.schemaList) {
-            setSchemaList(l.schemaList);
-        }
+        console.log("loadSchemaList:", l.schemaList);
         setFetchingList(true);
         let newData: SchemaListFile;
         try {
@@ -147,6 +155,10 @@ function OptionsPage() {
         } finally {
             setFetchingList(false);
         }
+        console.log("fetch", newData);
+        const selfDefinedSchema = await getSelfDefinedSchemaList();
+        newData.schemas = newData.schemas.concat(selfDefinedSchema);
+        console.log(newData);
         setSchemaList(newData);
         await chrome.storage.local.set({ schemaList: newData });
     }
@@ -219,14 +231,231 @@ function OptionsPage() {
         return schemaList.schemas.filter(x => x.id == imeSettings.schema)[0] || null;
     }
 
+    async function addSelfDefinedSchema(id: string, name: string, description: string, website: string, realName: string) {
+        const selfDefinedSchema = await getSelfDefinedSchemaList();
+        const user = true;
+        const item = {id, name, description, website, realName, user};
+        let result = selfDefinedSchema.filter( el => (el.id != id) );
+        result.push(item);
+        chrome.storage.local.set({ "selfDefinedSchema": result });
+        loadSchemaList();
+    }
+
+    async function removeSelfDefinedSchema(id: string) {
+        const selfDefinedSchema = await getSelfDefinedSchemaList();
+        let result = selfDefinedSchema.filter( el => (el.id != id) );
+        chrome.storage.local.set({ "selfDefinedSchema": result });
+        loadSchemaList();
+        
+    }
+
+    async function getSelfDefinedSchemaList() {
+        const l = await chrome.storage.local.get(["selfDefinedSchema"]);
+        console.log("selfDefinedSchema", l.selfDefinedSchema);
+        if (l.selfDefinedSchema) {
+            return l.selfDefinedSchema;
+        } else {
+            return [];
+        } 
+    }
+
+    async function convertPersonalSchema(repo: string='', schema_id: string='', force: boolean=false, convert_schema_id: string='') {
+        setFetchListError('');
+        try {
+            if (convert_schema_id) {
+                setDownloadSchemaId(convert_schema_id);
+            } else {
+                setDownloadSchemaId(fydeosUserDefinedSchema);
+            }
+
+            setDownloadProgress(5);
+
+            const fetchInit: RequestInit = { cache: "no-cache" };
+            
+            let postData = {repo, schema_id, force};
+
+            if (postData.repo == '') {
+                postData.repo = personalRepoURL;
+            }
+
+            if (postData.schema_id == '') {
+                postData.schema_id = personalRepoSchemaId;
+            }
+
+            if (!(postData.repo && postData.schema_id)) {
+                setFetchListError($$("error_form"));
+                return;
+            }
+
+            const data = await fetch(kConventerUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(postData),
+            }).then(x => x.json())
+
+            if (data['status'] != 'complete') {
+                setFetchListError($$("error_downloading_schema") + data['message']);
+                return;
+            }
+
+            const update = true;
+            const id = data['schema_id'];
+            // [to-do] do not with merge with downloadSchema, there will be more features soon. 
+            setDownloadProgress(10);
+
+            const kRepoUrl = kConventerUrl + "/schema/"+id;
+            const schemaFile = `build/${id}.schema.yaml`;
+            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`, fetchInit).then(x => x.text());
+            const schema = parse(schemaYaml);
+
+            const dependencies: Set<string> = new Set();
+
+            if (schemaYaml.includes("lua_")) {
+                dependencies.add(`shared/${id}.rime.lua`);
+            }
+            
+            if (schema.engine?.filters) {
+                for (const t of schema.engine.filters) {
+                    const tn = t.split("@");
+                    if (tn[0] == "simplifier") {
+                        const opencc = schema[tn[1] ?? "simplifier"];
+                        const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
+                        dependencies.add(configPath);
+                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`, fetchInit).then(x => x.text());
+                        const config = JSON.parse(opencc_config);
+
+                        function parseDict(dict) {
+                            if (dict.type === 'ocd2' || dict.type === 'text') {
+                                dependencies.add(`shared/opencc/${dict.file}`);
+                            } else if (dict.type === 'group') {
+                                dict.dicts.forEach(d => parseDict(d));
+                            }
+                        }
+
+                        if (config.segmentation && config.segmentation.dict) {
+                            parseDict(config.segmentation.dict);
+                        }
+
+                        if (config.conversion_chain) {
+                            config.conversion_chain.forEach(step => {
+                                if (step.dict) {
+                                    parseDict(step.dict);
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (schema.engine?.translators) {
+                for (const t of schema.engine.translators) {
+                    const tn = t.split("@");
+                    // Only these two use a dictionary
+                    const translators = ["script_translator", "table_translator", "reverse_lookup_translator"];
+                    if (translators.includes(tn[0])) {
+                        const ns = tn[1] ?? "translator";
+                        const dictName: string = schema[ns].dictionary;
+                        if (!dictName) {
+                            continue;
+                        }
+                        const prismName: string = schema[ns].prism ?? dictName;
+
+                        dependencies.add(`build/${dictName}.table.bin`);
+                        dependencies.add(`build/${dictName}.reverse.bin`);
+                        dependencies.add(`build/${prismName}.prism.bin`);
+                    }
+                }
+            }
+            if (schema.grammar?.language) {
+                dependencies.add(`shared/${schema.grammar.language}.gram`);
+            }
+
+            const kPhase1Weight = 30;
+            const phase2Files = [];
+            const phase2Sizes = [];
+            let phase1Progress = 0;
+
+            const fs = await getFs();
+            // Phase 1: Download small files and get size of big files
+            for (const f of dependencies) {
+                if (await fs.readEntry(`/root/${f}`) && !update) {
+                    // file already exists
+                    console.log(`${f} already exists, skipped`);
+                } else {
+                    let controller = new AbortController();
+                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal, ...fetchInit });
+                    const size = parseInt(res.headers.get('Content-Length'));
+                    if ((size && size < 70 * 1024) ||
+                        // If response is gzipped, size = NaN
+                        isNaN(size)
+                    ) {
+                        const buf = await res.arrayBuffer();
+                        fs.writeWholeFile(`/root/${f}`, new Uint8Array(buf));
+                        console.log("Downloaded", f);
+                    } else {
+                        phase2Files.push(f);
+                        phase2Sizes.push(size);
+                        controller.abort();
+                        console.log("Checked", f, `Size = ${size}`);
+                    }
+                }
+                phase1Progress++;
+                setDownloadProgress(kPhase1Weight * phase1Progress / dependencies.size);
+            }
+
+            // Phase 2: Download big files
+            let downloadedSize = 0;
+            let phase2LastProgress = 0;
+            let phase2TotalSize = _.sum(phase2Sizes);
+            for (let i = 0; i < phase2Files.length; i++) {
+                const f = phase2Files[i];
+                const res = await fetch(`${kRepoUrl}/${f}`, fetchInit);
+                const reader = res.body.getReader();
+                const buf = new ArrayBuffer(phase2Sizes[i]);
+                let offset = 0;
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = new Uint8Array(buf, offset, value.length);
+                    chunk.set(new Uint8Array(value));
+                    offset += value.length;
+                    downloadedSize += value.length;
+                    let newProgress = kPhase1Weight + (kTotalProgress - kPhase1Weight) * downloadedSize / phase2TotalSize;
+                    if (newProgress - phase2LastProgress > 0.5) {
+                        setDownloadProgress(newProgress);
+                        phase2LastProgress = newProgress;
+                    }
+                }
+                fs.writeWholeFile(`/root/${f}`, new Uint8Array(buf));
+                console.log("Downloaded", f);
+            }
+
+            // Schema should be the last file to be written, in case an error is encountered while downloading
+            await fs.writeWholeFile(`/root/${schemaFile}`, new TextEncoder().encode(schemaYaml));
+            await addSelfDefinedSchema(id, schema.schema.name, schema.schema.description, data['repo'], postData.schema_id);
+            changeSettings({ schema: id });
+        } catch (ex) {
+            console.log(ex);
+            setFetchListError($$("error_downloading_schema") + 'repo conf error');
+        } finally {
+            await loadLocalSchemaList();
+            setDownloadSchemaId(null);
+        }
+    }
+
     async function downloadSchema(id: string, update: boolean = false) {
+        setFetchListError('');
         try {
             const fetchInit: RequestInit = { cache: "no-cache" };
             setDownloadSchemaId(id);
             setDownloadProgress(0);
+            
             const schemaFile = `build/${id}.schema.yaml`;
             const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`, fetchInit).then(x => x.text());
             const schema = parse(schemaYaml);
+
 
             const dependencies: Set<string> = new Set();
 
@@ -413,20 +642,28 @@ function OptionsPage() {
                                         <ListItemIcon>
                                             {downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
                                                 localSchemaList.includes(schema.id) ? <Radio value={schema.id} /> :
-                                                    <IconButton onClick={() => downloadSchema(schema.id)} disabled={downloadSchemaId != null}>
+                                                    <IconButton onClick={() =>downloadSchema(schema.id)} disabled={downloadSchemaId != null}>
                                                         <CloudDownloadIcon />
                                                     </IconButton>}
-
                                         </ListItemIcon>
                                         <ListItemText
-                                            primary={<>{schema.name}
+                                            primary={<>{schema.user ? schema.realName : schema.id } { schema.name }
                                                 {localSchemaList.includes(schema.id) &&
                                                     <Link component="button" underline="hover"
-                                                        onClick={() => downloadSchema(schema.id, true)}
+                                                        onClick={() =>  {
+                                                            schema.user  ? convertPersonalSchema(schema.website, schema.realName, true, schema.id) : downloadSchema(schema.id, true)
+                                                        }}
                                                         style={{ marginLeft: "8px" }}
                                                         disabled={downloadSchemaId != null}>
                                                         {$$("update_schema")}
                                                     </Link>
+                                                }
+                                                {schema.user ?
+                                                    <Link component="button" underline="hover"
+                                                        onClick={() => removeSelfDefinedSchema(schema.id)}
+                                                        style={{ marginLeft: "8px" }}>
+                                                        {$$("remove_schema")}
+                                                    </Link> : <></>
                                                 }
                                             </>}
                                             secondary={<>
@@ -439,6 +676,40 @@ function OptionsPage() {
                                             </>}
                                         />
                                     </ListItem>)}
+                                <ListItem key="1000" disablePadding>
+                                    <ListItemIcon>
+                                    {downloadSchemaId == fydeosUserDefinedSchema ? <CircularProgress variant="determinate" value={downloadProgress} /> : <></>}
+                                    </ListItemIcon>
+                                    <TextField
+                                        className={styles.input}
+                                        id="filled"
+                                        label="GitHub Repo URL"
+                                        variant="filled"
+                                        onChange={e => {
+                                            let v = e.target.value;
+                                            setPersonalRepoURL(v);
+                                        }}
+                                        style={{ width: "400px" }}
+                                    />
+                                
+                                    <TextField
+                                        className={styles.input}
+                                        id="filled"
+                                        label="schema Id"
+                                        variant="filled"
+                                        onChange={e => {
+                                            let v = e.target.value;
+                                            setPersonalRepoSchemaId(v);
+                                        }}
+                                        style={{ width: "150px", marginLeft: "8px" }}
+                                    />
+                                    <Link component="button" underline="hover"
+                                        onClick={() => convertPersonalSchema()}
+                                        style={{ marginLeft: "8px" }}
+                                        disabled={downloadSchemaId != null}>
+                                        {$$("add_schema")}
+                                    </Link>
+                                </ListItem>
                             </List>
                         </RadioGroup>
                         <p>{fetchListError && <Box sx={{ color: "error.main" }}>{fetchListError}</Box>}</p>

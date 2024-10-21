@@ -4,6 +4,7 @@ import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
 import type { RimeCandidate } from "~shared-types";
 import EventEmitter from "events";
+import { ConstructionOutlined } from "@mui/icons-material";
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -185,14 +186,15 @@ export class InputController extends EventEmitter {
             }
         }
         try {
-            console.log("Loading RIME engine...");
+            console.log(">>>Loading RIME engine...");
             const configObj = await chrome.storage.sync.get(["settings"]);
             if (!configObj.settings) {
                 throw Error("Could not find RIME settings, refusing to launch.");
             }
             this.activeSettings = configObj.settings as ImeSettings;
-            console.log("Settings: ", JSON.stringify(this.activeSettings));
+            console.log(">>>Settings: ", JSON.stringify(this.activeSettings));
             await this.loadMutex.runExclusive(async () => {
+                console.log("this.loadMutex.runExclusive");
                 let asciiMode = false;
                 if (this.engine) {
                     if (this.session) {
@@ -206,7 +208,7 @@ export class InputController extends EventEmitter {
                 }
 
                 await new Promise(r => setTimeout(r, 10));
-
+                console.log("loadRimeConfig");
                 const config = await this.loadRimeConfig(this.activeSettings);
                 const fs = await getFs();
                 const dirs = ['/root/build', '/root/shared', '/root/user', '/root/shared/opencc'];
@@ -225,13 +227,13 @@ export class InputController extends EventEmitter {
                 await fs.writeWholeFile("/root/build/default.yaml", new TextEncoder().encode(stringify(
                     { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code" } } }
                 )));
-
+                console.log("new RimeEngine()");
                 const engine = new RimeEngine();
                 await engine.initialize(this.printErr.bind(this), fs);
                 if (maintenance) {
                     await engine.rebuildPrism(this.activeSettings.schema, config);
                 }
-
+                console.log("engine.createSession");
                 const session = await engine.createSession(this.activeSettings.schema, config);
                 await this.flushInputCacheToSession(session);
                 this.engine = engine;

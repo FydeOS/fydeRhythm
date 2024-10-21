@@ -64,6 +64,9 @@
     "error_downloading_schema": {
         "message": "下载方案时发生错误："
     },
+    "error_form": {
+        "message": "github repo url 和 schema id 错误"
+    },
     "error_fetch_schema_list": {
         "message": "获取方案列表时发生错误："
     },
@@ -82,8 +85,14 @@
     "open_source": {
         "message": "源代码"
     },
+    "add_schema": {
+        "message": "添加"
+    },
     "update_schema": {
         "message": "更新"
+    },
+    "remove_schema": {
+        "message": "移除"
     },
     "cannot_edit_this_file": {
         "message": "请选择一个文本文件"
