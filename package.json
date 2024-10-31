@@ -29,15 +29,16 @@
     "material@6.0.2": "link:mui/material@6.0.2",
     "messaging@0.6.2": "link:plasmohq/messaging@0.6.2",
     "monaco-editor": "^0.37.1",
-    "plasmo": "0.89.1",
+    "plasmo": "0.89.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "yaml": "^2.5.1"
+    "svgo": "^3.3.2",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "@plasmohq/prettier-plugin-sort-imports": "3.6.3",
     "@types/chrome": "0.0.233",
-    "@types/lodash": "^4.17.7",
+    "@types/lodash": "^4.17.13",
     "@types/node": "18.11.18",
     "@types/react": "18.0.27",
     "@types/react-dom": "18.0.10",
