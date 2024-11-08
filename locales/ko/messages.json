@@ -1,0 +1,115 @@
+{
+    "extension_name": {
+        "message": "FydeRhythm 입력 방식"
+    },
+    "description": {
+        "message": "ChromeOS 및 FydeOS용 입력 방식으로, RIME를 기반으로 FydeOS 팀에서 개발하였습니다."
+    },
+    "input_method_name": {
+        "message": "FydeRhythm IME"
+    },
+    "setting_page": {
+        "message": "FydeRhythm 설정"
+    },
+    "loading_engine": {
+        "message": "RIME 엔진을 로딩 중..."
+    },
+    "candidate_page": {
+        "message": "페이지 $PAGE$",
+        "placeholders": {
+            "page": {
+                "content": "$1"
+            }
+        }
+    },
+    "candidate_page_last": {
+        "message": "(마지막)"
+    },
+    "rime_engine_logs": {
+        "message": "RIME 엔진 로그"
+    },
+    "rime_engine_not_started": {
+        "message": "시작되지 않음"
+    },
+    "rime_engine_starting": {
+        "message": "시작 중"
+    },
+    "rime_engine_ready": {
+        "message": "준비 완료"
+    },
+    "rime_engine_starting_button": {
+        "message": "RIME 엔진 다시 시작"
+    },
+    "save_settings_and_apply_button": {
+        "message": "저장 및 적용"
+    },
+    "select_schema": {
+        "message": "입력 스키마 선택"
+    },
+    "fetching_schema_list": {
+        "message": "(리스트 새로 고침 중)"
+    },
+    "candidate_count": {
+        "message": "페이지당 후보 수"
+    },
+    "fuzzy_pinyin": {
+        "message": "모호한 병음"
+    },
+    "rime_engine_status": {
+        "message": "엔진 상태: "
+    },
+    "settings_changed_snackbar": {
+        "message": "설정이 변경되었습니다."
+    },
+    "error_downloading_schema": {
+        "message": "스키마 다운로드 중 오류 발생: "
+    },
+    "error_form": {
+        "message": "GitHub 저장소 URL 또는 schema_id 오류"
+    },
+    "error_fetch_schema_list": {
+        "message": "스키마 리스트 가져오기 오류:"
+    },
+    "schema_home_page": {
+        "message": "스키마 홈페이지"
+    },
+    "privacy_statement": {
+        "message": "개인정보 보호 정책"
+    },
+    "privacy_statement_url": {
+        "message": "https://fydeos.io/privacy/fyderhythm/"
+    },
+    "edit_rime_config": {
+        "message": "RIME 설정 편집 (고급 사용자 전용)"
+    },
+    "open_source": {
+        "message": "GitHub에서 보기"
+    },
+    "add_schema": {
+        "message": "추가"
+    },
+    "update_schema": {
+        "message": "업데이트"
+    },
+    "remove_schema": {
+        "message": "삭제"
+    },
+    "cannot_edit_this_file": {
+        "message": "텍스트 파일을 선택하세요"
+    },
+    "loading_editor": {
+        "message": "에디터 로딩 중..."
+    },
+    "config_editor_title": {
+        "message": "RIME 설정 에디터"
+    },
+    "candidates_layout": {
+        "message": "후보 목록 레이아웃"
+    },
+    "layout_vertical": {
+        "message": "세로"
+    },
+    "layout_horizontal": {
+        "message": "가로 (ChromeOS에서만 사용 가능, FydeOS에서는 사용 불가)"
+    }
+}

@@ -1,0 +1,115 @@
+{
+    "extension_name": {
+        "message": "FydeRhythm入力法"
+    },
+    "description": {
+        "message": "ChromeOSおよびFydeOS向けの入力法、RIMEに基づき、FydeOSチームによって開発されました。"
+    },
+    "input_method_name": {
+        "message": "FydeRhythm IME"
+    },
+    "setting_page": {
+        "message": "FydeRhythm設定"
+    },
+    "loading_engine": {
+        "message": "RIMEエンジンを読み込み中..."
+    },
+    "candidate_page": {
+        "message": "ページ $PAGE$",
+        "placeholders": {
+            "page": {
+                "content": "$1"
+            }
+        }
+    },
+    "candidate_page_last": {
+        "message": "（最後）"
+    },
+    "rime_engine_logs": {
+        "message": "RIMEエンジンログ"
+    },
+    "rime_engine_not_started": {
+        "message": "開始されていません"
+    },
+    "rime_engine_starting": {
+        "message": "開始中"
+    },
+    "rime_engine_ready": {
+        "message": "準備完了"
+    },
+    "rime_engine_starting_button": {
+        "message": "RIMEエンジンを再起動"
+    },
+    "save_settings_and_apply_button": {
+        "message": "保存して適用"
+    },
+    "select_schema": {
+        "message": "入力スキーマを選択"
+    },
+    "fetching_schema_list": {
+        "message": "（リストを更新中）"
+    },
+    "candidate_count": {
+        "message": "ページごとの候補数"
+    },
+    "fuzzy_pinyin": {
+        "message": "あいまいピンイン"
+    },
+    "rime_engine_status": {
+        "message": "エンジンの状態："
+    },
+    "settings_changed_snackbar": {
+        "message": "設定が変更されました。"
+    },
+    "error_downloading_schema": {
+        "message": "スキーマのダウンロード中にエラー："
+    },
+    "error_form": {
+        "message": "GitHubリポジトリURLまたはschema_idエラー"
+    },
+    "error_fetch_schema_list": {
+        "message": "スキーマリストの取得中にエラー："
+    },
+    "schema_home_page": {
+        "message": "スキーマのホームページ"
+    },
+    "privacy_statement": {
+        "message": "プライバシーに関する声明"
+    },
+    "privacy_statement_url": {
+        "message": "https://fydeos.io/privacy/fyderhythm/"
+    },
+    "edit_rime_config": {
+        "message": "RIME設定を編集（上級ユーザーのみ）"
+    },
+    "open_source": {
+        "message": "GitHubで見る"
+    },
+    "add_schema": {
+        "message": "追加"
+    },
+    "update_schema": {
+        "message": "更新"
+    },
+    "remove_schema": {
+        "message": "削除"
+    },
+    "cannot_edit_this_file": {
+        "message": "テキストファイルを選択してください"
+    },
+    "loading_editor": {
+        "message": "エディターを読み込み中..."
+    },
+    "config_editor_title": {
+        "message": "RIME設定エディター"
+    },
+    "candidates_layout": {
+        "message": "候補リストのレイアウト"
+    },
+    "layout_vertical": {
+        "message": "縦"
+    },
+    "layout_horizontal": {
+        "message": "横（ChromeOSでのみ利用可能、FydeOSでは利用不可）"
+    }
+}

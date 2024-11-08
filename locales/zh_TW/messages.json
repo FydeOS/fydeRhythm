@@ -1,0 +1,115 @@
+{
+    "extension_name": {
+        "message": "FydeRhythm 輸入法"
+    },
+    "description": {
+        "message": "適用於 ChromeOS 和 FydeOS 的輸入法，基於 RIME 由 FydeOS 團隊開發。"
+    },
+    "input_method_name": {
+        "message": "FydeRhythm IME"
+    },
+    "setting_page": {
+        "message": "FydeRhythm 設定"
+    },
+    "loading_engine": {
+        "message": "正在載入 RIME 引擎..."
+    },
+    "candidate_page": {
+        "message": "第 $PAGE$ 頁",
+        "placeholders": {
+            "page": {
+                "content": "$1"
+            }
+        }
+    },
+    "candidate_page_last": {
+        "message": "（最後）"
+    },
+    "rime_engine_logs": {
+        "message": "RIME 引擎日誌"
+    },
+    "rime_engine_not_started": {
+        "message": "未啟動"
+    },
+    "rime_engine_starting": {
+        "message": "正在啟動"
+    },
+    "rime_engine_ready": {
+        "message": "準備完成"
+    },
+    "rime_engine_starting_button": {
+        "message": "重新啟動 RIME 引擎"
+    },
+    "save_settings_and_apply_button": {
+        "message": "保存並應用"
+    },
+    "select_schema": {
+        "message": "選擇輸入方案"
+    },
+    "fetching_schema_list": {
+        "message": "（正在刷新列表）"
+    },
+    "candidate_count": {
+        "message": "每頁候選數量"
+    },
+    "fuzzy_pinyin": {
+        "message": "模糊拼音"
+    },
+    "rime_engine_status": {
+        "message": "引擎狀態："
+    },
+    "settings_changed_snackbar": {
+        "message": "設定已更改。"
+    },
+    "error_downloading_schema": {
+        "message": "下載方案時出錯："
+    },
+    "error_form": {
+        "message": "GitHub 庫 URL 或 schema_id 錯誤"
+    },
+    "error_fetch_schema_list": {
+        "message": "獲取方案列表時出錯："
+    },
+    "schema_home_page": {
+        "message": "方案主頁"
+    },
+    "privacy_statement": {
+        "message": "隱私聲明"
+    },
+    "privacy_statement_url": {
+        "message": "https://fydeos.io/privacy/fyderhythm/"
+    },
+    "edit_rime_config": {
+        "message": "編輯 RIME 配置（僅限高級用戶）"
+    },
+    "open_source": {
+        "message": "在 GitHub 上查看"
+    },
+    "add_schema": {
+        "message": "添加"
+    },
+    "update_schema": {
+        "message": "更新"
+    },
+    "remove_schema": {
+        "message": "移除"
+    },
+    "cannot_edit_this_file": {
+        "message": "請選擇文本文件"
+    },
+    "loading_editor": {
+        "message": "正在載入編輯器..."
+    },
+    "config_editor_title": {
+        "message": "RIME 配置編輯器"
+    },
+    "candidates_layout": {
+        "message": "候選列表佈局"
+    },
+    "layout_vertical": {
+        "message": "垂直"
+    },
+    "layout_horizontal": {
+        "message": "水平（僅適用於 ChromeOS，FydeOS 不可用）"
+    }
+}
