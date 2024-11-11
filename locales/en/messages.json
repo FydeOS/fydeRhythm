@@ -1,9 +1,9 @@
 {
     "extension_name": {
-        "message": "FydeRhythm Input Method"
+        "message": "FydeRhythm IME"
     },
     "description": {
-        "message": "Input method for ChromeOS and FydeOS, based on RIME, built by FydeOS team."
+        "message": "Input Method Editor(IME) for ChromeOS and FydeOS, powered by RIME engine, developed by FydeOS team."
     },
     "input_method_name": {
         "message": "FydeRhythm IME"
@@ -65,7 +65,7 @@
         "message": "Error while downloading schema: "
      },
      "error_form": {
-        "message": "github repo url or schema_id error"
+        "message": "GitHub repo URL or schema_id error"
      },
      "error_fetch_schema_list": {
         "message": "Error while fetching schema list:"
@@ -110,6 +110,6 @@
         "message": "Vertical"
     },
     "layout_horizontal": {
-        "message": "Horizontal (Only available for ChromeOS, unavailable for FydeOS)"
+        "message": "Horizontal (only available for ChromeOS, unavailable for FydeOS)"
     }
 }

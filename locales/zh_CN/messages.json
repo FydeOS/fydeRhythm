@@ -3,7 +3,7 @@
         "message": "真文韵输入法"
     },
     "description": {
-        "message": "一款适用于 ChromeOS 和 FydeOS 系统的输入法，由 FydeOS 团队基于 RIME 引擎定制。"
+        "message": "适用于 ChromeOS 和 FydeOS 系统的输入法，由 FydeOS 团队基于 RIME 引擎定制。"
     },
     "input_method_name": {
         "message": "真文韵输入法"
@@ -65,7 +65,7 @@
         "message": "下载方案时发生错误："
     },
     "error_form": {
-        "message": "github repo url 和 schema id 错误"
+        "message": "GitHub 仓库 URL 或 schema id 错误"
     },
     "error_fetch_schema_list": {
         "message": "获取方案列表时发生错误："

@@ -1,15 +1,15 @@
 {
     "extension_name": {
-        "message": "FydeRhythm 輸入法"
+        "message": "真文韻輸入法"
     },
     "description": {
-        "message": "適用於 ChromeOS 和 FydeOS 的輸入法，基於 RIME 由 FydeOS 團隊開發。"
+        "message": "適用於 ChromeOS 和 FydeOS 的輸入法，由 FydeOS 團隊基於 RIME 引擎訂製。"
     },
     "input_method_name": {
-        "message": "FydeRhythm IME"
+        "message": "真文韻"
     },
     "setting_page": {
-        "message": "FydeRhythm 設定"
+        "message": "真文韻設定"
     },
     "loading_engine": {
         "message": "正在載入 RIME 引擎..."

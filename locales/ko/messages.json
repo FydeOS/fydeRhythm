@@ -1,15 +1,15 @@
 {
     "extension_name": {
-        "message": "FydeRhythm 입력 방식"
+        "message": "진문운 입력법"
     },
     "description": {
-        "message": "ChromeOS 및 FydeOS용 입력 방식으로, RIME를 기반으로 FydeOS 팀에서 개발하였습니다."
+        "message": "ChromeOS 및 FydeOS 용 입력 방식으로, RIME 를 기반으로 FydeOS 팀에서 개발하였습니다."
     },
     "input_method_name": {
-        "message": "FydeRhythm IME"
+        "message": "진문운 입력법"
     },
     "setting_page": {
-        "message": "FydeRhythm 설정"
+        "message": "진문운 설정"
     },
     "loading_engine": {
         "message": "RIME 엔진을 로딩 중..."
@@ -83,7 +83,7 @@
         "message": "RIME 설정 편집 (고급 사용자 전용)"
     },
     "open_source": {
-        "message": "GitHub에서 보기"
+        "message": "GitHub 에서 보기"
     },
     "add_schema": {
         "message": "추가"
@@ -110,6 +110,6 @@
         "message": "세로"
     },
     "layout_horizontal": {
-        "message": "가로 (ChromeOS에서만 사용 가능, FydeOS에서는 사용 불가)"
+        "message": "가로 (ChromeOS 에서만 사용 가능, FydeOS 에서는 사용 불가)"
     }
 }

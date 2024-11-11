@@ -1,18 +1,18 @@
 {
     "extension_name": {
-        "message": "FydeRhythm入力法"
+        "message": "真文韻入力法"
     },
     "description": {
-        "message": "ChromeOSおよびFydeOS向けの入力法、RIMEに基づき、FydeOSチームによって開発されました。"
+        "message": "ChromeOS および FydeOS 向けの入力法、RIME に基づき、FydeOS チームによって開発されました。"
     },
     "input_method_name": {
-        "message": "FydeRhythm IME"
+        "message": "真文韻入力法"
     },
     "setting_page": {
-        "message": "FydeRhythm設定"
+        "message": "真文韻設定"
     },
     "loading_engine": {
-        "message": "RIMEエンジンを読み込み中..."
+        "message": "RIME エンジンを読み込み中..."
     },
     "candidate_page": {
         "message": "ページ $PAGE$",
@@ -26,7 +26,7 @@
         "message": "（最後）"
     },
     "rime_engine_logs": {
-        "message": "RIMEエンジンログ"
+        "message": "RIME エンジンログ"
     },
     "rime_engine_not_started": {
         "message": "開始されていません"
@@ -38,7 +38,7 @@
         "message": "準備完了"
     },
     "rime_engine_starting_button": {
-        "message": "RIMEエンジンを再起動"
+        "message": "RIME エンジンを再起動"
     },
     "save_settings_and_apply_button": {
         "message": "保存して適用"
@@ -65,7 +65,7 @@
         "message": "スキーマのダウンロード中にエラー："
     },
     "error_form": {
-        "message": "GitHubリポジトリURLまたはschema_idエラー"
+        "message": "GitHub リポジトリ URL または schema_id エラー"
     },
     "error_fetch_schema_list": {
         "message": "スキーマリストの取得中にエラー："
@@ -80,7 +80,7 @@
         "message": "https://fydeos.io/privacy/fyderhythm/"
     },
     "edit_rime_config": {
-        "message": "RIME設定を編集（上級ユーザーのみ）"
+        "message": "RIME 設定を編集（上級ユーザーのみ）"
     },
     "open_source": {
         "message": "GitHubで見る"
@@ -101,7 +101,7 @@
         "message": "エディターを読み込み中..."
     },
     "config_editor_title": {
-        "message": "RIME設定エディター"
+        "message": "RIME 設定エディター"
     },
     "candidates_layout": {
         "message": "候補リストのレイアウト"
@@ -110,6 +110,6 @@
         "message": "縦"
     },
     "layout_horizontal": {
-        "message": "横（ChromeOSでのみ利用可能、FydeOSでは利用不可）"
+        "message": "横（ChromeOS でのみ利用可能、FydeOS では利用不可）"
     }
 }
