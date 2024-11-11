@@ -1,4 +1,4 @@
-# 真文韵输入法
+# 真文韻輸入法
 
 <h4 align="right">
   <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README.md">English</a> | 
