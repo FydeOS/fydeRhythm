@@ -1,19 +1,27 @@
-# fydeRhythm
-<h4 align="right"><strong>English </strong>| <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README_ZH.md"> 简体中文 </a> </h4>
-<p align="center">
-    <img src=https://github.com/Lorde627/fydeRhythm/blob/master/fydeRhythm%20Logo.png?raw=true width=138/>
-</p>
+# fydeRhythm（真文韵输入法）
+<h4 align="right">
+  <strong>English</strong> | 
+  <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README-ZH_CN.md">简体中文</a> | 
+  <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README-ZH_TW.md">繁體中文</a> | 
+  <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README-JA.md">日本語</a> | 
+  <a href="https://github.com/FydeOS/fydeRhythm/blob/master/README-KO.md">한국인</a>
+</h4>
+
+<p align="center"><img src="https://raw.githubusercontent.com/FydeOS/fydeRhythm/refs/heads/master/media/fyderhythm_logo.png" width=138/></p>
+
+
 <p align="center">
     <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
-    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png"raw=true width=138 alt="Download for Chrome" />
+    <img src="https://raw.githubusercontent.com/FydeOS/fydeRhythm/refs/heads/master/media/chromewebstore.png"raw=true width=138 alt="Download for Chrome" /></a>
+</p>
 
-  </a>
 
 **fydeRhythm** is a meticulously crafted keyboard input method editor(IME), designed by the FydeOS team. fydeRhythm is designed for operating systems that are based on the Chromium OS ecosystem, such as chromeOS, openFyde and FydeOS. It leverages the power and versatility of the [RIME](https://rime.im/) input method engine.
 
+
 <p align="center">
 <a >
-    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/fydeRhythm%20Demo.gif" alt="fydeRhythm Demo" width="500">
+    <img src="https://raw.githubusercontent.com/FydeOS/fydeRhythm/refs/heads/master/media/fyderhythm_demo.gif" alt="fydeRhythm Demo" width="500">
 </a>
 </p>
 
@@ -29,7 +37,7 @@ We're proud to present the source code for the second iteration of fydeRhythm. T
 
 ## Download Options
 - <a href="https://chrome.google.com/webstore/detail/%E7%9C%9F%E6%96%87%E9%9F%B5%E8%BE%93%E5%85%A5%E6%B3%95/ppgpjbgimfloenilfemmcejiiokelkni">
-    <img src="https://github.com/FydeOS/fydeRhythm/blob/master/Chrome%20Web%20Store.png" alt="Chrome Web Store" width="138">
+    <img src="https://raw.githubusercontent.com/FydeOS/fydeRhythm/refs/heads/master/media/chromewebstore.png" alt="Chrome Web Store" width="138">
 </a>
 
 - [GitHub Release](https://github.com/FydeOS/fydeRhythm/releases)
