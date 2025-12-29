@@ -1,12 +1,27 @@
 {
-  "extends": "plasmo/templates/tsconfig.base",
-  "exclude": ["node_modules"],
-  "include": [".plasmo/index.d.ts", "./**/*.ts", "./**/*.tsx", "typings.d.ts" ],
+  "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "~*": ["./*"]
-    },
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "baseUrl": ".",
-    "target": "ES2022"
+    "paths": {
+      "@/*": ["./*"],
+      "~/*": ["./*"]
+    }
   },
+  "include": [
+    "entrypoints/**/*",
+    "lib/**/*",
+    "wxt-env.d.ts"
+  ],
+  "exclude": ["node_modules", ".output"]
 }

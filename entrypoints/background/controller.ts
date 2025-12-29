@@ -1,8 +1,8 @@
 import { Mutex } from "async-mutex";
-import { getFs, type ImeSettings } from "~utils";
+import { getFs, type ImeSettings } from "@/lib/utils";
 import { RimeCandidateIterator, RimeEngine, RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
-import type { RimeCandidate } from "~shared-types";
+import type { RimeCandidate } from "@/lib/shared-types";
 import EventEmitter from "events";
 import { ConstructionOutlined } from "@mui/icons-material";
 

@@ -1,4 +1,4 @@
-import { FastIndexedDbFsController } from '~fs'
+import { FastIndexedDbFsController } from './fs'
 
 export function dec2hex(dec) {
     return dec.toString(16).padStart(2, "0")

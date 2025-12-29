@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { $$, formatBytes, getFileName, getFs } from "~utils";
+import { $$, formatBytes, getFileName, getFs } from "@/lib/utils";
 import { ExpandMore, ChevronRight } from '@mui/icons-material';
 import { AiFillSetting } from '@react-icons/all-files/ai/AiFillSetting'
 import { AiFillFileText } from '@react-icons/all-files/ai/AiFillFileText'
@@ -24,7 +24,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import Slide from '@mui/material/Slide';
 import type { TransitionProps } from '@mui/material/transitions';
 
-loader.config({ paths: { vs: "/assets/monaco/vs" } });
+loader.config({ paths: { vs: "/monaco/vs" } });
 
 const Transition = React.forwardRef(function Transition(
     props: TransitionProps & {

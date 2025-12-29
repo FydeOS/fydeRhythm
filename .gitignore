@@ -28,18 +28,13 @@ yarn-error.log*
 # local env files
 .env*
 
-out/
-build/
-dist/
+.output/
 
-# plasmo - https://www.plasmo.com
-.plasmo
-
-# bpp - http://bpp.browser.market/
-keys.json
+# wxt - https://wxt.dev
+.wxt
 
 # typescript
 .tsbuildinfo
 
-/assets/rime_emscripten.wasm
-/background/rime_emscripten.js
+/public/rime_emscripten.wasm
+/entrypoints/background/rime_emscripten.js

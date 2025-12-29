@@ -1,10 +1,10 @@
 import CreateRimeWasm from "./rime_emscripten"
-import { getFs } from "../utils"
+import { getFs } from "@/lib/utils"
 import { Mutex } from 'async-mutex';
 import { openDB, deleteDB, unwrap } from "idb";
-import type { RimeCandidate, RimeCommit, RimeContext, RimeSchema, RimeStatus } from "~shared-types";
+import type { RimeCandidate, RimeCommit, RimeContext, RimeSchema, RimeStatus } from "@/lib/shared-types";
 import type { Schema } from "yaml";
-import type { FastIndexedDbFsController } from "~fs";
+import type { FastIndexedDbFsController } from "@/lib/fs";
 import EventEmitter from "events";
 
 export class RimeCandidateIterator {
@@ -139,7 +139,7 @@ export class RimeEngine {
             if (!this.initialized) {
                 this.wasmObject = await CreateRimeWasm({
                     locateFile: (path, dir) => {
-                        return '/assets/' + path;
+                        return '/' + path;
                     },
                     fsc: fs,
                     idb: { openDB, deleteDB },

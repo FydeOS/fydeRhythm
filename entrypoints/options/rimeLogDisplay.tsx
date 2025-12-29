@@ -1,5 +1,5 @@
 import FormControl from "@mui/material/FormControl";
-import { sendToBackground } from "@plasmohq/messaging";
+import { sendMessage } from "@/lib/messaging";
 import { useEffect, useRef, useState } from "react";
 import * as styles from "./styles.module.less";
 
@@ -14,9 +14,7 @@ function RimeLogDisplay() {
     }, [rimeLogs]);
 
     async function updateRimeLogs() {
-        const result = await sendToBackground({
-            name: "GetRimeLogs"
-        });
+        const result = await sendMessage("GetRimeLogs");
         setRimeLogs(result.logs);
     }
     

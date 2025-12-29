@@ -31,10 +31,10 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import Animation from "./utils/animation";
-import { sendToBackground } from "@plasmohq/messaging";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { $$, getFs, type ImeSettings, kDefaultSettings } from "~utils";
+import { $$, getFs, type ImeSettings, kDefaultSettings } from "@/lib/utils";
+import { sendMessage } from "@/lib/messaging";
 import Link from "@mui/material/Link";
 import { CompressTwoTone, Settings, Visibility } from "@mui/icons-material";
 import { Input } from "@mui/material";
@@ -113,9 +113,7 @@ function OptionsPage() {
     // chrome.storage.local.get
 
     async function updateRimeStatus() {
-        const result = await sendToBackground({
-            name: "GetEngineStatus"
-        });
+        const result = await sendMessage("GetEngineStatus");
         setEngineStatus(result);
     }
 
@@ -194,9 +192,7 @@ function OptionsPage() {
         await chrome.storage.sync.set({ settings: imeSettings });
         if (!engineStatus.loading) {
             setSettingsDirty(SettingsDirtyStatus.Reloading);
-            await sendToBackground({
-                name: "ReloadRime",
-            });
+            await sendMessage("ReloadRime");
             setSettingsDirty(SettingsDirtyStatus.NotDirty);
         }
     }
@@ -612,7 +608,7 @@ function OptionsPage() {
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
             <div style={{ position: 'absolute', top: 30, left: 30 }}>
-                <object type="image/svg+xml" data="/assets/logo.svg"></object>
+                <object type="image/svg+xml" data="/logo.svg"></object>
             </div>
             <div className={styles.bgBlock}>
                 <div className={styles.leftTop1} />
