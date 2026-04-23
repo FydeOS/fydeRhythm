@@ -277,6 +277,10 @@ function OptionsPage() {
                 return;
             }
 
+            if (imeSettings.schema === id) {
+                return;
+            }
+
             // Delete the schema directory and all its contents
             const fs = await getFs();
             const schemaPath = `/root/${id}`;
@@ -298,23 +302,10 @@ function OptionsPage() {
                 ? { enabledSchemas: strippedEnabled }
                 : {};
 
-            // If the removed schema is currently selected, switch to another schema
-            if (imeSettings.schema === id) {
-                const updatedList = await loadLocalSchemaList();
-                if (updatedList.length > 0) {
-                    // Switch to the first available schema
-                    changeSettings({ schema: updatedList[0], ...enabledChange });
-                } else if (Object.keys(enabledChange).length > 0) {
-                    changeSettings(enabledChange);
-                }
-            } else {
-                // Just reload the lists
-                await loadLocalSchemaList();
-                if (Object.keys(enabledChange).length > 0) {
-                    changeSettings(enabledChange);
-                }
+            await loadLocalSchemaList();
+            if (Object.keys(enabledChange).length > 0) {
+                changeSettings(enabledChange);
             }
-
             await loadSchemaList();
         } catch (ex) {
             console.error("Error removing schema:", ex);
@@ -900,14 +891,23 @@ return {}
                                                         {$$("update_schema")}
                                                     </Link>
                                                 }
-                                                {localSchemaList.includes(schema.id) &&
-                                                    <Link component="button" underline="hover"
+                                                {localSchemaList.includes(schema.id) && (() => {
+                                                    const isActive = schema.id === imeSettings.schema;
+                                                    return <Link
+                                                        component="button"
+                                                        underline="hover"
                                                         onClick={() => removeSchema(schema.id)}
-                                                        style={{ marginLeft: "8px", fontSize: "0.85rem" }}
-                                                        disabled={downloadSchemaId != null}>
+                                                        style={{
+                                                            marginLeft: "8px",
+                                                            fontSize: "0.85rem",
+                                                            opacity: isActive ? 0.45 : 1,
+                                                            cursor: isActive ? "not-allowed" : undefined,
+                                                        }}
+                                                        color={isActive ? "primary.main" : "error"}
+                                                        disabled={downloadSchemaId != null || isActive}>
                                                         {$$("remove_schema")}
-                                                    </Link>
-                                                }
+                                                    </Link>;
+                                                })()}
                                             </div>}
                                             secondary={<Stack direction="column" spacing={0.5} sx={{ mt: 0.5 }}>
                                                 <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
