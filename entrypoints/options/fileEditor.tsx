@@ -22,6 +22,7 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import Slide from '@mui/material/Slide';
+import CircularProgress from '@mui/material/CircularProgress';
 import type { TransitionProps } from '@mui/material/transitions';
 
 loader.config({ paths: { vs: "/monaco/vs" } });
@@ -47,12 +48,96 @@ interface FileItem {
     size: number;
 }
 
+const NON_EDITABLE_SUFFIXES = ['.bin', '.gram'];
+
 function FileEditorButton(props: FileEditorButtonProps) {
     const [data, setData] = useState<FileItem[]>([]);
     const [open, setOpen] = useState(false);
+    const [expandedItems, setExpandedItems] = useState<string[]>([]);
+    const [selectedTreeItem, setSelectedTreeItem] = useState<string | null>(null);
+    const [filePath, setFilePath] = useState("");
+    const [fileContent, setFileContent] = useState<string | null>(null);
+    const [isFileLoading, setIsFileLoading] = useState(false);
+    const [editorSessionKey, setEditorSessionKey] = useState(0);
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const filePathRef = useRef(filePath);
+    const hasUnsavedChangesRef = useRef(false);
+    const changeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const loadRequestIdRef = useRef(0);
 
     useEffect(() => {
-        async function load() {
+        filePathRef.current = filePath;
+    }, [filePath]);
+
+    function invalidatePendingLoads() {
+        loadRequestIdRef.current += 1;
+        return loadRequestIdRef.current;
+    }
+
+    function clearPendingSave() {
+        if (changeTimerRef.current) {
+            clearTimeout(changeTimerRef.current);
+            changeTimerRef.current = null;
+        }
+    }
+
+    const resetEditorView = useCallback(() => {
+        setFilePath("");
+        setFileContent(null);
+        setIsFileLoading(false);
+    }, []);
+
+    const loadFileForEditor = useCallback(async (path: string, requestId: number) => {
+        const isStaleRequest = () => requestId !== loadRequestIdRef.current;
+
+        if (!path) {
+            if (!isStaleRequest()) resetEditorView();
+            return;
+        }
+
+        if (!isStaleRequest()) setIsFileLoading(true);
+
+        if (NON_EDITABLE_SUFFIXES.some(suffix => path.endsWith(suffix))) {
+            hasUnsavedChangesRef.current = false;
+            if (!isStaleRequest()) resetEditorView();
+            return;
+        }
+
+        const fs = await getFs();
+        try {
+            const entry = await fs.readEntry(path);
+            if (isStaleRequest()) return;
+            if (!entry || entry.isDirectory) {
+                hasUnsavedChangesRef.current = false;
+                resetEditorView();
+                return;
+            }
+            const buffer = await fs.readWholeFile(path);
+            if (isStaleRequest()) return;
+            const content = new TextDecoder().decode(buffer);
+            hasUnsavedChangesRef.current = false;
+            setFilePath(path);
+            setFileContent(content);
+        } catch (error) {
+            if (isStaleRequest()) return;
+            console.error(`Failed to load ${path}`, error);
+            hasUnsavedChangesRef.current = false;
+            resetEditorView();
+        } finally {
+            if (!isStaleRequest()) setIsFileLoading(false);
+        }
+    }, [resetEditorView]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        setEditorSessionKey((prev) => prev + 1);
+        const openRequestId = invalidatePendingLoads();
+        if (filePathRef.current) setIsFileLoading(true);
+
+        let isActive = true;
+
+        async function loadTreeAndRestoreFile() {
             const fs = await getFs();
             const content = await fs.readAll();
 
@@ -61,17 +146,26 @@ function FileEditorButton(props: FileEditorButtonProps) {
                 newData.push({
                     id: entry.fullPath,
                     parent: entry.parent,
-                    name: getFileName(entry.fullPath),
+                    name: getFileName(entry.fullPath) ?? entry.fullPath,
                     isDir: entry.isDirectory,
                     size: _.sumBy(entry.blobs, b => b.size),
                 });
             }
+
+            if (!isActive) return;
             setData(newData);
+
+            if (filePathRef.current) {
+                await loadFileForEditor(filePathRef.current, openRequestId);
+            }
         }
-        if (open) {
-            load();
-        }
-    }, [open]);
+
+        void loadTreeAndRestoreFile();
+
+        return () => {
+            isActive = false;
+        };
+    }, [open, loadFileForEditor]);
 
     const getFileIcon = (item: FileItem): IconType => {
         if (item.isDir) return AiFillFolder;
@@ -111,67 +205,58 @@ function FileEditorButton(props: FileEditorButtonProps) {
 
 
     async function saveCurrent() {
-        if (currentChangeTimer) {
-            clearTimeout(currentChangeTimer);
-            setCurrentChangeTimer(null);
-        }
+        clearPendingSave();
+        if (!editorRef.current || !filePathRef.current) return;
+        if (!hasUnsavedChangesRef.current) return;
         const value = editorRef.current.getValue();
-        const path = filePath;
+        const path = filePathRef.current;
         const fs = await getFs();
         await fs.writeWholeFile(path, new TextEncoder().encode(value));
+        hasUnsavedChangesRef.current = false;
         props.onEdit();
         console.log(`Changes to ${path} is saved!`);
     }
     function handleEditorChange() {
-        if (currentChangeTimer) {
-            clearTimeout(currentChangeTimer);
-            setCurrentChangeTimer(null);
-        }
-        // Create a timer to save the changes after a while
-        // If new changes happen within this period, timer is reset
-        const timer = setTimeout(saveCurrent, 500);
-        setCurrentChangeTimer(timer);
+        hasUnsavedChangesRef.current = true;
+        clearPendingSave();
+        changeTimerRef.current = setTimeout(() => {
+            void saveCurrent();
+        }, 500);
     }
-
-    const [filePath, setFilePath] = useState("");
-    const [fileContent, setFileContent] = useState(null);
 
     // Find root parent - check both "" and null
     const rootParent = data.some(d => d.parent === null) ? null : "";
 
-    function onSelectFile(event: React.SyntheticEvent, itemId: string) {
-        (async () => {
-
-            if (currentChangeTimer) {
-                // has pending unsaved changes, save it now
-                saveCurrent();
-            }
-
-            const path = itemId;
-            const uneditable = ['.bin', '.gram'];
-            if (uneditable.some(suffix => path.endsWith(suffix))) {
-                setFileContent(null);
-                return;
-            }
-            const fs = await getFs();
-            const entry = await fs.readEntry(path);
-            if (entry.isDirectory) {
-                setFileContent(null);
-                return;
-            }
-            const buffer = await fs.readWholeFile(path);
-            const content = new TextDecoder().decode(buffer);
-            setFileContent(content);
-            setFilePath(path);
-        })();
+    async function onSelectFile(_event: React.SyntheticEvent, itemId: string) {
+        setSelectedTreeItem(itemId);
+        const requestId = invalidatePendingLoads();
+        if (changeTimerRef.current || hasUnsavedChangesRef.current) {
+            await saveCurrent();
+        }
+        await loadFileForEditor(itemId, requestId);
     }
 
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>(null);
-    function handleEditorDidMount(editor: monaco.editor.IStandaloneCodeEditor, monaco: Monaco) {
+    function handleEditorDidMount(editor: monaco.editor.IStandaloneCodeEditor, _monaco: Monaco) {
         editorRef.current = editor;
     }
 
-    const [currentChangeTimer, setCurrentChangeTimer] = useState(null);
+    function cleanupEditorRuntimeState() {
+        invalidatePendingLoads();
+        clearPendingSave();
+        hasUnsavedChangesRef.current = false;
+        setFileContent(null);
+        setIsFileLoading(false);
+        editorRef.current = null;
+        // filePath is kept so the next open restores the last file from disk
+    }
+
+    async function handleCloseEditor() {
+        if (changeTimerRef.current || hasUnsavedChangesRef.current) {
+            await saveCurrent();
+        }
+        cleanupEditorRuntimeState();
+        setOpen(false);
+    }
 
     return <>
         <Button variant="contained" onClick={() => setOpen(true)}>
@@ -180,7 +265,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
         <Dialog
             fullScreen
             open={open}
-            onClose={() => setOpen(false)}
+            onClose={handleCloseEditor}
             TransitionComponent={Transition}
         >
             <AppBar sx={{ position: 'relative' }}>
@@ -188,7 +273,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                     <IconButton
                         edge="start"
                         color="inherit"
-                        onClick={() => setOpen(false)}
+                        onClick={handleCloseEditor}
                         aria-label="close"
                     >
                         <CloseIcon />
@@ -201,6 +286,9 @@ function FileEditorButton(props: FileEditorButtonProps) {
             <div style={{ display: 'flex' }}>
                 <div style={{ height: "calc(100vh - 64px)", overflow: "scroll", minWidth: "250px", borderRight: "solid 1px gray" }}>
                     <SimpleTreeView
+                        expandedItems={expandedItems}
+                        onExpandedItemsChange={(_event, itemIds) => setExpandedItems(itemIds)}
+                        selectedItems={selectedTreeItem ?? undefined}
                         onItemClick={onSelectFile}
                         sx={{ flexGrow: 1, overflowY: 'auto' }}
                         slots={{
@@ -212,8 +300,13 @@ function FileEditorButton(props: FileEditorButtonProps) {
                     </SimpleTreeView>
                 </div>
                 <div style={{ flexGrow: 1 }}>
-                    {fileContent != null ?
+                    {isFileLoading ?
+                        <div style={{ height: "calc(100vh - 64px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <CircularProgress size={30} />
+                        </div>
+                        : fileContent != null ?
                         <Editor
+                            key={`${editorSessionKey}:${filePath}`}
                             defaultValue={fileContent}
                             path={filePath}
                             onMount={handleEditorDidMount}
