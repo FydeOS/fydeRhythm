@@ -11,18 +11,9 @@ import IconButton from "@mui/material/IconButton";
 import Radio from "@mui/material/Radio";
 import FormControl from "@mui/material/FormControl";
 import TextField from "@mui/material/TextField";
-import FormGroup from "@mui/material/FormGroup";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Checkbox from "@mui/material/Checkbox";
 import Switch from "@mui/material/Switch";
 import Snackbar from "@mui/material/Snackbar";
 import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
-import RadioGroup from '@mui/material/RadioGroup'
-import ListItem from '@mui/material/ListItem';
-import List from '@mui/material/List';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
 import CircularProgress from "@mui/material/CircularProgress";
 import Box from "@mui/material/Box";
 
@@ -778,266 +769,352 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>{$$("select_schema")}{fetchingList ? $$("fetching_schema_list") : ""}</div>
-                        <RadioGroup
-                            value={imeSettings.schema}
-                            onChange={(e, v) => changeSettings({ schema: v })}
-                        >
-                            <List>
-                                {schemaList.schemas.map((schema) =>
-                                    <ListItem 
-                                        key={schema.id} 
-                                        alignItems="flex-start"
-                                        style={{ paddingTop: '8px', paddingBottom: '8px' }}
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
+                            <div className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("select_schema")}</div>
+                            {fetchingList && (
+                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{$$("fetching_schema_list")}</Box>
+                            )}
+                        </Box>
+
+                        {/* Schema cards */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {schemaList.schemas.map((schema) => {
+                                const isInstalled = localSchemaList.includes(schema.id);
+                                const isActive = schema.id === imeSettings.schema;
+                                return (
+                                    <Box
+                                        key={schema.id}
+                                        sx={{
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: 1.5,
+                                            px: 2,
+                                            py: 1.5,
+                                            borderRadius: '12px',
+                                            border: '1px solid',
+                                            borderColor: isActive ? 'rgba(228, 0, 70, 0.18)' : 'rgba(0,0,0,0.08)',
+                                            bgcolor: isActive ? 'rgba(228, 0, 70, 0.02)' : 'rgba(0,0,0,0)',
+                                            cursor: isInstalled && !isActive ? 'pointer' : 'default',
+                                            transition: 'background-color 0.15s',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            '&::after': isInstalled && !isActive ? {
+                                                content: '""',
+                                                position: 'absolute',
+                                                inset: 0,
+                                                borderRadius: '12px',
+                                                bgcolor: 'rgba(0,0,0,0)',
+                                                transition: 'background-color 0.15s',
+                                                pointerEvents: 'none',
+                                            } : {},
+                                            '&:hover::after': isInstalled && !isActive ? {
+                                                bgcolor: 'rgba(0,0,0,0.04)',
+                                            } : {},
+                                            '&:active::after': isInstalled && !isActive ? {
+                                                bgcolor: 'rgba(0,0,0,0.08)',
+                                            } : {},
+                                        }}
+                                        onClick={isInstalled && !isActive ? () => changeSettings({ schema: schema.id }) : undefined}
                                     >
-                                        <ListItemIcon>
-                                            {downloadSchemaId == schema.id ? <CircularProgress variant="determinate" value={downloadProgress} /> :
-                                                localSchemaList.includes(schema.id) ?
-                                                    <Radio value={schema.id} /> :
-                                                    <IconButton onClick={() =>downloadSchema(schema.id)} disabled={downloadSchemaId != null}>
-                                                        <CloudDownloadIcon />
-                                                    </IconButton>}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            disableTypography
-                                            primary={<div style={{ fontSize: '1rem', fontWeight: localSchemaList.includes(schema.id) ? 500 : 400 }}>
-                                                {schema.user ? schema.realName : schema.id } { schema.name }
-                                                {localSchemaList.includes(schema.id) && (!schema.user || schema.website) &&
+                                        {/* Leading: radio / download / progress — fixed 36px column */}
+                                        <Box sx={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>
+                                            {downloadSchemaId === schema.id
+                                                ? <CircularProgress variant="determinate" value={downloadProgress} size={22} />
+                                                : isInstalled
+                                                    ? <Radio
+                                                        checked={isActive}
+                                                        onChange={() => changeSettings({ schema: schema.id })}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        size="small"
+                                                        sx={{ p: 0 }}
+                                                      />
+                                                    : <IconButton
+                                                        size="small"
+                                                        onClick={(e) => { e.stopPropagation(); downloadSchema(schema.id); }}
+                                                        disabled={downloadSchemaId != null}
+                                                        sx={{ p: 0.5 }}
+                                                      >
+                                                        <CloudDownloadIcon fontSize="small" />
+                                                      </IconButton>
+                                            }
+                                        </Box>
+
+                                        {/* Content */}
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            {/* Title + action links */}
+                                            <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px 10px', mb: 0.5 }}>
+                                                <Box sx={{ fontSize: '0.9375rem', fontWeight: isInstalled ? 500 : 400, color: '#1A1A24' }}>
+                                                    {schema.user ? schema.realName : schema.id} {schema.name}
+                                                </Box>
+                                                {isInstalled && (!schema.user || schema.website) && (
                                                     <Link component="button" underline="hover"
-                                                        onClick={() =>  {
-                                                            schema.user  ? convertPersonalSchema(schema.website, schema.realName, true, schema.id) : downloadSchema(schema.id, true)
-                                                        }}
-                                                        style={{ marginLeft: "8px", fontSize: "0.85rem" }}
+                                                        onClick={(e) => { e.stopPropagation(); schema.user ? convertPersonalSchema(schema.website, schema.realName, true, schema.id) : downloadSchema(schema.id, true); }}
+                                                        sx={{ fontSize: '0.8rem' }}
                                                         disabled={downloadSchemaId != null}>
                                                         {$$("update_schema")}
                                                     </Link>
-                                                }
-                                                {localSchemaList.includes(schema.id) && (() => {
-                                                    const isActive = schema.id === imeSettings.schema;
-                                                    return <Link
-                                                        component="button"
-                                                        underline="hover"
-                                                        onClick={() => removeSchema(schema.id)}
-                                                        style={{
-                                                            marginLeft: "8px",
-                                                            fontSize: "0.85rem",
-                                                            opacity: isActive ? 0.45 : 1,
-                                                            cursor: isActive ? "not-allowed" : undefined,
-                                                        }}
+                                                )}
+                                                {isInstalled && (
+                                                    <Link component="button" underline="hover"
+                                                        onClick={(e) => { e.stopPropagation(); removeSchema(schema.id); }}
                                                         sx={{
-                                                            color: isActive ? "primary.main" : "error.main",
+                                                            fontSize: '0.8rem',
+                                                            opacity: isActive ? 0.4 : 1,
+                                                            cursor: isActive ? 'not-allowed' : undefined,
+                                                            color: isActive ? 'primary.main' : 'error.main',
                                                         }}
                                                         disabled={downloadSchemaId != null || isActive}>
                                                         {$$("remove_schema")}
-                                                    </Link>;
-                                                })()}
-                                            </div>}
-                                            secondary={<Stack direction="column" spacing={0.5} sx={{ mt: 0.5 }}>
-                                                <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
-                                                    {schema.description}
-                                                    {schema.website &&
-                                                        <Link href={schema.website} target="_blank" underline="hover" style={{ marginLeft: "8px" }}>
-                                                            {$$("schema_home_page")}
-                                                        </Link>
-                                                    }
-                                                </Box>
-                                                {localSchemaList.includes(schema.id) && (
-                                                    <FormControlLabel
-                                                        control={
-                                                            <Switch
-                                                                size="small"
-                                                                checked={isSchemaEnabled(schema.id)}
-                                                                disabled={schema.id === imeSettings.schema}
-                                                                onChange={(_, checked) => toggleSchemaEnabled(schema.id, checked)}
-                                                                color="primary"
-                                                            />
-                                                        }
-                                                        label={
-                                                            <span style={{ fontSize: '0.85rem', color: 'var(--mui-palette-text-secondary, gray)' }}>
-                                                                {$$("enable_schema_hint")}
-                                                            </span>
-                                                        }
-                                                    />
+                                                    </Link>
                                                 )}
-                                            </Stack>}
-                                        />
-                                    </ListItem>)}
-                                <ListItem key="1000" disablePadding>
-                                    <ListItemIcon>
-                                    {downloadSchemaId == fydeosUserDefinedSchema ? <CircularProgress variant="determinate" value={downloadProgress} /> : <></>}
-                                    </ListItemIcon>
-                                    <TextField
-                                        className={styles.input}
-                                        id="filled"
-                                        label="GitHub Repo URL"
-                                        variant="filled"
-                                        onChange={e => {
-                                            const v = e.target.value;
-                                            setPersonalRepoURL(v);
-                                        }}
-                                        style={{ width: "400px" }}
-                                    />
-                                
-                                    <TextField
-                                        className={styles.input}
-                                        id="filled"
-                                        label="schema Id"
-                                        variant="filled"
-                                        onChange={e => {
-                                            const v = e.target.value;
-                                            setPersonalRepoSchemaId(v);
-                                        }}
-                                        style={{ width: "150px", marginLeft: "8px" }}
-                                    />
-                                    <Link component="button" underline="hover"
-                                        onClick={() => convertPersonalSchema()}
-                                        style={{ marginLeft: "8px" }}
-                                        disabled={downloadSchemaId != null}>
-                                        {$$("add_schema")}
-                                    </Link>
-                                </ListItem>
-                                <ListItem disablePadding style={{ marginTop: "16px" }}>
-                                    <ListItemIcon>
-                                        {downloadSchemaId == 'importing' ? <CircularProgress variant="determinate" value={downloadProgress} /> : <></>}
-                                    </ListItemIcon>
-                                    <input
-                                        type="file"
-                                        accept=".zip"
-                                        id="schema-import-input"
-                                        style={{ display: 'none' }}
-                                        onChange={async (e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                                await importCompiledSchema(e.target.files[0]);
-                                                // Reset the input so the same file can be selected again
-                                                e.target.value = '';
-                                            }
-                                        }}
-                                    />
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon />}
-                                        onClick={() => document.getElementById('schema-import-input')?.click()}
-                                        disabled={downloadSchemaId != null}
-                                        size="small"
-                                    >
-                                        {$$("import_compiled_schema")}
-                                    </Button>
-                                    <Box sx={{ fontSize: '0.85rem', color: 'text.secondary', marginLeft: '12px' }}>
-                                        {$$("import_compiled_schema_hint")}
+                                            </Box>
+
+                                            {/* Description */}
+                                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary', lineHeight: 1.45, mb: isInstalled ? 1.25 : 0 }}>
+                                                {schema.description}
+                                                {schema.website && (
+                                                    <Link href={schema.website} target="_blank" underline="hover"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        sx={{ ml: 1 }}>
+                                                        {$$("schema_home_page")}
+                                                    </Link>
+                                                )}
+                                            </Box>
+
+                                            {/* Sub-controls (installed schemas only) */}
+                                            {isInstalled && (
+                                                <Box
+                                                    sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 20px' }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Box component="label" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: isActive ? 'default' : 'pointer' }}>
+                                                        <Switch
+                                                            size="small"
+                                                            checked={isSchemaEnabled(schema.id)}
+                                                            disabled={isActive}
+                                                            onChange={(_, checked) => toggleSchemaEnabled(schema.id, checked)}
+                                                            color="primary"
+                                                            sx={{ ml: -0.75 }}
+                                                        />
+                                                        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                            {$$("enable_schema_hint")}
+                                                        </Box>
+                                                    </Box>
+
+                                                </Box>
+                                            )}
+                                        </Box>
                                     </Box>
-                                </ListItem>
-                            </List>
-                        </RadioGroup>
-                        <p>{fetchListError && <Box sx={{ color: "error.main" }}>{fetchListError}</Box>}</p>
+                                );
+                            })}
+                        </Box>
+
+                        {/* Personal repo import */}
+                        <Box sx={{
+                            mt: 2,
+                            pt: 2,
+                            borderTop: '1px solid rgba(0,0,0,0.06)',
+                            display: 'flex',
+                            flexDirection: { xs: 'column', sm: 'row' },
+                            alignItems: { xs: 'stretch', sm: 'stretch' },
+                            gap: 1.5,
+                        }}>
+                            {downloadSchemaId === fydeosUserDefinedSchema && (
+                                <CircularProgress variant="determinate" value={downloadProgress} size={22} sx={{ flexShrink: 0 }} />
+                            )}
+                            <TextField
+                                label="GitHub Repo URL"
+                                variant="filled"
+                                onChange={e => setPersonalRepoURL(e.target.value)}
+                                sx={{ flex: 1, minWidth: 0 }}
+                            />
+                            <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1.5, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Schema Id"
+                                    variant="filled"
+                                    onChange={e => setPersonalRepoSchemaId(e.target.value)}
+                                    sx={{ width: { xs: '100%', sm: '150px' } }}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => convertPersonalSchema()}
+                                    disabled={downloadSchemaId != null}
+                                >
+                                    {$$("add_schema")}
+                                </Button>
+                            </Box>
+                        </Box>
+
+                        {/* ZIP import */}
+                        <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            {downloadSchemaId === 'importing' && (
+                                <CircularProgress variant="determinate" value={downloadProgress} size={22} sx={{ flexShrink: 0 }} />
+                            )}
+                            <input
+                                type="file"
+                                accept=".zip"
+                                id="schema-import-input"
+                                style={{ display: 'none' }}
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        await importCompiledSchema(e.target.files[0]);
+                                        e.target.value = '';
+                                    }
+                                }}
+                            />
+                            <Button
+                                variant="outlined"
+                                startIcon={<CloudUploadIcon />}
+                                onClick={() => document.getElementById('schema-import-input')?.click()}
+                                disabled={downloadSchemaId != null}
+                                size="small"
+                            >
+                                {$$("import_compiled_schema")}
+                            </Button>
+                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                                {$$("import_compiled_schema_hint")}
+                            </Box>
+                        </Box>
+
+                        {fetchListError && (
+                            <Box sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
+                        )}
                     </FormControl>
                 </div>
             </div>
 
             <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <div className={styles.pageSize}>
-                            <div className={styles.formLabel}>{$$("candidate_count")}</div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
-                                <IconButton onClick={() => {
+                <div className={styles.formBox} style={{ padding: '8px 0' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
+                        <Box sx={{ fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                            {$$("candidate_count")}
+                        </Box>
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            background: 'rgba(0, 0, 0, 0.04)',
+                            borderRadius: '24px',
+                            padding: '4px'
+                        }}>
+                            <IconButton 
+                                size="small"
+                                onClick={() => {
                                     const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
                                     if (s > kMinPageSize) { changeSettings({ pageSize: s - 1 }) }
-                                }}>
-                                    <RemoveIcon />
-                                </IconButton>
+                                }}
+                                sx={{ 
+                                    width: 36, height: 36,
+                                    borderRadius: '18px', 
+                                    color: '#444',
+                                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
+                                }}
+                            >
+                                <RemoveIcon fontSize="small" />
+                            </IconButton>
 
-                                <TextField
-                                    className={styles.input}
-                                    id="outlined-basic"
-                                    variant="outlined"
-                                    value={imeSettings.pageSize?.toString() ?? ""}
-                                    onChange={e => {
-                                        let v = e.target.value;
-                                        if (v.length >= 2) {
-                                            v = v.substring(v.length - 1);
-                                        }
-                                        const val = parseInt(v, 10);
-                                        if (!isNaN(val) && val >= kMinPageSize && val <= kMaxPageSize) {
-                                            changeSettings({ pageSize: val });
-                                        } else if (v.length == 0) {
-                                            changeSettings({ pageSize: null });
-                                        }
-                                    }}
-                                />
+                            <Box sx={{ width: 44, textAlign: 'center', fontWeight: 500, fontSize: '15px', color: '#1A1A24' }}>
+                                {(imeSettings.pageSize ?? kDefaultSettings.pageSize).toString()}
+                            </Box>
 
-                                <IconButton onClick={() => {
+                            <IconButton 
+                                size="small"
+                                onClick={() => {
                                     const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
                                     if (s < kMaxPageSize) { changeSettings({ pageSize: s + 1 }) }
-                                }}>
-                                    <AddIcon />
-                                </IconButton>
-                            </div>
-                        </div>
-                    </FormControl>
-
-                    <FormControl className={styles.formControl} style={{ display: "none" }}>
-                        <div className={styles.formLabel}>{$$("candidates_layout")}</div>
-                        <FormGroup>
-                            <RadioGroup
-                                value={imeSettings.horizontal ?? false}
-                                onChange={(e) => changeSettings({ horizontal: e.target.value === "true" ? true : false })}
-                                name="layoutHorizontal"
-                                row
+                                }}
+                                sx={{ 
+                                    width: 36, height: 36,
+                                    borderRadius: '18px', 
+                                    color: '#444',
+                                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
+                                }}
                             >
-                                <FormControlLabel
-                                    control={<Radio />}
-                                    value={false}
-                                    label={$$("layout_vertical")}
-                                />
-                                <FormControlLabel
-                                    control={<Radio />}
-                                    value={true}
-                                    label={$$("layout_horizontal")}
-                                />
-                            </RadioGroup>
-                        </FormGroup>
-                    </FormControl>
+                                <AddIcon fontSize="small" />
+                            </IconButton>
+                        </Box>
+                    </Box>
+
                 </div>
             </div>
 
             {currentSchemaInfo()?.fuzzy_pinyin && <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>{$$("fuzzy_pinyin")}</div>
-                        <FormGroup row>
-                            {
-                                kFuzzyMap.map((fuzzy) =>
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                value={fuzzy.value}
-                                                name={fuzzy.label}
-                                                checked={imeSettings.algebraList.includes(fuzzy.value)}
-                                                onChange={async (e) => changeFuzzy(e.target.checked, e.target.value)}
-                                            />
-                                        }
-                                        label={fuzzy.label}
-                                        key={fuzzy.value}
+                <div className={styles.formBox} style={{ padding: '8px 0' }}>
+                    <Box sx={{ px: 4, py: 2.5, pb: 1.5, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                        {$$("fuzzy_pinyin")}
+                    </Box>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', px: 2, pb: 2 }}>
+                        {kFuzzyMap.map((fuzzy) => {
+                            const isChecked = imeSettings.algebraList.includes(fuzzy.value);
+                            return (
+                                <Box
+                                    key={fuzzy.value}
+                                    component="label"
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        px: 2,
+                                        py: 1.25,
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.15s',
+                                        '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' },
+                                        '&:active': { bgcolor: 'rgba(0, 0, 0, 0.08)' },
+                                    }}
+                                >
+                                    <Box sx={{ fontSize: '14px', fontWeight: 400, color: '#1A1A24' }}>
+                                        {fuzzy.label}
+                                    </Box>
+                                    <Switch
+                                        size="small"
+                                        checked={isChecked}
+                                        onChange={() => changeFuzzy(!isChecked, fuzzy.value)}
                                     />
-                                )
-                            }
-                        </FormGroup>
-                    </FormControl>
+                                </Box>
+                            );
+                        })}
+                    </Box>
                 </div>
             </div>}
 
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
-                        <div className={styles.formLabel}>{$$("rime_engine_logs")}</div>
-                        <div className={styles.formLabel}>{$$("rime_engine_status")}
-                            <Box sx={{ color: engineColor, display: 'inline' }}> {engineStatusString}</Box>
-                        </div>
+                        {/* Header: section title + engine status badge */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                            <div className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("rime_engine_logs")}</div>
+                            <Box sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: '20px',
+                                bgcolor: engineStatus.loaded
+                                    ? 'rgba(34, 197, 94, 0.1)'
+                                    : engineStatus.loading
+                                        ? 'rgba(234, 179, 8, 0.1)'
+                                        : 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid',
+                                borderColor: engineStatus.loaded
+                                    ? 'rgba(34, 197, 94, 0.3)'
+                                    : engineStatus.loading
+                                        ? 'rgba(234, 179, 8, 0.3)'
+                                        : 'rgba(239, 68, 68, 0.25)',
+                            }}>
+                                <Box sx={{
+                                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                                    bgcolor: engineColor,
+                                }} />
+                                <Box sx={{ fontSize: '0.75rem', fontWeight: 500, color: engineColor, whiteSpace: 'nowrap' }}>
+                                    {engineStatusString}
+                                </Box>
+                            </Box>
+                        </Box>
                         <RimeLogDisplay />
-                        <div className={styles.formLabel} style={{ marginTop: "10px" }}>
+                        <Box sx={{ mt: 2 }}>
                             <FileEditorButton onEdit={() => setSettingsDirty(SettingsDirtyStatus.Dirty)} />
-                        </div>
+                        </Box>
                     </FormControl>
                 </div>
             </div>

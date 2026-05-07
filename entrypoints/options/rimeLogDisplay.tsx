@@ -32,7 +32,28 @@ function RimeLogDisplay() {
         };
     }, []);
 
-    return <textarea readOnly value={rimeLogs.join("\n")} rows={14} ref={logTextArea}></textarea>;
+    return <textarea
+        readOnly
+        value={rimeLogs.join("\n")}
+        rows={10}
+        ref={logTextArea}
+        style={{
+            display: 'block',
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            maxWidth: '100%',
+            fontFamily: 'ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace',
+            fontSize: '12px',
+            lineHeight: '1.6',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: '1px solid rgba(0, 0, 0, 0.09)',
+            backgroundColor: 'rgba(0, 0, 0, 0.025)',
+            color: '#333',
+            outline: 'none',
+        }}
+    />;
 }
 
 export default RimeLogDisplay

@@ -3,7 +3,8 @@
     flex-direction: column;
     align-items: center;
     width: 100%;
-    min-width: 800px;
+    min-width: 320px;
+    overflow-x: hidden;
 
     .bgBlock {
         position: fixed;
@@ -12,6 +13,8 @@
         z-index: -1;
         top: 0;
         left: 0;
+        overflow: hidden;
+        pointer-events: none;
 
         .randomWave(@x: 5px, @y: 5px, @time: 5s, @name) {
             @keyframes @name {
@@ -85,26 +88,39 @@
     .topAnimation {
         width: 500px;
         height: 180px;
-        margin-bottom: 102px;
+        margin-top: 40px;
+        margin-bottom: 60px;
     }
 
     .formGroup {
         width: 718px;
+        max-width: 90vw;
 
         .formBox {
-            padding: 16px 20px;
-            border: 1px solid #EFEFEF;
-            border-radius: 2px;
+            padding: 24px 32px;
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.03);
+            border-radius: 20px;
             margin-bottom: 16px;
+            transition: box-shadow 0.2s ease;
+
+            &:hover {
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+            }
 
             .formControl {
                 width: 100%;
 
                 .formLabel {
-                    font-weight: 500;
-                    font-size: 14px;
-                    line-height: 22px;
-                    margin-bottom: 19px;
+                    font-weight: 600;
+                    font-size: 16px;
+                    color: #1A1A24;
+                    line-height: 24px;
+                    margin-bottom: 16px;
+                    letter-spacing: -0.01em;
                 }
 
                 .pageSize {
@@ -129,9 +145,10 @@
 
 .footer {
     font-weight: 400;
-    font-size: 12px;
-    line-height: 20px;
+    font-size: 13px;
+    line-height: 22px;
     text-align: center;
+    color: #666677;
 
     @media (max-height: 700px) {
         margin-top: 124px;
@@ -139,7 +156,8 @@
     }
 
     @media (min-height: 701px) {
-        margin-bottom: 16px;
+        margin-top: 40px;
+        margin-bottom: 32px;
         width: 100%;
         text-align: center;
     }

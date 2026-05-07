@@ -10,31 +10,33 @@ export default createTheme({
     MuiButton: {
       styleOverrides: {
         contained: {
-          borderRadius: 100,
-          padding: "6px 28px",
+          borderRadius: 12,
+          padding: "8px 24px",
           backgroundColor: "rgba(228, 0, 70, 1)",
-          fontSize: "12px",
+          fontSize: "13px",
           lineHeight: "22px",
           textTransform: "unset",
-          fontWeight: 400,
+          fontWeight: 500,
+          boxShadow: "0 2px 8px rgba(228, 0, 70, 0.2)",
+          transition: "all 0.2s ease-in-out",
           "&:hover": {
-            backgroundColor: "rgba(228, 0, 70, .8)",
-            boxShadow: "unset"
+            backgroundColor: "rgba(228, 0, 70, .85)",
+            boxShadow: "0 4px 12px rgba(228, 0, 70, 0.3)"
           },
-          boxShadow: "unset"
         },
         outlined: {
-          borderRadius: 100,
-          padding: "6px 28px",
-          borderColor: "rgba(239, 239, 239, 1)",
-          fontSize: "12px",
+          borderRadius: 12,
+          padding: "8px 24px",
+          borderColor: "rgba(220, 220, 225, 1)",
+          fontSize: "13px",
           lineHeight: "22px",
           textTransform: "unset",
-          fontWeight: 400,
-          color: "black",
+          fontWeight: 500,
+          color: "#333",
+          transition: "all 0.2s ease-in-out",
           "&:hover": {
             borderColor: "rgba(228, 0, 70, .5)",
-            backgroundColor: "white"
+            backgroundColor: "rgba(228, 0, 70, 0.04)"
           }
         },
         text: {
@@ -45,9 +47,10 @@ export default createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 100,
-          fontSize: "12px",
+          borderRadius: 8,
+          fontSize: "13px",
           lineHeight: "22px",
+          transition: "all 0.2s ease-in-out",
           "&.Mui-focused": {
             "& .MuiOutlinedInput-notchedOutline": {
               borderColor: "rgba(228, 0, 70, 1)"
@@ -55,17 +58,54 @@ export default createTheme({
           },
           "&:hover": {
             "& .MuiOutlinedInput-notchedOutline": {
-              borderColor: "rgba(228, 0, 70, 1)"
+              borderColor: "rgba(228, 0, 70, 0.5)"
             }
           }
         },
       },
     },
+    MuiFilledInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          backgroundColor: "rgba(0, 0, 0, 0.04)",
+          transition: "background-color 0.2s ease-in-out",
+          "&:hover": {
+            backgroundColor: "rgba(0, 0, 0, 0.06)"
+          },
+          "&.Mui-focused": {
+            backgroundColor: "rgba(0, 0, 0, 0.04)"
+          },
+          "&::before, &::after": {
+            display: "none"
+          },
+          input: {
+            padding: "24px 16px 8px",
+            fontSize: "13px",
+            lineHeight: "22px",
+            fontWeight: 500,
+            color: "#1A1A24"
+          }
+        },
+      }
+    },
     MuiInputLabel: {
       styleOverrides: {
         root: {
+          fontSize: "13px",
+          transform: "translate(16px, 12px) scale(1)",
+          "&.MuiInputLabel-shrink": {
+            transform: "translate(16px, -8px) scale(0.85)",
+            fontWeight: 600
+          },
           "&.Mui-focused": {
             color: "rgba(228, 0, 70, 1)"
+          }
+        },
+        filled: {
+          transform: "translate(16px, 16px) scale(1)",
+          "&.MuiInputLabel-shrink": {
+            transform: "translate(16px, 5px) scale(0.75)"
           }
         }
       }
@@ -84,7 +124,7 @@ export default createTheme({
             lineHeight: "22px"
           },
           "& .MuiSvgIcon-root": {
-            width: "16px",
+            width: "18px",
           }
         }
       }
@@ -148,7 +188,7 @@ export default createTheme({
           },
           input: {
             height: "22px",
-            fontSize: "12px",
+            fontSize: "13px",
             lineHeight: "22px",
             padding: "1px 0"
           }
@@ -162,7 +202,30 @@ export default createTheme({
           marginRight: "20px !important"
         }
       }
-    }
+    },
+    MuiSnackbarContent: {
+      styleOverrides: {
+        root: {
+          borderRadius: 14,
+          backgroundColor: "#1A1A24",
+          padding: "6px 8px 6px 20px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12)",
+          minWidth: "unset",
+          flexWrap: "nowrap",
+          gap: "8px",
+        },
+        message: {
+          fontSize: "13px",
+          fontWeight: 500,
+          color: "#ffffff",
+          padding: "6px 0",
+        },
+        action: {
+          paddingLeft: "4px",
+          marginRight: 0,
+        },
+      },
+    },
   },
 });
 
