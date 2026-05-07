@@ -68,7 +68,8 @@
     "overrides": {
       "semver@>=7.0.0 <7.5.2": ">=7.5.2",
       "@babel/traverse@<7.23.2": ">=7.23.2",
-      "svgo@2.8.0": "^4.0.0"
+      "svgo@2.8.0": "^4.0.0",
+      "dompurify": ">=3.4.0"
     },
     "peerDependencyRules": {
       "ignoreMissing": [
