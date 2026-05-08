@@ -23,6 +23,7 @@ export default tseslint.config(
       "node_modules/**",
       "public/**",
       "entrypoints/background/rime_emscripten.js",
+      "entrypoints/background/rime_emscripten.d.ts",
     ],
   },
   js.configs.recommended,
