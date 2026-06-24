@@ -51,6 +51,50 @@ async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSetting
   return next;
 }
 
+/**
+ * Send the initial keyset config ("init" message) to a freshly connected
+ * inputview port.
+ *
+ * On a cold-started MV3 service worker the inputview can connect before RIME
+ * has finished loading, so `controller.session` is still null. The inputview
+ * stays a single row until it receives an "init" message, so the invariant is:
+ * exactly one "init" must always be sent, no matter what state the session is
+ * in. When the value can't be read we send a default (asciiMode=false); the
+ * controller's schemaSwitched event later corrects the keyset once RIME loads.
+ */
+export function sendInputViewInit(
+  controller: InputController | undefined,
+  postToPort: (msg: object) => void,
+): void {
+  const sendDefault = () => postToPort({ name: "init", msg: { asciiMode: false } });
+
+  const session = controller?.session;
+  if (!session) {
+    // Cold-start race: RIME not loaded yet.
+    sendDefault();
+    return;
+  }
+
+  let result: unknown;
+  try {
+    // A half-destroyed session (or a future refactor) could make getOption
+    // missing or throw synchronously; never let that swallow the init.
+    result = session.getOption("ascii_mode");
+  } catch {
+    sendDefault();
+    return;
+  }
+
+  if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+    void Promise.resolve(result as PromiseLike<boolean | undefined>).then((asciiMode) => {
+      postToPort({ name: "init", msg: { asciiMode: asciiMode ?? false } });
+    }).catch(sendDefault);
+  } else {
+    // getOption returned a plain value instead of a promise.
+    postToPort({ name: "init", msg: { asciiMode: (result as boolean | undefined) ?? false } });
+  }
+}
+
 export default defineBackground({
   main() {
     async function fallbackDefaultSettings() {
@@ -215,11 +259,7 @@ export default defineBackground({
           }
         };
 
-        void self.controller?.session?.getOption("ascii_mode").then((asciiMode: boolean | undefined) => {
-          postToPort({ name: "init", msg: { asciiMode: asciiMode ?? false } });
-        }).catch(() => {
-          postToPort({ name: "init", msg: { asciiMode: false } });
-        });
+        sendInputViewInit(self.controller, postToPort);
 
         port.onMessage.addListener((msg) => {
           console.log("Message from inputview:", msg);
