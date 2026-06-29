@@ -17,7 +17,11 @@ async function buildSchemaMenuItems(activeSchema: string, enabledSchemas?: strin
   }));
 }
 
-async function refreshImeMenuItems() {
+// onActivate doesn't re-fire when the MV3 worker respawns, so cache engineId in
+// storage.session to recover it on the next cold start (see restoreEngineId).
+const kEngineIdSessionKey = "imeEngineId";
+
+export async function refreshImeMenuItems() {
   const engineID = self.controller?.engineId;
   if (!engineID) return;
   const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
@@ -29,6 +33,32 @@ async function refreshImeMenuItems() {
   } catch (ex) {
     console.error("setMenuItems failed:", ex);
   }
+}
+
+async function persistEngineId(engineId: string): Promise<void> {
+  try {
+    await chrome.storage.session.set({ [kEngineIdSessionKey]: engineId });
+  } catch (ex) {
+    console.error("persistEngineId failed:", ex);
+  }
+}
+
+// On startup, restore a cached engineId (if onActivate hasn't re-fired) and refresh
+// the menu so it populates without a click. No-op if engineId is known or uncached.
+export async function restoreEngineId(): Promise<void> {
+  if (!self.controller || self.controller.engineId) return;
+  let cached: string | undefined;
+  try {
+    const obj = await chrome.storage.session.get([kEngineIdSessionKey]) as { [kEngineIdSessionKey]?: string };
+    cached = obj[kEngineIdSessionKey];
+  } catch (ex) {
+    console.error("restoreEngineId failed:", ex);
+    return;
+  }
+  // onActivate may have set a fresh engineId while we awaited.
+  if (!cached || !self.controller || self.controller.engineId) return;
+  self.controller.engineId = cached;
+  await refreshImeMenuItems();
 }
 
 async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSettings | null> {
@@ -51,48 +81,65 @@ async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSetting
   return next;
 }
 
-/**
- * Send the initial keyset config ("init" message) to a freshly connected
- * inputview port.
- *
- * On a cold-started MV3 service worker the inputview can connect before RIME
- * has finished loading, so `controller.session` is still null. The inputview
- * stays a single row until it receives an "init" message, so the invariant is:
- * exactly one "init" must always be sent, no matter what state the session is
- * in. When the value can't be read we send a default (asciiMode=false); the
- * controller's schemaSwitched event later corrects the keyset once RIME loads.
- */
+// Send the inputview's "init" message (runs its one-time setup) and return a
+// cleanup fn. The init must not be sent before RIME is ready, or feedKey can't
+// compose pinyin and the keyboard types raw English; so on a cold start we defer
+// until the controller's "schemaSwitched" fires, bounded by a timeout in case the
+// load fails and never fires. Exactly one init is sent whichever path wins.
+export const kInputViewInitFallbackMs = 8000;
+
 export function sendInputViewInit(
   controller: InputController | undefined,
   postToPort: (msg: object) => void,
-): void {
-  const sendDefault = () => postToPort({ name: "init", msg: { asciiMode: false } });
+  fallbackMs: number = kInputViewInitFallbackMs,
+): () => void {
+  let done = false;
+  const send = () => {
+    if (done) return;
+    done = true;
+    const session = controller?.session;
+    if (!session) {
+      postToPort({ name: "init", msg: { asciiMode: false } });
+      return;
+    }
+    let result: unknown;
+    try {
+      // getOption may be missing or throw synchronously on a half-destroyed session.
+      result = session.getOption("ascii_mode");
+    } catch {
+      postToPort({ name: "init", msg: { asciiMode: false } });
+      return;
+    }
+    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+      void Promise.resolve(result as PromiseLike<boolean | undefined>).then((asciiMode) => {
+        postToPort({ name: "init", msg: { asciiMode: asciiMode ?? false } });
+      }).catch(() => postToPort({ name: "init", msg: { asciiMode: false } }));
+    } else {
+      postToPort({ name: "init", msg: { asciiMode: (result as boolean | undefined) ?? false } });
+    }
+  };
 
-  const session = controller?.session;
-  if (!session) {
-    // Cold-start race: RIME not loaded yet.
-    sendDefault();
-    return;
+  // Warm path (or degenerate no-controller): init immediately.
+  if (controller?.session || !controller) {
+    send();
+    return () => { };
   }
 
-  let result: unknown;
-  try {
-    // A half-destroyed session (or a future refactor) could make getOption
-    // missing or throw synchronously; never let that swallow the init.
-    result = session.getOption("ascii_mode");
-  } catch {
-    sendDefault();
-    return;
+  // Cold start: defer until RIME is ready, with a timeout fallback.
+  const onReady = () => {
+    cleanup();
+    send();
+  };
+  controller.addListener("schemaSwitched", onReady);
+  const timer = setTimeout(() => {
+    cleanup();
+    send();
+  }, fallbackMs);
+  function cleanup() {
+    controller!.removeListener("schemaSwitched", onReady);
+    clearTimeout(timer);
   }
-
-  if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-    void Promise.resolve(result as PromiseLike<boolean | undefined>).then((asciiMode) => {
-      postToPort({ name: "init", msg: { asciiMode: asciiMode ?? false } });
-    }).catch(sendDefault);
-  } else {
-    // getOption returned a plain value instead of a promise.
-    postToPort({ name: "init", msg: { asciiMode: (result as boolean | undefined) ?? false } });
-  }
+  return cleanup;
 }
 
 export default defineBackground({
@@ -166,6 +213,8 @@ export default defineBackground({
     self.controller = new InputController();
     self.controller.addListener("schemaSwitched", () => { refreshImeMenuItems(); });
 
+    void restoreEngineId();
+
     chrome.storage.sync.get(["settings"]).then(async (obj) => {
       // Only load engine if settings exists
       if (obj.settings) {
@@ -187,6 +236,7 @@ export default defineBackground({
     // IME activation listener
     chrome.input.ime.onActivate.addListener(async (engineId, _screen) => {
       self.controller.engineId = engineId;
+      void persistEngineId(engineId);
       serviceWorkerKeepalive();
       refreshImeMenuItems();
     });
@@ -259,7 +309,7 @@ export default defineBackground({
           }
         };
 
-        sendInputViewInit(self.controller, postToPort);
+        const cancelInputViewInit = sendInputViewInit(self.controller, postToPort);
 
         port.onMessage.addListener((msg) => {
           console.log("Message from inputview:", msg);
@@ -298,6 +348,7 @@ export default defineBackground({
         port.onDisconnect.addListener(() => {
           console.log("InputView disconnected");
           inputViewDisconnected = true;
+          cancelInputViewInit();
           self.controller.removeListener("toggleLanguageState", onToggleLanguageState);
           self.controller.removeListener("candidatesBack", onCandidatesBack);
           self.controller.removeListener("schemaSwitched", onSchemaSwitched);

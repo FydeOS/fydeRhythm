@@ -42,3 +42,4 @@ build-*/
 
 /public/rime_emscripten.wasm
 /entrypoints/background/rime_emscripten.js
+/entrypoints/background/rime_emscripten.d.ts
