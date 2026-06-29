@@ -1,4 +1,15 @@
-import type { UserConfig } from 'wxt';
+import { fileURLToPath } from 'node:url';
+import type { UserConfig, WxtHooks } from 'wxt';
+
+const licensePath = fileURLToPath(new URL('./LICENSE', import.meta.url));
+
+// Bundle the repo's BSD LICENSE into every build output, without keeping a
+// duplicate copy in public/.
+export const sharedHooks: Partial<WxtHooks> = {
+  'build:publicAssets': (_wxt, assets) => {
+    assets.push({ absoluteSrc: licensePath, relativeDest: 'LICENSE' });
+  }
+};
 
 const icons = {
   16: '/icon-16.png',

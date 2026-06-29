@@ -1,5 +1,5 @@
 import { defineConfig } from 'wxt';
-import { sharedManifest, sharedInputComponent, sharedVite } from './wxt.config.base';
+import { sharedManifest, sharedInputComponent, sharedVite, sharedHooks } from './wxt.config.base';
 
 // WXT loads .env files after importing this config, so read the key when the manifest is resolved.
 const getExtensionKey = () => process.env.FYDE_RHYTHM_KEY?.trim();
@@ -41,5 +41,6 @@ export default defineConfig({
     } as any;
   },
 
-  vite: sharedVite
+  vite: sharedVite,
+  hooks: sharedHooks
 });

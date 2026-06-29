@@ -1,5 +1,5 @@
 import { defineConfig } from 'wxt';
-import { sharedManifest, sharedInputComponent, sharedVite } from './wxt.config.base';
+import { sharedManifest, sharedInputComponent, sharedVite, sharedHooks } from './wxt.config.base';
 
 // Chrome Web Store configuration - removes features not supported by Chrome Web Store
 export default defineConfig({
@@ -27,5 +27,6 @@ export default defineConfig({
     // update_url is managed by Chrome Web Store
   } as any,
 
-  vite: sharedVite
+  vite: sharedVite,
+  hooks: sharedHooks
 });
