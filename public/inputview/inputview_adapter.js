@@ -172,7 +172,16 @@ port.onMessage.addListener(function(msg) {
     return;
   }
   if (msg.name == 'schema_switched') {
-    switchVirtualKeyboard(getVirtualKeyboardConfig(msg.msg && msg.msg.asciiMode), _pendingName);
+    var vk = getVirtualKeyboardConfig(msg.msg && msg.msg.asciiMode);
+    if (_pendingName === null) {
+      // window.onload hasn't run yet, so the one-time overrides in maybeTriggerInit
+      // haven't been installed. Stash the config and let maybeTriggerInit do the
+      // full setup once onload fires, instead of initializing the keyboard without
+      // the API hooks (which switchVirtualKeyboard would then no-op past).
+      _pendingVk = vk;
+      return;
+    }
+    switchVirtualKeyboard(vk, _pendingName);
     return;
   }
   if (controller && controller.adapter_) {

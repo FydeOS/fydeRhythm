@@ -81,65 +81,28 @@ async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSetting
   return next;
 }
 
-// Send the inputview's "init" message (runs its one-time setup) and return a
-// cleanup fn. The init must not be sent before RIME is ready, or feedKey can't
-// compose pinyin and the keyboard types raw English; so on a cold start we defer
-// until the controller's "schemaSwitched" fires, bounded by a timeout in case the
-// load fails and never fires. Exactly one init is sent whichever path wins.
-export const kInputViewInitFallbackMs = 8000;
+// Read the engine's ascii_mode, defaulting to false when the session isn't ready
+// or the read fails. On a cold-started MV3 worker the inputview connects before
+// RIME has loaded, so the session is still null and we default to false.
+async function readAsciiMode(controller: InputController | undefined): Promise<boolean> {
+  try {
+    return (await controller?.session?.getOption("ascii_mode")) ?? false;
+  } catch {
+    return false;
+  }
+}
 
-export function sendInputViewInit(
+// Post {name, msg:{asciiMode}} to a connected inputview port. The inputview needs
+// the "init" message to build its full keyset — without it the keyboard stays a
+// single row — so it is sent immediately on connect regardless of session state;
+// on a cold start the session is null and asciiMode defaults to false, and the
+// controller's "schemaSwitched" event re-posts the real value once RIME loads.
+export async function postAsciiMode(
   controller: InputController | undefined,
   postToPort: (msg: object) => void,
-  fallbackMs: number = kInputViewInitFallbackMs,
-): () => void {
-  let done = false;
-  const send = () => {
-    if (done) return;
-    done = true;
-    const session = controller?.session;
-    if (!session) {
-      postToPort({ name: "init", msg: { asciiMode: false } });
-      return;
-    }
-    let result: unknown;
-    try {
-      // getOption may be missing or throw synchronously on a half-destroyed session.
-      result = session.getOption("ascii_mode");
-    } catch {
-      postToPort({ name: "init", msg: { asciiMode: false } });
-      return;
-    }
-    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-      void Promise.resolve(result as PromiseLike<boolean | undefined>).then((asciiMode) => {
-        postToPort({ name: "init", msg: { asciiMode: asciiMode ?? false } });
-      }).catch(() => postToPort({ name: "init", msg: { asciiMode: false } }));
-    } else {
-      postToPort({ name: "init", msg: { asciiMode: (result as boolean | undefined) ?? false } });
-    }
-  };
-
-  // Warm path (or degenerate no-controller): init immediately.
-  if (controller?.session || !controller) {
-    send();
-    return () => { };
-  }
-
-  // Cold start: defer until RIME is ready, with a timeout fallback.
-  const onReady = () => {
-    cleanup();
-    send();
-  };
-  controller.addListener("schemaSwitched", onReady);
-  const timer = setTimeout(() => {
-    cleanup();
-    send();
-  }, fallbackMs);
-  function cleanup() {
-    controller!.removeListener("schemaSwitched", onReady);
-    clearTimeout(timer);
-  }
-  return cleanup;
+  name: string,
+): Promise<void> {
+  postToPort({ name, msg: { asciiMode: await readAsciiMode(controller) } });
 }
 
 export default defineBackground({
@@ -309,7 +272,7 @@ export default defineBackground({
           }
         };
 
-        const cancelInputViewInit = sendInputViewInit(self.controller, postToPort);
+        void postAsciiMode(self.controller, postToPort, "init");
 
         port.onMessage.addListener((msg) => {
           console.log("Message from inputview:", msg);
@@ -334,11 +297,7 @@ export default defineBackground({
         }
 
         const onSchemaSwitched = function () {
-          void self.controller?.session?.getOption("ascii_mode").then((asciiMode: boolean | undefined) => {
-            postToPort({ name: "schema_switched", msg: { asciiMode: asciiMode ?? false } });
-          }).catch(() => {
-            postToPort({ name: "schema_switched", msg: { asciiMode: false } });
-          });
+          void postAsciiMode(self.controller, postToPort, "schema_switched");
         }
 
         self.controller.addListener("toggleLanguageState", onToggleLanguageState);
@@ -348,7 +307,6 @@ export default defineBackground({
         port.onDisconnect.addListener(() => {
           console.log("InputView disconnected");
           inputViewDisconnected = true;
-          cancelInputViewInit();
           self.controller.removeListener("toggleLanguageState", onToggleLanguageState);
           self.controller.removeListener("candidatesBack", onCandidatesBack);
           self.controller.removeListener("schemaSwitched", onSchemaSwitched);

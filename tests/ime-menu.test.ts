@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Keep importing index.ts side-effect-free (defineBackground / onMessage run at load).
 vi.stubGlobal('defineBackground', (def: unknown) => def);
@@ -34,6 +34,10 @@ vi.mock('@/lib/schema-install', () => ({
 }));
 
 const { refreshImeMenuItems, restoreEngineId } = await import('../entrypoints/background/index');
+
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
 
 interface ChromeStubOptions {
     sessionEngineId?: string;
