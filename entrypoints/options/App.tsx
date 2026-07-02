@@ -16,6 +16,11 @@ import Snackbar from "@mui/material/Snackbar";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Box from "@mui/material/Box";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
 
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -116,6 +121,8 @@ function OptionsPage() {
     const [personalRepoURL, setPersonalRepoURL] = useState<string | null>(null);
     const [personalRepoSchemaId, setPersonalRepoSchemaId] = useState<string | null>(null);
 
+    const [removeCandidate, setRemoveCandidate] = useState<SchemaDescription | null>(null);
+
     const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
 
     // chrome.storage.local.get
@@ -211,6 +218,14 @@ function OptionsPage() {
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (settingsDirty == SettingsDirtyStatus.NotDirty) return;
+        const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settingsDirty]);
 
     async function loadRime() {
         await chrome.storage.sync.set({ settings: imeSettings });
@@ -749,8 +764,9 @@ function OptionsPage() {
 
     return <ThemeProvider theme={theme}>
         <div className={styles.content}>
+            <h1 className={styles.visuallyHidden}>{$$("setting_page")}</h1>
             <div style={{ position: 'absolute', top: 30, left: 30 }}>
-                <object type="image/svg+xml" data="/logo.svg"></object>
+                <img src="/logo.svg" alt="" width={146} height={42} />
             </div>
             <div className={styles.bgBlock}>
                 <div className={styles.leftTop1} />
@@ -770,7 +786,7 @@ function OptionsPage() {
                 <div className={styles.formBox}>
                     <FormControl className={styles.formControl}>
                         <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-                            <div className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("select_schema")}</div>
+                            <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("select_schema")}</h2>
                             {fetchingList && (
                                 <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{$$("fetching_schema_list")}</Box>
                             )}
@@ -827,12 +843,14 @@ function OptionsPage() {
                                                         onClick={(e) => e.stopPropagation()}
                                                         size="small"
                                                         sx={{ p: 0 }}
+                                                        inputProps={{ 'aria-label': `${schema.id} ${schema.name}` }}
                                                       />
                                                     : <IconButton
                                                         size="small"
                                                         onClick={(e) => { e.stopPropagation(); downloadSchema(schema.id); }}
                                                         disabled={downloadSchemaId != null}
                                                         sx={{ p: 0.5 }}
+                                                        aria-label={`${$$("download_schema")} ${schema.name}`}
                                                       >
                                                         <CloudDownloadIcon fontSize="small" />
                                                       </IconButton>
@@ -856,7 +874,7 @@ function OptionsPage() {
                                                 )}
                                                 {isInstalled && (
                                                     <Link component="button" underline="hover"
-                                                        onClick={(e) => { e.stopPropagation(); removeSchema(schema.id); }}
+                                                        onClick={(e) => { e.stopPropagation(); setRemoveCandidate(schema); }}
                                                         sx={{
                                                             fontSize: '0.8rem',
                                                             opacity: isActive ? 0.4 : 1,
@@ -925,6 +943,10 @@ function OptionsPage() {
                             <TextField
                                 label="GitHub Repo URL"
                                 variant="filled"
+                                type="url"
+                                name="repoUrl"
+                                autoComplete="off"
+                                spellCheck={false}
                                 onChange={e => setPersonalRepoURL(e.target.value)}
                                 sx={{ flex: 1, minWidth: 0 }}
                             />
@@ -932,6 +954,9 @@ function OptionsPage() {
                                 <TextField
                                     label="Schema Id"
                                     variant="filled"
+                                    name="schemaId"
+                                    autoComplete="off"
+                                    spellCheck={false}
                                     onChange={e => setPersonalRepoSchemaId(e.target.value)}
                                     sx={{ width: { xs: '100%', sm: '150px' } }}
                                 />
@@ -977,7 +1002,7 @@ function OptionsPage() {
                         </Box>
 
                         {fetchListError && (
-                            <Box sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
+                            <Box role="alert" sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
                         )}
                     </FormControl>
                 </div>
@@ -986,7 +1011,7 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox} style={{ padding: '8px 0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
-                        <Box sx={{ fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                        <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
                             {$$("candidate_count")}
                         </Box>
                         <Box sx={{ 
@@ -996,15 +1021,17 @@ function OptionsPage() {
                             borderRadius: '24px',
                             padding: '4px'
                         }}>
-                            <IconButton 
+                            <IconButton
                                 size="small"
+                                aria-label={$$("decrease_candidate_count")}
+                                disabled={(imeSettings.pageSize ?? kDefaultSettings.pageSize) <= kMinPageSize}
                                 onClick={() => {
                                     const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
                                     if (s > kMinPageSize) { changeSettings({ pageSize: s - 1 }) }
                                 }}
-                                sx={{ 
+                                sx={{
                                     width: 36, height: 36,
-                                    borderRadius: '18px', 
+                                    borderRadius: '18px',
                                     color: '#444',
                                     '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
                                 }}
@@ -1016,8 +1043,10 @@ function OptionsPage() {
                                 {(imeSettings.pageSize ?? kDefaultSettings.pageSize).toString()}
                             </Box>
 
-                            <IconButton 
+                            <IconButton
                                 size="small"
+                                aria-label={$$("increase_candidate_count")}
+                                disabled={(imeSettings.pageSize ?? kDefaultSettings.pageSize) >= kMaxPageSize}
                                 onClick={() => {
                                     const s = imeSettings.pageSize ?? kDefaultSettings.pageSize;
                                     if (s < kMaxPageSize) { changeSettings({ pageSize: s + 1 }) }
@@ -1039,7 +1068,7 @@ function OptionsPage() {
 
             {currentSchemaInfo()?.fuzzy_pinyin && <div className={styles.formGroup}>
                 <div className={styles.formBox} style={{ padding: '8px 0' }}>
-                    <Box sx={{ px: 4, py: 2.5, pb: 1.5, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                    <Box component="h2" sx={{ m: 0, px: 4, py: 2.5, pb: 1.5, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
                         {$$("fuzzy_pinyin")}
                     </Box>
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', px: 2, pb: 2 }}>
@@ -1082,7 +1111,7 @@ function OptionsPage() {
                     <FormControl className={styles.formControl}>
                         {/* Header: section title + engine status badge */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                            <div className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("rime_engine_logs")}</div>
+                            <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("rime_engine_logs")}</h2>
                             <Box sx={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1140,6 +1169,27 @@ function OptionsPage() {
                 message={$$("settings_changed_snackbar")}
                 action={settingsDirtySnackbarActions}
             />
+
+            <Dialog open={removeCandidate != null} onClose={() => setRemoveCandidate(null)}>
+                <DialogTitle>{$$("remove_schema_confirm_title")}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {removeCandidate && $$("remove_schema_confirm_body", removeCandidate.name)}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="outlined" onClick={() => setRemoveCandidate(null)}>
+                        {$$("cancel_button")}
+                    </Button>
+                    <Button variant="contained" onClick={() => {
+                        const id = removeCandidate!.id;
+                        setRemoveCandidate(null);
+                        void removeSchema(id);
+                    }}>
+                        {$$("remove_schema")}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     </ThemeProvider>
 }

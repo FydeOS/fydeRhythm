@@ -11,12 +11,17 @@ interface IAnimationProps {
 const Animation = (props: IAnimationProps) => {
   // Clone the animation data to avoid "object is not extensible" error in Chrome extensions
   const clonedData = useMemo(() => JSON.parse(JSON.stringify(animationData)), []);
+  const reducedMotion = useMemo(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
 
-  return <div>
+  return <div aria-hidden="true">
     <Lottie
       animationData={clonedData}
       style={{ width: props.width, height: props.height }}
       loop={props.loop}
+      autoplay={!reducedMotion}
     />
   </div>
 }

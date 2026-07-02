@@ -12,7 +12,7 @@
         "message": "真文韵输入法设置"
     },
     "loading_engine": {
-        "message": "正在载入 RIME 引擎..."
+        "message": "正在载入 RIME 引擎…"
     },
     "candidate_page": {
         "message": "第 $PAGE$ 页",
@@ -119,7 +119,7 @@
         "message": "请选择一个文本文件"
     },
     "loading_editor": {
-        "message": "正在加载编辑器..."
+        "message": "正在加载编辑器…"
     },
     "config_editor_title": {
         "message": "RIME 配置编辑器"
@@ -132,5 +132,28 @@
     },
     "layout_horizontal": {
         "message": "横向（目前不能在 FydeOS 使用，只能在 ChromeOS 使用）"
+    },
+    "remove_schema_confirm_title": {
+        "message": "移除输入方案"
+    },
+    "remove_schema_confirm_body": {
+        "message": "确定要移除“$SCHEMA$”吗？方案文件将被删除，如需再次使用须重新下载。",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "cancel_button": {
+        "message": "取消"
+    },
+    "download_schema": {
+        "message": "下载方案"
+    },
+    "decrease_candidate_count": {
+        "message": "减少候选词数量"
+    },
+    "increase_candidate_count": {
+        "message": "增加候选词数量"
     }
 }

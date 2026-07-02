@@ -12,7 +12,7 @@
         "message": "진문운 설정"
     },
     "loading_engine": {
-        "message": "RIME 엔진을 로딩 중..."
+        "message": "RIME 엔진을 로딩 중…"
     },
     "candidate_page": {
         "message": "페이지 $PAGE$",
@@ -119,7 +119,7 @@
         "message": "텍스트 파일을 선택하세요"
     },
     "loading_editor": {
-        "message": "에디터 로딩 중..."
+        "message": "에디터 로딩 중…"
     },
     "config_editor_title": {
         "message": "RIME 설정 에디터"
@@ -132,5 +132,28 @@
     },
     "layout_horizontal": {
         "message": "가로 (ChromeOS 에서만 사용 가능, FydeOS 에서는 사용 불가)"
+    },
+    "remove_schema_confirm_title": {
+        "message": "입력 스키마 제거"
+    },
+    "remove_schema_confirm_body": {
+        "message": "“$SCHEMA$”을(를) 제거하시겠습니까? 스키마 파일이 삭제되며, 다시 사용하려면 다시 다운로드해야 합니다.",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "cancel_button": {
+        "message": "취소"
+    },
+    "download_schema": {
+        "message": "스키마 다운로드"
+    },
+    "decrease_candidate_count": {
+        "message": "후보 수 줄이기"
+    },
+    "increase_candidate_count": {
+        "message": "후보 수 늘리기"
     }
 }

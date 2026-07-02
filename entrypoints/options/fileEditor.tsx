@@ -190,7 +190,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                 const sizeLabel = item.isDir ? "" : ` (${formatBytes(item.size)})`;
                 const label = (
                     <>
-                        <ItemIcon style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        <ItemIcon aria-hidden="true" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                         {item.name}{sizeLabel}
                     </>
                 );
@@ -284,7 +284,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                 </Toolbar>
             </AppBar>
             <div style={{ display: 'flex' }}>
-                <div style={{ height: "calc(100vh - 64px)", overflow: "scroll", minWidth: "250px", borderRight: "solid 1px gray" }}>
+                <div style={{ height: "calc(100vh - 64px)", overflow: "auto", minWidth: "250px", borderRight: "solid 1px gray" }}>
                     <SimpleTreeView
                         expandedItems={expandedItems}
                         onExpandedItemsChange={(_event, itemIds) => setExpandedItems(itemIds)}

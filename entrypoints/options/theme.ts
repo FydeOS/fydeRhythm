@@ -18,7 +18,7 @@ export default createTheme({
           textTransform: "unset",
           fontWeight: 500,
           boxShadow: "0 2px 8px rgba(228, 0, 70, 0.2)",
-          transition: "all 0.2s ease-in-out",
+          transition: "background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
           "&:hover": {
             backgroundColor: "rgba(228, 0, 70, .85)",
             boxShadow: "0 4px 12px rgba(228, 0, 70, 0.3)"
@@ -33,7 +33,7 @@ export default createTheme({
           textTransform: "unset",
           fontWeight: 500,
           color: "#333",
-          transition: "all 0.2s ease-in-out",
+          transition: "background-color 0.2s ease-in-out, border-color 0.2s ease-in-out",
           "&:hover": {
             borderColor: "rgba(228, 0, 70, .5)",
             backgroundColor: "rgba(228, 0, 70, 0.04)"
@@ -50,7 +50,9 @@ export default createTheme({
           borderRadius: 8,
           fontSize: "13px",
           lineHeight: "22px",
-          transition: "all 0.2s ease-in-out",
+          "& .MuiOutlinedInput-notchedOutline": {
+            transition: "border-color 0.2s ease-in-out",
+          },
           "&.Mui-focused": {
             "& .MuiOutlinedInput-notchedOutline": {
               borderColor: "rgba(228, 0, 70, 1)"

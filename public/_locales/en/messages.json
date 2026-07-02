@@ -12,7 +12,7 @@
         "message": "FydeRhythm Settings"
     },
     "loading_engine": {
-        "message": "Loading RIME Engine..."
+        "message": "Loading RIME Engine…"
     },
     "candidate_page": {
         "message": "Page $PAGE$",
@@ -26,71 +26,71 @@
         "message": " (Last)"
     },
     "rime_engine_logs": {
-        "message": "RIME Engine Logs"  
-     },
-     "rime_engine_not_started": {
+        "message": "RIME Engine Logs"
+    },
+    "rime_engine_not_started": {
         "message": "Not Started"
-     },
-     "rime_engine_starting": {
-        "message": "Starting" 
-     },
-     "rime_engine_ready": {
+    },
+    "rime_engine_starting": {
+        "message": "Starting"
+    },
+    "rime_engine_ready": {
         "message": "Ready"
-     }, 
-     "rime_engine_starting_button": {
+    },
+    "rime_engine_starting_button": {
         "message": "Restarting RIME Engine"
-     },
-     "save_settings_and_apply_button": {
+    },
+    "save_settings_and_apply_button": {
         "message": "Save and Apply"
-     },
-     "select_schema": {
-        "message": "Select Input Schema" 
-     },  
-     "fetching_schema_list": {
+    },
+    "select_schema": {
+        "message": "Select Input Schema"
+    },
+    "fetching_schema_list": {
         "message": " (Refreshing List)"
-     },
-     "candidate_count": {
+    },
+    "candidate_count": {
         "message": "Candidates per Page"
-     }, 
-     "fuzzy_pinyin": {
-        "message": "Fuzzy Pinyin" 
-     },
-     "rime_engine_status": {
+    },
+    "fuzzy_pinyin": {
+        "message": "Fuzzy Pinyin"
+    },
+    "rime_engine_status": {
         "message": "Engine Status: "
-     },
-     "settings_changed_snackbar": {
-        "message": "Settings Changed." 
-     },
-     "error_downloading_schema": {
+    },
+    "settings_changed_snackbar": {
+        "message": "Settings Changed."
+    },
+    "error_downloading_schema": {
         "message": "Error while downloading schema: "
-     },
-     "error_removing_schema": {
+    },
+    "error_removing_schema": {
         "message": "Error while removing schema: "
-     },
-     "error_last_schema": {
+    },
+    "error_last_schema": {
         "message": "Cannot remove the last schema. At least one schema must remain installed."
-     },
-     "error_importing_schema": {
+    },
+    "error_importing_schema": {
         "message": "Error while importing schema"
-     },
-     "import_compiled_schema": {
+    },
+    "import_compiled_schema": {
         "message": "Import from ZIP"
-     },
-     "import_compiled_schema_hint": {
+    },
+    "import_compiled_schema_hint": {
         "message": "Import pre-compiled schema (.zip file)"
-     },
-     "import_predefined_schema_confirm": {
+    },
+    "import_predefined_schema_confirm": {
         "message": "Schema \"$1\" is already included in the predefined schema list. Import the predefined schema instead?"
-     },
-     "error_form": {
+    },
+    "error_form": {
         "message": "GitHub repo URL or schema_id error"
-     },
-     "error_fetch_schema_list": {
+    },
+    "error_fetch_schema_list": {
         "message": "Error while fetching schema list:"
-     },
-     "schema_home_page": {
+    },
+    "schema_home_page": {
         "message": "Schema Homepage"
-     },
+    },
     "privacy_statement": {
         "message": "Privacy Statement"
     },
@@ -119,7 +119,7 @@
         "message": "Please choose a text file"
     },
     "loading_editor": {
-        "message": "Loading editor..."
+        "message": "Loading editor…"
     },
     "config_editor_title": {
         "message": "RIME Config Editor"
@@ -132,5 +132,28 @@
     },
     "layout_horizontal": {
         "message": "Horizontal (only available for ChromeOS, unavailable for FydeOS)"
+    },
+    "remove_schema_confirm_title": {
+        "message": "Remove Input Schema"
+    },
+    "remove_schema_confirm_body": {
+        "message": "Remove “$SCHEMA$”? Its files will be deleted, and you will need to download it again to use it.",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "cancel_button": {
+        "message": "Cancel"
+    },
+    "download_schema": {
+        "message": "Download schema"
+    },
+    "decrease_candidate_count": {
+        "message": "Decrease candidate count"
+    },
+    "increase_candidate_count": {
+        "message": "Increase candidate count"
     }
 }

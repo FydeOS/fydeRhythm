@@ -1,14 +1,17 @@
 import { sendMessage } from "@/lib/messaging";
+import { $$ } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
 function RimeLogDisplay() {
     const [rimeLogs, setRimeLogs] = useState<string[]>([]);
     const logTextArea = useRef<HTMLTextAreaElement | null>(null);
+    // Follow new logs only while the view is at the bottom, so a user reading
+    // older lines isn't yanked back down on every incoming message.
+    const pinnedToBottom = useRef(true);
 
     useEffect(() => {
-        // Scroll textarea to bottom on log update
         const area = logTextArea.current;
-        if (!area) return;
+        if (!area || !pinnedToBottom.current) return;
         area.scrollTop = area.scrollHeight;
     }, [rimeLogs]);
 
@@ -34,9 +37,14 @@ function RimeLogDisplay() {
 
     return <textarea
         readOnly
+        aria-label={$$("rime_engine_logs")}
         value={rimeLogs.join("\n")}
         rows={10}
         ref={logTextArea}
+        onScroll={(e) => {
+            const t = e.currentTarget;
+            pinnedToBottom.current = t.scrollHeight - t.scrollTop - t.clientHeight < 10;
+        }}
         style={{
             display: 'block',
             width: '100%',
