@@ -83,7 +83,7 @@
         "message": "Schema \"$1\" is already included in the predefined schema list. Import the predefined schema instead?"
     },
     "error_form": {
-        "message": "GitHub repo URL or schema_id error"
+        "message": "Enter both the GitHub repo URL and the Schema Id."
     },
     "error_fetch_schema_list": {
         "message": "Error while fetching schema list:"
@@ -155,5 +155,14 @@
     },
     "increase_candidate_count": {
         "message": "Increase candidate count"
+    },
+    "import_predefined_schema_title": {
+        "message": "Import Predefined Schema"
+    },
+    "import_button": {
+        "message": "Import"
+    },
+    "footer_tagline": {
+        "message": "FydeOS is made possible by gentle souls with real ❤️"
     }
 }

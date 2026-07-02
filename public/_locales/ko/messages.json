@@ -83,7 +83,7 @@
         "message": "\"$1\" 스키마는 이미 미리 정의된 스키마 목록에 있습니다. 미리 정의된 스키마를 가져오시겠습니까?"
     },
     "error_form": {
-        "message": "GitHub 저장소 URL 또는 schema_id 오류"
+        "message": "GitHub 저장소 URL과 Schema Id를 모두 입력해 주세요."
     },
     "error_fetch_schema_list": {
         "message": "스키마 리스트 가져오기 오류:"
@@ -155,5 +155,14 @@
     },
     "increase_candidate_count": {
         "message": "후보 수 늘리기"
+    },
+    "import_predefined_schema_title": {
+        "message": "사전 정의된 스키마 가져오기"
+    },
+    "import_button": {
+        "message": "가져오기"
+    },
+    "footer_tagline": {
+        "message": "FydeOS는 진심을 담은 따뜻한 사람들이 만듭니다 ❤️"
     }
 }

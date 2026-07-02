@@ -83,7 +83,7 @@
         "message": "スキーマ「$1」は定義済みスキーマ一覧に含まれています。定義済みスキーマをインポートしますか？"
     },
     "error_form": {
-        "message": "GitHub リポジトリ URL または schema_id エラー"
+        "message": "GitHub リポジトリの URL と Schema Id を入力してください。"
     },
     "error_fetch_schema_list": {
         "message": "スキーマリストの取得中にエラー："
@@ -155,5 +155,14 @@
     },
     "increase_candidate_count": {
         "message": "候補数を増やす"
+    },
+    "import_predefined_schema_title": {
+        "message": "定義済みスキーマをインポート"
+    },
+    "import_button": {
+        "message": "インポート"
+    },
+    "footer_tagline": {
+        "message": "FydeOS は、真心を込めた優しい人々によって作られています ❤️"
     }
 }

@@ -283,8 +283,11 @@ function FileEditorButton(props: FileEditorButtonProps) {
                     </Typography>
                 </Toolbar>
             </AppBar>
-            <div style={{ display: 'flex' }}>
-                <div style={{ height: "calc(100vh - 64px)", overflow: "auto", minWidth: "250px", borderRight: "solid 1px gray" }}>
+            {/* The fullScreen Dialog paper is a flex column; let this row fill
+                whatever height remains under the AppBar instead of hardcoding
+                the toolbar height (which differs across breakpoints). */}
+            <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+                <div style={{ overflow: "auto", minWidth: "250px", borderRight: "solid 1px rgba(0, 0, 0, 0.12)" }}>
                     <SimpleTreeView
                         expandedItems={expandedItems}
                         onExpandedItemsChange={(_event, itemIds) => setExpandedItems(itemIds)}
@@ -299,9 +302,9 @@ function FileEditorButton(props: FileEditorButtonProps) {
                         {renderTree(rootParent)}
                     </SimpleTreeView>
                 </div>
-                <div style={{ flexGrow: 1 }}>
+                <div style={{ flexGrow: 1, minWidth: 0 }}>
                     {isFileLoading ?
-                        <div style={{ height: "calc(100vh - 64px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <CircularProgress size={30} />
                         </div>
                         : fileContent != null ?

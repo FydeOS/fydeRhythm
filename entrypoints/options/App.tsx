@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { parse } from 'yaml'
 import { ThemeProvider } from '@mui/material/styles';
@@ -110,7 +110,15 @@ function OptionsPage() {
 
     const [schemaList, setSchemaList] = useState<SchemaListFile>({ schemas: [] });
     const [fetchingList, setFetchingList] = useState<boolean>(false);
+    // Errors are surfaced next to the UI they originate from: the schema list,
+    // the personal-repo form, and the ZIP import row each have their own slot.
     const [fetchListError, setFetchListError] = useState<string | null>(null);
+    const [repoError, setRepoError] = useState<string | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
+    const repoUrlInputRef = useRef<HTMLInputElement | null>(null);
+    const repoSchemaIdInputRef = useRef<HTMLInputElement | null>(null);
+
+    const [importPredefinedCandidate, setImportPredefinedCandidate] = useState<string | null>(null);
 
     const [localSchemaList, setLocalSchemaList] = useState<string[]>([]);
 
@@ -357,7 +365,7 @@ function OptionsPage() {
     }
 
     async function convertPersonalSchema(repo: string='', schema_id: string='', force: boolean=false, convert_schema_id: string='') {
-        setFetchListError(null);
+        setRepoError(null);
         try {
             if (convert_schema_id) {
                 setDownloadSchemaId(convert_schema_id);
@@ -373,7 +381,8 @@ function OptionsPage() {
             const finalSchemaId = schema_id || personalRepoSchemaId;
 
             if (!finalRepo || !finalSchemaId) {
-                setFetchListError($$("error_form"));
+                setRepoError($$("error_form"));
+                (!finalRepo ? repoUrlInputRef : repoSchemaIdInputRef).current?.focus();
                 return;
             }
 
@@ -386,7 +395,7 @@ function OptionsPage() {
             }).then(x => x.json()) as ConverterResponse;
 
             if (data['status'] != 'complete') {
-                setFetchListError($$("error_downloading_schema") + data['message']);
+                setRepoError($$("error_downloading_schema") + data['message']);
                 return;
             }
 
@@ -533,7 +542,7 @@ function OptionsPage() {
             setActiveSchemaOnInstall(id);
         } catch (ex) {
             console.log(ex);
-            setFetchListError($$("error_downloading_schema") + 'repo conf error');
+            setRepoError($$("error_downloading_schema") + 'repo conf error');
         } finally {
             await loadLocalSchemaList();
             setDownloadSchemaId(null);
@@ -691,7 +700,7 @@ function OptionsPage() {
     }
 
     async function importCompiledSchema(zipFile: File) {
-        setFetchListError(null);
+        setImportError(null);
         try {
             setDownloadSchemaId('importing');
             setDownloadProgress(0);
@@ -701,16 +710,8 @@ function OptionsPage() {
             if (predefinedSchema) {
                 setDownloadSchemaId(null);
                 setDownloadProgress(0);
-
-                const message = $$("import_predefined_schema_confirm", detectedSchema.schemaId) ||
-                    `Schema "${detectedSchema.schemaId}" is already predefined. Import the predefined schema instead?`;
-                if (window.confirm(message)) {
-                    if (localSchemaList.includes(detectedSchema.schemaId)) {
-                        setActiveSchemaOnInstall(detectedSchema.schemaId);
-                    } else {
-                        await downloadSchema(detectedSchema.schemaId);
-                    }
-                }
+                // Ask via dialog; the confirm handler continues the import.
+                setImportPredefinedCandidate(detectedSchema.schemaId);
                 return;
             }
 
@@ -732,10 +733,10 @@ function OptionsPage() {
             setDownloadProgress(100);
             console.log(`Schema ${result.schemaId} imported successfully! Total files: ${result.fileCount}`);
 
-            setTimeout(() => setFetchListError(null), 3000);
+            setTimeout(() => setImportError(null), 3000);
         } catch (ex) {
             console.error('Import error:', ex);
-            setFetchListError($$("error_importing_schema") + ': ' + String(ex));
+            setImportError($$("error_importing_schema") + ': ' + String(ex));
         } finally {
             await loadLocalSchemaList();
             setDownloadSchemaId(null);
@@ -927,6 +928,10 @@ function OptionsPage() {
                             })}
                         </Box>
 
+                        {fetchListError && (
+                            <Box role="alert" sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
+                        )}
+
                         {/* Personal repo import */}
                         <Box sx={{
                             mt: 2,
@@ -947,6 +952,8 @@ function OptionsPage() {
                                 name="repoUrl"
                                 autoComplete="off"
                                 spellCheck={false}
+                                inputRef={repoUrlInputRef}
+                                error={repoError != null && !personalRepoURL}
                                 onChange={e => setPersonalRepoURL(e.target.value)}
                                 sx={{ flex: 1, minWidth: 0 }}
                             />
@@ -957,6 +964,8 @@ function OptionsPage() {
                                     name="schemaId"
                                     autoComplete="off"
                                     spellCheck={false}
+                                    inputRef={repoSchemaIdInputRef}
+                                    error={repoError != null && !personalRepoSchemaId}
                                     onChange={e => setPersonalRepoSchemaId(e.target.value)}
                                     sx={{ width: { xs: '100%', sm: '150px' } }}
                                 />
@@ -969,6 +978,10 @@ function OptionsPage() {
                                 </Button>
                             </Box>
                         </Box>
+
+                        {repoError && (
+                            <Box role="alert" sx={{ mt: 1, color: 'error.main', fontSize: '0.85rem' }}>{repoError}</Box>
+                        )}
 
                         {/* ZIP import */}
                         <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -1001,8 +1014,8 @@ function OptionsPage() {
                             </Box>
                         </Box>
 
-                        {fetchListError && (
-                            <Box role="alert" sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
+                        {importError && (
+                            <Box role="alert" sx={{ mt: 1, color: 'error.main', fontSize: '0.85rem' }}>{importError}</Box>
                         )}
                     </FormControl>
                 </div>
@@ -1157,7 +1170,7 @@ function OptionsPage() {
                     {$$("open_source")}
                 </Link>
                 <br />
-                FydeOS is made possible by gentle souls with real ❤️
+                {$$("footer_tagline")}
             </div>
 
             <Snackbar
@@ -1187,6 +1200,31 @@ function OptionsPage() {
                         void removeSchema(id);
                     }}>
                         {$$("remove_schema")}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={importPredefinedCandidate != null} onClose={() => setImportPredefinedCandidate(null)}>
+                <DialogTitle>{$$("import_predefined_schema_title")}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {importPredefinedCandidate && $$("import_predefined_schema_confirm", importPredefinedCandidate)}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="outlined" onClick={() => setImportPredefinedCandidate(null)}>
+                        {$$("cancel_button")}
+                    </Button>
+                    <Button variant="contained" onClick={() => {
+                        const id = importPredefinedCandidate!;
+                        setImportPredefinedCandidate(null);
+                        if (localSchemaList.includes(id)) {
+                            setActiveSchemaOnInstall(id);
+                        } else {
+                            void downloadSchema(id);
+                        }
+                    }}>
+                        {$$("import_button")}
                     </Button>
                 </DialogActions>
             </Dialog>
