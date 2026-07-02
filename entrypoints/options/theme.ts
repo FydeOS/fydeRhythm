@@ -205,6 +205,31 @@ export default createTheme({
         }
       }
     },
+    MuiDialog: {
+      styleOverrides: {
+        // Match the 20px formBox card radius; keep the fullScreen editor square.
+        paper: ({ ownerState }) => ({
+          ...(ownerState.fullScreen ? {} : { borderRadius: 20 }),
+        }),
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontWeight: 600,
+          fontSize: "16px",
+          color: "#1A1A24",
+          letterSpacing: "-0.01em",
+        },
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          padding: "8px 24px 20px",
+        },
+      },
+    },
     MuiSnackbarContent: {
       styleOverrides: {
         root: {

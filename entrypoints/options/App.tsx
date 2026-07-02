@@ -119,6 +119,7 @@ function OptionsPage() {
     const repoSchemaIdInputRef = useRef<HTMLInputElement | null>(null);
 
     const [importPredefinedCandidate, setImportPredefinedCandidate] = useState<string | null>(null);
+    const [importPredefinedDialogOpen, setImportPredefinedDialogOpen] = useState(false);
 
     const [localSchemaList, setLocalSchemaList] = useState<string[]>([]);
 
@@ -129,7 +130,11 @@ function OptionsPage() {
     const [personalRepoURL, setPersonalRepoURL] = useState<string | null>(null);
     const [personalRepoSchemaId, setPersonalRepoSchemaId] = useState<string | null>(null);
 
+    // Each confirm dialog keeps its data in a separate state from its `open`
+    // flag: clearing the data on close would empty the dialog while the fade-out
+    // is still playing, visibly shrinking it. Data is cleared in onExited.
     const [removeCandidate, setRemoveCandidate] = useState<SchemaDescription | null>(null);
+    const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
     const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
 
@@ -348,7 +353,9 @@ function OptionsPage() {
             // Request an immediate tray refresh. This covers all paths – including
             // non-self-defined schemas and legacy mode (enabledSchemas: undefined) –
             // without waiting for the loadSchemaList() network round-trip.
-            await sendMessage("RefreshImeMenu");
+            // Fire-and-forget: the deletion already happened, so the UI refresh
+            // below must not be blocked by an unresponsive background worker.
+            sendMessage("RefreshImeMenu").catch((ex) => console.error("RefreshImeMenu failed:", ex));
 
             await loadLocalSchemaList();
             await loadSchemaList();
@@ -712,6 +719,7 @@ function OptionsPage() {
                 setDownloadProgress(0);
                 // Ask via dialog; the confirm handler continues the import.
                 setImportPredefinedCandidate(detectedSchema.schemaId);
+                setImportPredefinedDialogOpen(true);
                 return;
             }
 
@@ -875,7 +883,7 @@ function OptionsPage() {
                                                 )}
                                                 {isInstalled && (
                                                     <Link component="button" underline="hover"
-                                                        onClick={(e) => { e.stopPropagation(); setRemoveCandidate(schema); }}
+                                                        onClick={(e) => { e.stopPropagation(); setRemoveCandidate(schema); setRemoveDialogOpen(true); }}
                                                         sx={{
                                                             fontSize: '0.8rem',
                                                             opacity: isActive ? 0.4 : 1,
@@ -1170,7 +1178,8 @@ function OptionsPage() {
                     {$$("open_source")}
                 </Link>
                 <br />
-                {$$("footer_tagline")}
+                {/* Brand tagline — intentionally shown in English in every locale. */}
+                FydeOS is made possible by gentle souls with real ❤️
             </div>
 
             <Snackbar
@@ -1183,20 +1192,26 @@ function OptionsPage() {
                 action={settingsDirtySnackbarActions}
             />
 
-            <Dialog open={removeCandidate != null} onClose={() => setRemoveCandidate(null)}>
-                <DialogTitle>{$$("remove_schema_confirm_title")}</DialogTitle>
+            <Dialog
+                open={removeDialogOpen}
+                onClose={() => setRemoveDialogOpen(false)}
+                slotProps={{ transition: { onExited: () => setRemoveCandidate(null) } }}
+                aria-labelledby="remove-schema-dialog-title"
+                aria-describedby="remove-schema-dialog-desc"
+            >
+                <DialogTitle id="remove-schema-dialog-title">{$$("remove_schema_confirm_title")}</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
-                        {removeCandidate && $$("remove_schema_confirm_body", removeCandidate.name)}
+                    <DialogContentText id="remove-schema-dialog-desc">
+                        {removeCandidate && $$("remove_schema_confirm_body", removeCandidate.name || removeCandidate.id)}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="outlined" onClick={() => setRemoveCandidate(null)}>
+                    <Button variant="outlined" onClick={() => setRemoveDialogOpen(false)}>
                         {$$("cancel_button")}
                     </Button>
                     <Button variant="contained" onClick={() => {
                         const id = removeCandidate!.id;
-                        setRemoveCandidate(null);
+                        setRemoveDialogOpen(false);
                         void removeSchema(id);
                     }}>
                         {$$("remove_schema")}
@@ -1204,25 +1219,33 @@ function OptionsPage() {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={importPredefinedCandidate != null} onClose={() => setImportPredefinedCandidate(null)}>
-                <DialogTitle>{$$("import_predefined_schema_title")}</DialogTitle>
+            <Dialog
+                open={importPredefinedDialogOpen}
+                onClose={() => setImportPredefinedDialogOpen(false)}
+                slotProps={{ transition: { onExited: () => setImportPredefinedCandidate(null) } }}
+                aria-labelledby="import-predefined-dialog-title"
+                aria-describedby="import-predefined-dialog-desc"
+            >
+                <DialogTitle id="import-predefined-dialog-title">{$$("import_predefined_schema_title")}</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
+                    <DialogContentText id="import-predefined-dialog-desc">
                         {importPredefinedCandidate && $$("import_predefined_schema_confirm", importPredefinedCandidate)}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="outlined" onClick={() => setImportPredefinedCandidate(null)}>
+                    <Button variant="outlined" onClick={() => setImportPredefinedDialogOpen(false)}>
                         {$$("cancel_button")}
                     </Button>
                     <Button variant="contained" onClick={() => {
                         const id = importPredefinedCandidate!;
-                        setImportPredefinedCandidate(null);
-                        if (localSchemaList.includes(id)) {
-                            setActiveSchemaOnInstall(id);
-                        } else {
+                        setImportPredefinedDialogOpen(false);
+                        if (!localSchemaList.includes(id)) {
                             void downloadSchema(id);
+                        } else if (id !== imeSettings.schema) {
+                            setActiveSchemaOnInstall(id);
                         }
+                        // Already installed and active: nothing to do — don't
+                        // mark the settings dirty for a no-op.
                     }}>
                         {$$("import_button")}
                     </Button>
