@@ -16,6 +16,12 @@
         overflow: hidden;
         pointer-events: none;
 
+        // The decorative shapes are tuned for a white canvas; on the dark
+        // canvas their saturated fills glare, so knock them back.
+        :global(html.dark) & {
+            opacity: 0.35;
+        }
+
         .randomWave(@x: 5px, @y: 5px, @time: 5s, @name) {
             @keyframes @name {
                 to {
@@ -118,6 +124,16 @@
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
             }
 
+            :global(html.dark) & {
+                background: rgba(40, 41, 45, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.25);
+
+                &:hover {
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
+                }
+            }
+
             .formControl {
                 width: 100%;
 
@@ -128,6 +144,10 @@
                     line-height: 24px;
                     margin: 0 0 16px;
                     letter-spacing: -0.01em;
+
+                    :global(html.dark) & {
+                        color: #E8EAED;
+                    }
                 }
 
                 .pageSize {
@@ -168,6 +188,10 @@
     line-height: 22px;
     text-align: center;
     color: #666677;
+
+    :global(html.dark) & {
+        color: #9aa0a6;
+    }
 
     @media (max-height: 700px) {
         margin-top: 124px;

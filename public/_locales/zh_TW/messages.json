@@ -161,5 +161,17 @@
     },
     "import_button": {
         "message": "匯入"
+    },
+    "appearance": {
+        "message": "外觀"
+    },
+    "theme_light": {
+        "message": "淺色"
+    },
+    "theme_system": {
+        "message": "跟隨系統"
+    },
+    "theme_dark": {
+        "message": "深色"
     }
 }

@@ -23,6 +23,7 @@ import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import Slide from '@mui/material/Slide';
 import CircularProgress from '@mui/material/CircularProgress';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import type { TransitionProps } from '@mui/material/transitions';
 
 loader.config({ paths: { vs: "/monaco/vs" } });
@@ -51,6 +52,8 @@ interface FileItem {
 const NON_EDITABLE_SUFFIXES = ['.bin', '.gram'];
 
 function FileEditorButton(props: FileEditorButtonProps) {
+    // Follow the OS scheme so Monaco matches the rest of the options page.
+    const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
     const [data, setData] = useState<FileItem[]>([]);
     const [open, setOpen] = useState(false);
     const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -287,7 +290,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                 whatever height remains under the AppBar instead of hardcoding
                 the toolbar height (which differs across breakpoints). */}
             <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-                <div style={{ overflow: "auto", minWidth: "250px", borderRight: "solid 1px rgba(0, 0, 0, 0.12)" }}>
+                <div style={{ overflow: "auto", minWidth: "250px", borderRight: "solid 1px var(--mui-palette-divider)" }}>
                     <SimpleTreeView
                         expandedItems={expandedItems}
                         onExpandedItemsChange={(_event, itemIds) => setExpandedItems(itemIds)}
@@ -312,6 +315,7 @@ function FileEditorButton(props: FileEditorButtonProps) {
                             key={`${editorSessionKey}:${filePath}`}
                             defaultValue={fileContent}
                             path={filePath}
+                            theme={prefersDark ? 'vs-dark' : 'light'}
                             onMount={handleEditorDidMount}
                             onChange={handleEditorChange}
                             loading={$$("loading_editor")}

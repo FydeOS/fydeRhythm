@@ -1,6 +1,7 @@
 import { sendMessage } from "@/lib/messaging";
 import { $$ } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import Box from "@mui/material/Box";
 
 function RimeLogDisplay() {
     const [rimeLogs, setRimeLogs] = useState<string[]>([]);
@@ -35,7 +36,8 @@ function RimeLogDisplay() {
         };
     }, []);
 
-    return <textarea
+    return <Box
+        component="textarea"
         readOnly
         aria-label={$$("rime_engine_logs")}
         value={rimeLogs.join("\n")}
@@ -45,7 +47,7 @@ function RimeLogDisplay() {
             const t = e.currentTarget;
             pinnedToBottom.current = t.scrollHeight - t.scrollTop - t.clientHeight < 10;
         }}
-        style={{
+        sx={{
             display: 'block',
             width: '100%',
             boxSizing: 'border-box',
@@ -56,9 +58,10 @@ function RimeLogDisplay() {
             lineHeight: '1.6',
             padding: '10px 14px',
             borderRadius: '10px',
-            border: '1px solid rgba(0, 0, 0, 0.09)',
-            backgroundColor: 'rgba(0, 0, 0, 0.025)',
-            color: '#333',
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'action.hover',
+            color: 'text.primary',
             outline: 'none',
         }}
     />;

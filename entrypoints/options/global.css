@@ -4,6 +4,15 @@ html {
        longer propagate to the canvas and would paint over the z-index: -1
        decorative shapes. */
     background-color: #ffffff;
+    color-scheme: light;
+}
+
+/* Driven by the same `.dark` / `.light` class MUI toggles on <html>
+   (colorSchemeSelector: 'class'), set pre-paint by the script in index.html. */
+html.dark {
+    background-color: #202124;
+    /* Keep native controls (scrollbars, form widgets) in step with the theme. */
+    color-scheme: dark;
 }
 
 html,
@@ -23,4 +32,8 @@ body {
     font-size: 12px;
     line-height: 22px;
     color: #999999;
+}
+
+html.dark .MuiInputLabel-root.MuiInputLabel-formControl {
+    color: #9aa0a6;
 }

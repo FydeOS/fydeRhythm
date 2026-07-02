@@ -1,9 +1,45 @@
 import { createTheme } from '@mui/material/styles';
 
+// Brand crimson — identical in both color schemes.
+const brand = "rgba(228, 0, 70, 1)";
+
 export default createTheme({
-  palette: {
-    primary: {
-      main: "rgba(228, 0, 70, 1)",
+  // Emit CSS variables switched by a `.light` / `.dark` class on <html>, which
+  // MUI's `useColorScheme` sets from the persisted mode (light / dark / system).
+  // Every `theme.vars.*` token and every `sx` palette string resolves to a var
+  // that flips with that class. The plain CSS/Less surfaces key off the same
+  // class (see global.css, styles.module.less) so they stay in lock-step.
+  cssVariables: {
+    colorSchemeSelector: 'class',
+  },
+  colorSchemes: {
+    light: {
+      palette: {
+        primary: { main: brand },
+        background: {
+          default: "#ffffff",
+          paper: "#ffffff",
+        },
+        text: {
+          primary: "#1A1A24",
+        },
+        divider: "rgba(0, 0, 0, 0.08)",
+      },
+    },
+    dark: {
+      palette: {
+        primary: { main: brand },
+        background: {
+          // Matches the ChromeOS dark surface used by the candidate window.
+          default: "#202124",
+          paper: "#28292d",
+        },
+        text: {
+          primary: "#E8EAED",
+          secondary: "#BDC1C6",
+        },
+        divider: "rgba(255, 255, 255, 0.12)",
+      },
     },
   },
   components: {
@@ -12,7 +48,7 @@ export default createTheme({
         contained: {
           borderRadius: 12,
           padding: "8px 24px",
-          backgroundColor: "rgba(228, 0, 70, 1)",
+          backgroundColor: brand,
           fontSize: "13px",
           lineHeight: "22px",
           textTransform: "unset",
@@ -24,23 +60,23 @@ export default createTheme({
             boxShadow: "0 4px 12px rgba(228, 0, 70, 0.3)"
           },
         },
-        outlined: {
+        outlined: ({ theme }) => ({
           borderRadius: 12,
           padding: "8px 24px",
-          borderColor: "rgba(220, 220, 225, 1)",
+          borderColor: theme.vars.palette.divider,
           fontSize: "13px",
           lineHeight: "22px",
           textTransform: "unset",
           fontWeight: 500,
-          color: "#333",
+          color: theme.vars.palette.text.primary,
           transition: "background-color 0.2s ease-in-out, border-color 0.2s ease-in-out",
           "&:hover": {
             borderColor: "rgba(228, 0, 70, .5)",
             backgroundColor: "rgba(228, 0, 70, 0.04)"
           }
-        },
+        }),
         text: {
-          color: "rgba(228, 0, 70, 1)"
+          color: brand
         }
       },
     },
@@ -68,15 +104,15 @@ export default createTheme({
     },
     MuiFilledInput: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           borderRadius: 12,
-          backgroundColor: "rgba(0, 0, 0, 0.04)",
+          backgroundColor: theme.vars.palette.action.hover,
           transition: "background-color 0.2s ease-in-out",
           "&:hover": {
-            backgroundColor: "rgba(0, 0, 0, 0.06)"
+            backgroundColor: theme.vars.palette.action.selected,
           },
           "&.Mui-focused": {
-            backgroundColor: "rgba(0, 0, 0, 0.04)"
+            backgroundColor: theme.vars.palette.action.hover,
           },
           "&::before, &::after": {
             display: "none"
@@ -86,9 +122,9 @@ export default createTheme({
             fontSize: "13px",
             lineHeight: "22px",
             fontWeight: 500,
-            color: "#1A1A24"
+            color: theme.vars.palette.text.primary,
           }
-        },
+        }),
       }
     },
     MuiInputLabel: {
@@ -142,9 +178,12 @@ export default createTheme({
     },
     MuiSwitch: {
       styleOverrides: {
-        track: {
+        track: ({ theme }) => ({
           backgroundColor: "rgba(0, 0, 0, 0.38)",
-        },
+          ...theme.applyStyles('dark', {
+            backgroundColor: "rgba(255, 255, 255, 0.3)",
+          }),
+        }),
         switchBase: {
           "&.Mui-checked": {
             color: "rgba(228, 0, 70, 1)",
@@ -215,12 +254,12 @@ export default createTheme({
     },
     MuiDialogTitle: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           fontWeight: 600,
           fontSize: "16px",
-          color: "#1A1A24",
+          color: theme.vars.palette.text.primary,
           letterSpacing: "-0.01em",
-        },
+        }),
       },
     },
     MuiDialogActions: {
@@ -232,7 +271,9 @@ export default createTheme({
     },
     MuiSnackbarContent: {
       styleOverrides: {
-        root: {
+        // Inverted surface in both schemes: a near-black chip on light, a light
+        // chip on dark, so the toast always contrasts against the page.
+        root: ({ theme }) => ({
           borderRadius: 14,
           backgroundColor: "#1A1A24",
           padding: "6px 8px 6px 20px",
@@ -240,7 +281,10 @@ export default createTheme({
           minWidth: "unset",
           flexWrap: "nowrap",
           gap: "8px",
-        },
+          ...theme.applyStyles('dark', {
+            backgroundColor: "#3c3c44",
+          }),
+        }),
         message: {
           fontSize: "13px",
           fontWeight: 500,
@@ -255,4 +299,3 @@ export default createTheme({
     },
   },
 });
-

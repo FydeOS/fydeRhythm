@@ -161,5 +161,17 @@
     },
     "import_button": {
         "message": "インポート"
+    },
+    "appearance": {
+        "message": "外観"
+    },
+    "theme_light": {
+        "message": "ライト"
+    },
+    "theme_system": {
+        "message": "システム"
+    },
+    "theme_dark": {
+        "message": "ダーク"
     }
 }

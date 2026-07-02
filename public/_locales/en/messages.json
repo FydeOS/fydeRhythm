@@ -161,5 +161,17 @@
     },
     "import_button": {
         "message": "Import"
+    },
+    "appearance": {
+        "message": "Appearance"
+    },
+    "theme_light": {
+        "message": "Light"
+    },
+    "theme_system": {
+        "message": "System"
+    },
+    "theme_dark": {
+        "message": "Dark"
     }
 }

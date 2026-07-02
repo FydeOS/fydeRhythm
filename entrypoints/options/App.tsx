@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { parse } from 'yaml'
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider, useColorScheme } from '@mui/material/styles';
+import Tooltip from "@mui/material/Tooltip";
 
 import theme from "./theme"
 import styles from "./styles.module.less";
@@ -26,6 +27,9 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import LightModeIcon from '@mui/icons-material/LightModeOutlined';
+import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
+import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlined';
 
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
@@ -96,6 +100,161 @@ interface OpenCcConfig {
 
 const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
 const kConventerUrl = 'https://rime-conf-translator.fydeos.io'
+
+// Light / System / Dark pill in the top-right corner. Persistence and the
+// <html> class are handled by MUI's useColorScheme, so it renders inside the
+// ThemeProvider. Supports click, keyboard, and drag/swipe.
+function AppearanceToggle() {
+    const { mode, setMode } = useColorScheme();
+    const current = mode ?? 'system';
+    const options = [
+        { value: 'light' as const, icon: <LightModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_light") },
+        { value: 'system' as const, icon: <SettingsBrightnessIcon sx={{ fontSize: 18 }} />, label: $$("theme_system") },
+        { value: 'dark' as const, icon: <DarkModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_dark") },
+    ];
+    const size = 34;
+    const gap = 2;
+    const step = size + gap;
+    const n = options.length;
+    const activeIndex = Math.max(0, options.findIndex((o) => o.value === current));
+
+    const trackRef = useRef<HTMLDivElement | null>(null);
+    const draggingRef = useRef(false);
+    // Distinguishes a drag from a click so a drag ending on a segment doesn't
+    // also trigger its onClick.
+    const movedRef = useRef(false);
+    const startXRef = useRef(0);
+    const rectLeftRef = useRef(0);
+    // Snapped slot under the pointer while dragging; null follows the selection.
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const indexFromClientX = (clientX: number) =>
+        clamp(Math.round((clientX - rectLeftRef.current - size / 2) / step), 0, n - 1);
+
+    function onPointerDown(e: React.PointerEvent) {
+        draggingRef.current = true;
+        movedRef.current = false;
+        startXRef.current = e.clientX;
+        // Measured once (pill is fixed-position) to keep pointermove reflow-free.
+        rectLeftRef.current = trackRef.current?.getBoundingClientRect().left ?? 0;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+    function onPointerMove(e: React.PointerEvent) {
+        if (!draggingRef.current) return;
+        if (Math.abs(e.clientX - startXRef.current) > 4) movedRef.current = true;
+        if (movedRef.current) {
+            const idx = indexFromClientX(e.clientX);
+            setDragIndex((prev) => (prev === idx ? prev : idx));
+        }
+    }
+    function endDrag(e: React.PointerEvent) {
+        if (!draggingRef.current) return;
+        draggingRef.current = false;
+        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* already released */ }
+        if (movedRef.current) setMode(options[indexFromClientX(e.clientX)].value);
+        setDragIndex(null);
+    }
+
+    const dragging = dragIndex != null;
+    const litIndex = dragging ? dragIndex! : activeIndex;
+
+    return (
+        <Box
+            role="radiogroup"
+            aria-label={$$("appearance")}
+            sx={{
+                position: 'fixed',
+                top: 16,
+                right: 16,
+                zIndex: 10,
+                p: '4px',
+                borderRadius: '999px',
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 28px rgba(0,0,0,0.08)',
+            }}
+        >
+            <Box
+                ref={trackRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                sx={{
+                    position: 'relative',
+                    display: 'inline-flex',
+                    gap: `${gap}px`,
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    cursor: dragging ? 'grabbing' : 'default',
+                }}
+            >
+                <Box
+                    aria-hidden
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: size,
+                        height: size,
+                        borderRadius: '999px',
+                        background: 'linear-gradient(135deg, #F5316E 0%, #E40046 100%)',
+                        transform: `translateX(${litIndex * step}px) scale(${dragging ? 1.08 : 1})`,
+                        boxShadow: dragging
+                            ? '0 6px 16px rgba(228,0,70,0.44)'
+                            : '0 3px 8px rgba(228,0,70,0.32)',
+                        transition: 'transform .3s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease',
+                        pointerEvents: 'none',
+                    }}
+                />
+                {options.map((opt, i) => {
+                    const selected = i === litIndex;
+                    return (
+                        <Tooltip key={opt.value} title={opt.label} arrow>
+                            <Box
+                                component="button"
+                                type="button"
+                                role="radio"
+                                aria-checked={current === opt.value}
+                                aria-label={opt.label}
+                                onClick={() => { if (!movedRef.current) setMode(opt.value); }}
+                                sx={{
+                                    position: 'relative',
+                                    zIndex: 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: size,
+                                    height: size,
+                                    p: 0,
+                                    m: 0,
+                                    border: 0,
+                                    borderRadius: '999px',
+                                    cursor: dragging ? 'grabbing' : 'pointer',
+                                    appearance: 'none',
+                                    background: 'transparent',
+                                    outline: 'none',
+                                    touchAction: 'none',
+                                    WebkitTapHighlightColor: 'transparent',
+                                    color: selected ? '#fff' : 'text.secondary',
+                                    transition: 'color .25s ease',
+                                    '& svg': { transition: 'transform .3s cubic-bezier(.34, 1.56, .64, 1)' },
+                                    '&:hover': { color: selected ? '#fff' : 'text.primary' },
+                                    '&:hover svg': { transform: selected ? 'none' : 'scale(1.12)' },
+                                    '&:focus-visible': { boxShadow: '0 0 0 2px var(--mui-palette-primary-main)' },
+                                }}
+                            >
+                                {opt.icon}
+                            </Box>
+                        </Tooltip>
+                    );
+                })}
+            </Box>
+        </Box>
+    );
+}
 
 function OptionsPage() {
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
@@ -771,9 +930,10 @@ function OptionsPage() {
 
     const manifest = chrome.runtime.getManifest();
 
-    return <ThemeProvider theme={theme}>
+    return <ThemeProvider theme={theme} defaultMode="system">
         <div className={styles.content}>
             <h1 className={styles.visuallyHidden}>{$$("setting_page")}</h1>
+            <AppearanceToggle />
             <div style={{ position: 'absolute', top: 30, left: 30 }}>
                 <img src="/logo.svg" alt="" width={146} height={42} />
             </div>
@@ -817,8 +977,8 @@ function OptionsPage() {
                                             py: 1.5,
                                             borderRadius: '12px',
                                             border: '1px solid',
-                                            borderColor: isActive ? 'rgba(228, 0, 70, 0.18)' : 'rgba(0,0,0,0.08)',
-                                            bgcolor: isActive ? 'rgba(228, 0, 70, 0.02)' : 'rgba(0,0,0,0)',
+                                            borderColor: isActive ? 'rgba(228, 0, 70, 0.18)' : 'divider',
+                                            bgcolor: isActive ? 'rgba(228, 0, 70, 0.02)' : 'transparent',
                                             cursor: isInstalled && !isActive ? 'pointer' : 'default',
                                             transition: 'background-color 0.15s',
                                             position: 'relative',
@@ -828,15 +988,15 @@ function OptionsPage() {
                                                 position: 'absolute',
                                                 inset: 0,
                                                 borderRadius: '12px',
-                                                bgcolor: 'rgba(0,0,0,0)',
+                                                bgcolor: 'transparent',
                                                 transition: 'background-color 0.15s',
                                                 pointerEvents: 'none',
                                             } : {},
                                             '&:hover::after': isInstalled && !isActive ? {
-                                                bgcolor: 'rgba(0,0,0,0.04)',
+                                                bgcolor: 'action.hover',
                                             } : {},
                                             '&:active::after': isInstalled && !isActive ? {
-                                                bgcolor: 'rgba(0,0,0,0.08)',
+                                                bgcolor: 'action.selected',
                                             } : {},
                                         }}
                                         onClick={isInstalled && !isActive ? () => changeSettings({ schema: schema.id }) : undefined}
@@ -870,7 +1030,7 @@ function OptionsPage() {
                                         <Box sx={{ flex: 1, minWidth: 0 }}>
                                             {/* Title + action links */}
                                             <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px 10px', mb: 0.5 }}>
-                                                <Box sx={{ fontSize: '0.9375rem', fontWeight: isInstalled ? 500 : 400, color: '#1A1A24' }}>
+                                                <Box sx={{ fontSize: '0.9375rem', fontWeight: isInstalled ? 500 : 400, color: 'text.primary' }}>
                                                     {schema.user ? schema.realName : schema.id} {schema.name}
                                                 </Box>
                                                 {isInstalled && (!schema.user || schema.website) && (
@@ -944,7 +1104,8 @@ function OptionsPage() {
                         <Box sx={{
                             mt: 2,
                             pt: 2,
-                            borderTop: '1px solid rgba(0,0,0,0.06)',
+                            borderTop: '1px solid',
+                            borderColor: 'divider',
                             display: 'flex',
                             flexDirection: { xs: 'column', sm: 'row' },
                             alignItems: { xs: 'stretch', sm: 'stretch' },
@@ -1032,13 +1193,13 @@ function OptionsPage() {
             <div className={styles.formGroup}>
                 <div className={styles.formBox} style={{ padding: '8px 0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
-                        <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                        <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
                             {$$("candidate_count")}
                         </Box>
-                        <Box sx={{ 
-                            display: 'flex', 
+                        <Box sx={{
+                            display: 'flex',
                             alignItems: 'center',
-                            background: 'rgba(0, 0, 0, 0.04)',
+                            bgcolor: 'action.hover',
                             borderRadius: '24px',
                             padding: '4px'
                         }}>
@@ -1053,14 +1214,14 @@ function OptionsPage() {
                                 sx={{
                                     width: 36, height: 36,
                                     borderRadius: '18px',
-                                    color: '#444',
-                                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
+                                    color: 'text.secondary',
+                                    '&:hover': { bgcolor: 'action.hover' }
                                 }}
                             >
                                 <RemoveIcon fontSize="small" />
                             </IconButton>
 
-                            <Box sx={{ width: 44, textAlign: 'center', fontWeight: 500, fontSize: '15px', color: '#1A1A24' }}>
+                            <Box sx={{ width: 44, textAlign: 'center', fontWeight: 500, fontSize: '15px', color: 'text.primary' }}>
                                 {(imeSettings.pageSize ?? kDefaultSettings.pageSize).toString()}
                             </Box>
 
@@ -1075,8 +1236,8 @@ function OptionsPage() {
                                 sx={{ 
                                     width: 36, height: 36,
                                     borderRadius: '18px', 
-                                    color: '#444',
-                                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
+                                    color: 'text.secondary',
+                                    '&:hover': { bgcolor: 'action.hover' }
                                 }}
                             >
                                 <AddIcon fontSize="small" />
@@ -1089,7 +1250,7 @@ function OptionsPage() {
 
             {currentSchemaInfo()?.fuzzy_pinyin && <div className={styles.formGroup}>
                 <div className={styles.formBox} style={{ padding: '8px 0' }}>
-                    <Box component="h2" sx={{ m: 0, px: 4, py: 2.5, pb: 1.5, fontSize: '15px', fontWeight: 600, color: '#1A1A24', letterSpacing: '-0.01em' }}>
+                    <Box component="h2" sx={{ m: 0, px: 4, py: 2.5, pb: 1.5, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
                         {$$("fuzzy_pinyin")}
                     </Box>
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', px: 2, pb: 2 }}>
@@ -1108,11 +1269,11 @@ function OptionsPage() {
                                         borderRadius: '10px',
                                         cursor: 'pointer',
                                         transition: 'background 0.15s',
-                                        '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' },
-                                        '&:active': { bgcolor: 'rgba(0, 0, 0, 0.08)' },
+                                        '&:hover': { bgcolor: 'action.hover' },
+                                        '&:active': { bgcolor: 'action.selected' },
                                     }}
                                 >
-                                    <Box sx={{ fontSize: '14px', fontWeight: 400, color: '#1A1A24' }}>
+                                    <Box sx={{ fontSize: '14px', fontWeight: 400, color: 'text.primary' }}>
                                         {fuzzy.label}
                                     </Box>
                                     <Switch
