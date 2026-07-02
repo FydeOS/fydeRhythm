@@ -98,9 +98,10 @@
 
         .formBox {
             padding: 24px 32px;
-            background: rgba(255, 255, 255, 0.55);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            // No backdrop-filter here: on ChromeOS it produces gray flicker at the
+            // viewport edge when the partially-offscreen box is re-rasterized
+            // (window deactivation / periodic recomposite of the animated bgBlock).
+            background: rgba(255, 255, 255, 0.85);
             border: 1px solid rgba(255, 255, 255, 0.75);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.03);
             border-radius: 20px;

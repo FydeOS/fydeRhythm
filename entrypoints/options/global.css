@@ -1,3 +1,11 @@
+html {
+    /* Explicit canvas color so GPU re-rasterization never samples an undefined
+       backdrop. On html only: if body also had one, body's background would no
+       longer propagate to the canvas and would paint over the z-index: -1
+       decorative shapes. */
+    background-color: #ffffff;
+}
+
 html,
 body {
     width: 100%;
