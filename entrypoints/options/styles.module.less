@@ -24,6 +24,10 @@
             }
 
             animation: @name @time ease-in-out infinite alternate;
+
+            @media (prefers-reduced-motion: reduce) {
+                animation: none;
+            }
         }
 
         .leftTop1 {
@@ -88,7 +92,9 @@
     .topAnimation {
         width: 500px;
         height: 180px;
-        margin-top: 40px;
+        // No top margin: the pendulum strings are anchored at the very top of
+        // the Lottie canvas, so the animation must sit flush against the page
+        // top for them to visually hang from the edge.
         margin-bottom: 60px;
     }
 
@@ -120,7 +126,7 @@
                     font-size: 16px;
                     color: #1A1A24;
                     line-height: 24px;
-                    margin-bottom: 16px;
+                    margin: 0 0 16px;
                     letter-spacing: -0.01em;
                 }
 
@@ -142,6 +148,18 @@
             }
         }
     }
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .footer {
