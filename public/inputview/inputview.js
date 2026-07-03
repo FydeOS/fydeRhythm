@@ -22894,6 +22894,11 @@ KeyboardView.prototype.isQualifiedForSpatial_ = function(key) {
       key.type == ElementType.COMPACT_KEY;
 };
 KeyboardView.prototype.isNearby_ = function(key1, key2) {
+  // Guard: a key whose layout coordinates haven't been computed yet cannot be
+  // "nearby" anything. Prevents a TypeError from setUpNearbyKeys_ during setup.
+  if (!key1.topLeftCoordinate || !key2.centerCoordinate) {
+    return false;
+  }
   var key2Center = key2.centerCoordinate;
   var key1Left = key1.topLeftCoordinate.x;
   var key1Right = key1Left + key1.width;
