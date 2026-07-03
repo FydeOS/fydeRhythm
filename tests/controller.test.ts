@@ -30,20 +30,29 @@ vi.mock('../entrypoints/background/engine', () => ({
     RimeEngine: mocks.RimeEngine,
 }));
 
-vi.mock('@/lib/utils', () => ({
-    getFs: mocks.getFs,
-    kDefaultSettings: {
-        schema: 'aurora',
-        pageSize: 5,
-        algebraList: [],
-    },
-}));
+// Use the real helpers (matchesSchemaSwitchKey et al.) but stub getFs and pin
+// kDefaultSettings so the controller has no schemaSwitchKey by default (→ Ctrl+`).
+vi.mock('@/lib/utils', async (importOriginal) => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    const actual = await importOriginal<typeof import('../lib/utils')>();
+    return {
+        ...actual,
+        getFs: mocks.getFs,
+        kDefaultSettings: {
+            schema: 'aurora',
+            pageSize: 5,
+            algebraList: [],
+        },
+    };
+});
 
 vi.mock('../entrypoints/background/schemas', () => ({
     listEnabledInstalledSchemas: mocks.listEnabledInstalledSchemas,
 }));
 
 const { InputController } = await import('../entrypoints/background/controller');
+// Resolves to the mocked module — the same kDefaultSettings object the controller sees.
+const { kDefaultSettings } = await import('../lib/utils');
 
 function stubChrome(settings?: ImeSettings) {
     let storedSettings = settings;
@@ -200,21 +209,236 @@ describe('InputController schema switching', () => {
         });
     });
 
-    it('swallows Ctrl+Backquote keyup without cycling twice', () => {
+    it('swallows the keyup of a swallowed keydown without cycling twice', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycleToNextSchema = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        await controller.feedKey({
+            type: 'keydown', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+        const handled = controller.feedKey({
+            type: 'keyup', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(true);
+        expect(cycleToNextSchema).toHaveBeenCalledTimes(1);
+    });
+
+    it('swallows the keyup even when modifiers were released before the main key', async () => {
+        // Press Ctrl+`, cycle fires; release Ctrl first, then `. The `Backquote`
+        // keyup arrives with ctrlKey=false and must still be swallowed so the
+        // page never sees a stray release without its press.
+        stubChrome(settings());
+        const controller = new InputController();
+        vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        await controller.feedKey({
+            type: 'keydown', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+        const handled = controller.feedKey({
+            type: 'keyup', code: 'Backquote', ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(true);
+    });
+
+    it('does not swallow a keyup whose keydown was not intercepted', () => {
+        // Binding is default Ctrl+`; a bare Ctrl+` keyup with no swallowed
+        // keydown (e.g. the press happened before the IME took focus) must be
+        // forwarded, not eaten.
         stubChrome(settings());
         const controller = new InputController();
         const cycleToNextSchema = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
 
         const handled = controller.feedKey({
-            type: 'keyup',
+            type: 'keyup', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(false);
+        expect(cycleToNextSchema).not.toHaveBeenCalled();
+    });
+
+    it('fires a custom schema-switch shortcut from activeSettings', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        controller.activeSettings = settings({ schemaSwitchKey: { code: 'F2' } });
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        const handled = await controller.feedKey({
+            type: 'keydown',
+            code: 'F2',
+            ctrlKey: false,
+            altKey: false,
+            shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(true);
+        expect(cycle).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops firing the old default once a custom shortcut is set', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        controller.activeSettings = settings({ schemaSwitchKey: { code: 'F2' } });
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        // Ctrl+` should now be forwarded normally, not swallowed for switching.
+        const handled = await controller.feedKey({
+            type: 'keydown',
             code: 'Backquote',
             ctrlKey: true,
             altKey: false,
             shiftKey: false,
         } as chrome.input.ime.KeyboardEvent);
 
+        expect(handled).toBe(false);
+        expect(cycle).not.toHaveBeenCalled();
+    });
+
+    it('does not switch schemas when the shortcut is disabled (null)', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        controller.activeSettings = settings({ schemaSwitchKey: null });
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        const handled = await controller.feedKey({
+            type: 'keydown',
+            code: 'Backquote',
+            ctrlKey: true,
+            altKey: false,
+            shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(false);
+        expect(cycle).not.toHaveBeenCalled();
+    });
+
+    it('does not fire the default when an extra modifier is held (Ctrl+Alt+`)', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        const handled = await controller.feedKey({
+            type: 'keydown',
+            code: 'Backquote',
+            ctrlKey: true,
+            altKey: true,
+            shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(handled).toBe(false);
+        expect(cycle).not.toHaveBeenCalled();
+    });
+
+    it('applySchemaSwitchKey hot-swaps the switch key without a reload', () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        // Starts on the default (undefined → Ctrl+`).
+        expect(controller.activeSettings.schemaSwitchKey).toBeUndefined();
+
+        controller.applySchemaSwitchKey({ code: 'Digit1', ctrlKey: true, shiftKey: true });
+        expect(controller.activeSettings.schemaSwitchKey).toEqual({ code: 'Digit1', ctrlKey: true, shiftKey: true });
+
+        // Disabling also propagates.
+        controller.applySchemaSwitchKey(null);
+        expect(controller.activeSettings.schemaSwitchKey).toBeNull();
+
+        // Missing settings (undefined) resets to the default.
+        controller.applySchemaSwitchKey(undefined);
+        expect(controller.activeSettings.schemaSwitchKey).toBeUndefined();
+    });
+
+    it('never mutates the shared kDefaultSettings constant (regression: aliasing)', () => {
+        // activeSettings starts as a copy of kDefaultSettings; hot-swapping the
+        // shortcut before the first loadRime must not write through to the
+        // module-wide default object.
+        stubChrome(settings());
+        const controller = new InputController();
+
+        controller.applySchemaSwitchKey(null);
+
+        expect(controller.activeSettings.schemaSwitchKey).toBeNull();
+        expect('schemaSwitchKey' in kDefaultSettings).toBe(false);
+    });
+
+    it('a live-updated shortcut is honored by feedKey immediately (regression: stale activeSettings)', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        // Before: Ctrl+Shift+1 conflicts with a schema binding and is NOT ours yet,
+        // so it must fall through to RIME.
+        const before = await controller.feedKey({
+            type: 'keydown', code: 'Digit1', ctrlKey: true, altKey: false, shiftKey: true,
+        } as chrome.input.ime.KeyboardEvent);
+        expect(before).toBe(false);
+        expect(cycle).not.toHaveBeenCalled();
+
+        // User saves Ctrl+Shift+1 as the switch key → storage.onChanged → applySchemaSwitchKey.
+        controller.applySchemaSwitchKey({ code: 'Digit1', ctrlKey: true, shiftKey: true });
+
+        // After: the same keystroke is now intercepted for switching, not forwarded.
+        const after = await controller.feedKey({
+            type: 'keydown', code: 'Digit1', ctrlKey: true, altKey: false, shiftKey: true,
+        } as chrome.input.ime.KeyboardEvent);
+        expect(after).toBe(true);
+        expect(cycle).toHaveBeenCalledTimes(1);
+    });
+
+    it('reverting to default via applySchemaSwitchKey drops the old custom key and restores Ctrl+`', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        controller.applySchemaSwitchKey({ code: 'F4' });
+        controller.applySchemaSwitchKey(undefined); // reset to default
+
+        const f4 = await controller.feedKey({
+            type: 'keydown', code: 'F4', ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+        expect(f4).toBe(false); // old custom key no longer ours
+
+        const backquote = await controller.feedKey({
+            type: 'keydown', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+        expect(backquote).toBe(true); // default fires again
+        expect(cycle).toHaveBeenCalledTimes(1);
+    });
+
+    it('disabling (null) via applySchemaSwitchKey stops both the custom key and the old default', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        controller.applySchemaSwitchKey({ code: 'F4' });
+        controller.applySchemaSwitchKey(null); // disable entirely
+
+        const f4 = await controller.feedKey({
+            type: 'keydown', code: 'F4', ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+        const backquote = await controller.feedKey({
+            type: 'keydown', code: 'Backquote', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
+
+        expect(f4).toBe(false);
+        expect(backquote).toBe(false);
+        expect(cycle).not.toHaveBeenCalled();
+    });
+
+    it('re-enabling from disabled to a new custom key takes effect immediately', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const cycle = vi.spyOn(controller, 'cycleToNextSchema').mockResolvedValue();
+
+        controller.applySchemaSwitchKey(null);
+        controller.applySchemaSwitchKey({ code: 'F4', ctrlKey: true });
+
+        const handled = await controller.feedKey({
+            type: 'keydown', code: 'F4', ctrlKey: true, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent);
         expect(handled).toBe(true);
-        expect(cycleToNextSchema).not.toHaveBeenCalled();
+        expect(cycle).toHaveBeenCalledTimes(1);
     });
 
     it('clears active RIME composition when deactivated', () => {

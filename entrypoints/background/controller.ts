@@ -1,5 +1,5 @@
 import { Mutex } from "async-mutex";
-import { getFs, kDefaultSettings, type ImeSettings } from "@/lib/utils";
+import { getFs, kDefaultSettings, matchesSchemaSwitchKey, type ImeSettings, type SchemaSwitchKey } from "@/lib/utils";
 import { type RimeCandidateIterator, RimeEngine, type RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
 import type { RimeCandidate } from "@/lib/shared-types";
@@ -51,8 +51,12 @@ export class InputController extends EventEmitter {
 
     rimeLogBuffer: string[];
     rimeLogBufferPos: number;
-    activeSettings: ImeSettings = kDefaultSettings;
+    // Copy, not alias: applySchemaSwitchKey patches this object in place, which
+    // must never write through to the shared kDefaultSettings constant.
+    activeSettings: ImeSettings = { ...kDefaultSettings };
     lastSuccessfulSchema: string | null = null;
+    // Code of a swallowed schema-switch keydown whose keyup we still owe a swallow.
+    pendingSwitchKeyUp: string | null = null;
 
     constructor() {
         super();
@@ -558,6 +562,15 @@ export class InputController extends EventEmitter {
         }
     }
 
+    // feedKey reads activeSettings.schemaSwitchKey on the hot path, so the
+    // storage.onChanged listener pushes shortcut changes here the moment they
+    // are saved (otherwise the shortcut would stay stale until the next
+    // loadRime()). Deliberately single-purpose: every other setting takes
+    // effect through a full loadRime().
+    applySchemaSwitchKey(key: SchemaSwitchKey | null | undefined): void {
+        this.activeSettings.schemaSwitchKey = key;
+    }
+
     async cycleToNextSchema(): Promise<void> {
         const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
         const settings = obj.settings ?? kDefaultSettings;
@@ -574,13 +587,19 @@ export class InputController extends EventEmitter {
 
     feedKey(keyData: chrome.input.ime.KeyboardEvent): Promise<boolean> | boolean {
         const release = keyData.type == 'keyup';
-        // Ctrl+` cycles to the next enabled schema. Swallow both keydown and keyup so the
-        // composed keystroke is never partially leaked to the focused page.
-        if (keyData.ctrlKey
-            && !keyData.altKey
-            && !keyData.shiftKey
-            && keyData.code === 'Backquote') {
-            if (release) return true;
+        // The schema-switch shortcut (default Ctrl+`, user-configurable, possibly
+        // disabled) cycles to the next enabled schema. A keyup is swallowed iff its
+        // keydown was swallowed — tracked by key code rather than by re-matching
+        // modifiers, so the keystroke is never partially leaked even when the user
+        // releases the modifiers before the main key (and a keyup whose keydown
+        // went to the page is never eaten).
+        if (release) {
+            if (this.pendingSwitchKeyUp === keyData.code) {
+                this.pendingSwitchKeyUp = null;
+                return true;
+            }
+        } else if (matchesSchemaSwitchKey(keyData, this.activeSettings.schemaSwitchKey)) {
+            this.pendingSwitchKeyUp = keyData.code;
             return (async () => {
                 try {
                     await this.cycleToNextSchema();

@@ -213,6 +213,10 @@ export default defineBackground({
       if (area === "local" && (changes.schemaList || changes.selfDefinedSchema)) {
         refreshImeMenuItems();
       } else if (area === "sync" && changes.settings) {
+        // Keep the schema-switch shortcut live on the hot key path without waiting
+        // for a full engine reload — feedKey reads activeSettings.schemaSwitchKey,
+        // which would otherwise stay stale until the next loadRime().
+        self.controller?.applySchemaSwitchKey((changes.settings.newValue as ImeSettings | undefined)?.schemaSwitchKey);
         refreshImeMenuItems();
       }
     });
