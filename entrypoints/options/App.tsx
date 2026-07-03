@@ -34,7 +34,7 @@ import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlin
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { $$, getFs, type ImeSettings, kDefaultSettings } from "@/lib/utils";
+import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey } from "@/lib/utils";
 import { detectSchemaInZip, importSchemaFromZip } from "@/lib/import-schema";
 import { getInstalledSchemaIds } from "@/lib/schema-install";
 import { sendMessage } from "@/lib/messaging";
@@ -267,6 +267,11 @@ function OptionsPage() {
     // Settings dirty = 0: not dirty, = 1: dirty, = 2: reloading
     const [settingsDirty, setSettingsDirty] = useState(SettingsDirtyStatus.NotDirty);
 
+    // Schema-switch shortcut capture state.
+    const [recordingSwitchKey, setRecordingSwitchKey] = useState(false);
+    const [switchKeyError, setSwitchKeyError] = useState<string | null>(null);
+    const recordButtonRef = useRef<HTMLButtonElement | null>(null);
+
     const [schemaList, setSchemaList] = useState<SchemaListFile>({ schemas: [] });
     const [fetchingList, setFetchingList] = useState<boolean>(false);
     // Errors are surfaced next to the UI they originate from: the schema list,
@@ -410,10 +415,65 @@ function OptionsPage() {
 
     function changeSettings(change: any) {
         console.log("Change:", change)
-        const newSettings = Object.assign({}, imeSettings, change);
+        // Functional update: long-lived callbacks (the shortcut-recording listener,
+        // beforeunload) call this from closures armed on an earlier render; merging
+        // onto prev instead of the captured imeSettings snapshot keeps them from
+        // reverting settings that changed in the meantime (e.g. via storage sync).
         setSettingsDirty(SettingsDirtyStatus.Dirty);
-        setImeSettings(newSettings);
+        setImeSettings(prev => Object.assign({}, prev, change));
     }
+
+    // Stop recording (if armed), clear any validation error, and write the new
+    // shortcut value — shared by the recorder and the Disable/Reset buttons.
+    function stopRecordingAndSetSwitchKey(value: SchemaSwitchKey | null | undefined) {
+        setRecordingSwitchKey(false);
+        setSwitchKeyError(null);
+        changeSettings({ schemaSwitchKey: value });
+    }
+
+    // While recording, capture the next non-modifier keystroke as the new
+    // schema-switch shortcut (see interpretRecordingKey for the decision table).
+    // Recording must never get stuck armed: it also cancels when the user clicks
+    // anywhere outside the record button or the window loses focus, and the
+    // record button itself toggles recording off (handled via the ref check —
+    // pointerdown inside the button is ignored here so onClick can toggle).
+    useEffect(() => {
+        if (!recordingSwitchKey) return;
+        const cancelRecording = () => {
+            setRecordingSwitchKey(false);
+            setSwitchKeyError(null);
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const result = interpretRecordingKey(e);
+            if (result.kind === 'cancel') {
+                cancelRecording();
+            } else if (result.kind === 'invalid') {
+                setSwitchKeyError($$("schema_switch_key_invalid"));
+            } else if (result.kind === 'accept') {
+                stopRecordingAndSetSwitchKey(result.binding);
+            } // 'pending': keep waiting for the final key
+        };
+        const onPointerDown = (e: PointerEvent) => {
+            // Clicks on the record button are handled by its onClick toggle.
+            if (recordButtonRef.current?.contains(e.target as Node)) return;
+            cancelRecording();
+        };
+        window.addEventListener('keydown', onKeyDown, true);
+        window.addEventListener('pointerdown', onPointerDown, true);
+        window.addEventListener('blur', cancelRecording);
+        return () => {
+            window.removeEventListener('keydown', onKeyDown, true);
+            window.removeEventListener('pointerdown', onPointerDown, true);
+            window.removeEventListener('blur', cancelRecording);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recordingSwitchKey]);
+
+    // Single source of truth for the shortcut row's display state:
+    // "" means no binding is in effect (disabled or a defensive empty-code value).
+    const switchKeyLabel = formatSchemaSwitchKey(imeSettings.schemaSwitchKey);
 
     function changeFuzzy(chk: boolean, val: string) {
         if (chk) {
@@ -1245,6 +1305,59 @@ function OptionsPage() {
                         </Box>
                     </Box>
 
+                </div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <div className={styles.formBox} style={{ padding: '8px 0' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
+                        <Box sx={{ pr: 2 }}>
+                            <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
+                                {$$("schema_switch_key")}
+                            </Box>
+                            {/* State-aware hint: the disabled state must always carry its own
+                                way back (how to re-enable), and recording explains how to bail. */}
+                            <Box sx={{ fontSize: '13px', color: 'text.secondary', mt: 0.5 }}>
+                                {recordingSwitchKey
+                                    ? $$("schema_switch_key_hint_recording")
+                                    : (switchKeyLabel
+                                        ? $$("schema_switch_key_hint")
+                                        : $$("schema_switch_key_hint_disabled"))}
+                            </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                            <Button
+                                ref={recordButtonRef}
+                                variant="outlined"
+                                size="small"
+                                onClick={() => { setSwitchKeyError(null); setRecordingSwitchKey(r => !r); }}
+                                sx={{ minWidth: 120, textTransform: 'none', fontFamily: 'monospace', fontWeight: 600 }}
+                            >
+                                {recordingSwitchKey
+                                    ? $$("schema_switch_key_recording")
+                                    : (switchKeyLabel || $$("schema_switch_key_set"))}
+                            </Button>
+                            <Button
+                                size="small"
+                                disabled={!switchKeyLabel}
+                                onClick={() => stopRecordingAndSetSwitchKey(null)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                {$$("schema_switch_key_disable")}
+                            </Button>
+                            <Button
+                                size="small"
+                                disabled={imeSettings.schemaSwitchKey === undefined}
+                                onClick={() => stopRecordingAndSetSwitchKey(undefined)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                {$$("schema_switch_key_reset")}
+                            </Button>
+                        </Box>
+                    </Box>
+                    {switchKeyError && (
+                        <Box role="alert" sx={{ px: 4, pb: 2, color: 'error.main', fontSize: '0.85rem' }}>{switchKeyError}</Box>
+                    )}
                 </div>
             </div>
 

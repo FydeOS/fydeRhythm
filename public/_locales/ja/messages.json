@@ -52,6 +52,33 @@
     "candidate_count": {
         "message": "ページごとの候補数"
     },
+    "schema_switch_key": {
+        "message": "スキーマ切り替えショートカット"
+    },
+    "schema_switch_key_hint": {
+        "message": "次の有効なスキーマに切り替えます。"
+    },
+    "schema_switch_key_hint_recording": {
+        "message": "新しいキーの組み合わせを押してください。Esc キーでキャンセルします。"
+    },
+    "schema_switch_key_hint_disabled": {
+        "message": "ショートカットは無効です。「ショートカットを設定」をクリックしてキーの組み合わせを押すと、再度有効になります。"
+    },
+    "schema_switch_key_recording": {
+        "message": "キーを押してください…"
+    },
+    "schema_switch_key_set": {
+        "message": "ショートカットを設定"
+    },
+    "schema_switch_key_disable": {
+        "message": "無効にする"
+    },
+    "schema_switch_key_reset": {
+        "message": "デフォルトに戻す"
+    },
+    "schema_switch_key_invalid": {
+        "message": "Ctrl または Alt を含めるか、ファンクションキーを使用してください。Shift や検索キーのみでは通常の入力を妨げます。"
+    },
     "fuzzy_pinyin": {
         "message": "あいまいピンイン"
     },

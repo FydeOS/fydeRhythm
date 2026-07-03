@@ -52,6 +52,33 @@
     "candidate_count": {
         "message": "Candidates per Page"
     },
+    "schema_switch_key": {
+        "message": "Schema Switch Shortcut"
+    },
+    "schema_switch_key_hint": {
+        "message": "Cycle to the next enabled schema."
+    },
+    "schema_switch_key_hint_recording": {
+        "message": "Press the new key combination. Press Esc to cancel."
+    },
+    "schema_switch_key_hint_disabled": {
+        "message": "Shortcut is disabled. Click \"Set shortcut\" and press a key combination to re-enable it."
+    },
+    "schema_switch_key_recording": {
+        "message": "Press keys…"
+    },
+    "schema_switch_key_set": {
+        "message": "Set shortcut"
+    },
+    "schema_switch_key_disable": {
+        "message": "Disable"
+    },
+    "schema_switch_key_reset": {
+        "message": "Reset to default"
+    },
+    "schema_switch_key_invalid": {
+        "message": "Include Ctrl or Alt, or use a function key. Shift or Search alone would interfere with typing."
+    },
     "fuzzy_pinyin": {
         "message": "Fuzzy Pinyin"
     },

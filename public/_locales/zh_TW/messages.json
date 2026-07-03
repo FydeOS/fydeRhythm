@@ -52,6 +52,33 @@
     "candidate_count": {
         "message": "每頁候選數量"
     },
+    "schema_switch_key": {
+        "message": "方案切換快捷鍵"
+    },
+    "schema_switch_key_hint": {
+        "message": "切換到下一個已啟用的方案。"
+    },
+    "schema_switch_key_hint_recording": {
+        "message": "請按下新的組合鍵，按 Esc 取消。"
+    },
+    "schema_switch_key_hint_disabled": {
+        "message": "快捷鍵已停用。點擊「設定快捷鍵」並按下組合鍵即可重新啟用。"
+    },
+    "schema_switch_key_recording": {
+        "message": "請按下按鍵…"
+    },
+    "schema_switch_key_set": {
+        "message": "設定快捷鍵"
+    },
+    "schema_switch_key_disable": {
+        "message": "停用"
+    },
+    "schema_switch_key_reset": {
+        "message": "回復預設"
+    },
+    "schema_switch_key_invalid": {
+        "message": "請包含 Ctrl 或 Alt，或使用功能鍵。僅 Shift 或搜尋鍵會干擾正常輸入。"
+    },
     "fuzzy_pinyin": {
         "message": "模糊拼音"
     },

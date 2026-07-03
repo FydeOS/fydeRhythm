@@ -52,6 +52,33 @@
     "candidate_count": {
         "message": "单页候选词数量"
     },
+    "schema_switch_key": {
+        "message": "方案切换快捷键"
+    },
+    "schema_switch_key_hint": {
+        "message": "切换到下一个已启用的方案。"
+    },
+    "schema_switch_key_hint_recording": {
+        "message": "请按下新的组合键，按 Esc 取消。"
+    },
+    "schema_switch_key_hint_disabled": {
+        "message": "快捷键已禁用。点击“设置快捷键”并按下组合键即可重新启用。"
+    },
+    "schema_switch_key_recording": {
+        "message": "请按下按键…"
+    },
+    "schema_switch_key_set": {
+        "message": "设置快捷键"
+    },
+    "schema_switch_key_disable": {
+        "message": "禁用"
+    },
+    "schema_switch_key_reset": {
+        "message": "恢复默认"
+    },
+    "schema_switch_key_invalid": {
+        "message": "请包含 Ctrl 或 Alt，或使用功能键。仅 Shift 或搜索键会干扰正常输入。"
+    },
     "fuzzy_pinyin": {
         "message": "模糊音"
     },

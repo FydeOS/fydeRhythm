@@ -52,6 +52,33 @@
     "candidate_count": {
         "message": "페이지당 후보 수"
     },
+    "schema_switch_key": {
+        "message": "스키마 전환 단축키"
+    },
+    "schema_switch_key_hint": {
+        "message": "다음 사용 설정된 스키마로 전환합니다."
+    },
+    "schema_switch_key_hint_recording": {
+        "message": "새 키 조합을 누르세요. Esc 키를 누르면 취소됩니다."
+    },
+    "schema_switch_key_hint_disabled": {
+        "message": "단축키가 사용 중지되었습니다. '단축키 설정'을 클릭하고 키 조합을 누르면 다시 사용 설정됩니다."
+    },
+    "schema_switch_key_recording": {
+        "message": "키를 누르세요…"
+    },
+    "schema_switch_key_set": {
+        "message": "단축키 설정"
+    },
+    "schema_switch_key_disable": {
+        "message": "사용 안 함"
+    },
+    "schema_switch_key_reset": {
+        "message": "기본값으로 재설정"
+    },
+    "schema_switch_key_invalid": {
+        "message": "Ctrl 또는 Alt를 포함하거나 기능 키를 사용하세요. Shift나 검색 키만으로는 일반 입력을 방해합니다."
+    },
     "fuzzy_pinyin": {
         "message": "모호한 병음"
     },
