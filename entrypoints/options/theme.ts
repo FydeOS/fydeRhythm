@@ -269,6 +269,30 @@ export default createTheme({
         },
       },
     },
+    MuiTooltip: {
+      defaultProps: {
+        enterDelay: 400,
+        // Match the pill's slide timing so the label feels part of the control.
+        TransitionProps: { timeout: 180 },
+      },
+      styleOverrides: {
+        tooltip: ({ theme }) => ({
+          backgroundColor: '#1A1A24',
+          color: '#ffffff',
+          fontSize: '12px',
+          fontWeight: 500,
+          lineHeight: '16px',
+          padding: '6px 10px',
+          borderRadius: 8,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.12)',
+          ...theme.applyStyles('dark', { backgroundColor: '#3c3c44' }),
+        }),
+        arrow: ({ theme }) => ({
+          color: '#1A1A24',
+          ...theme.applyStyles('dark', { color: '#3c3c44' }),
+        }),
+      },
+    },
     MuiSnackbarContent: {
       styleOverrides: {
         // Inverted surface in both schemes: a near-black chip on light, a light
