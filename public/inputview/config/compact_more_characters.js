@@ -35,7 +35,7 @@ i18n.input.chrome.inputview.content.compact.more.keyNAMoreCharacters =
     /* 3 */ { 'text': '\u2022',
       'moreKeys': {
         'characters': ['\u266A', '\u2665', '\u2660', '\u2666', '\u2663']}},
-    /* 4 */ { 'text': '\u23B7' },
+    /* 4 */ { 'text': '\u221A' },
     // Keep in sync with rowkeys_symbols_shift1.xml in android input tool.
     /* 5 */ { 'text': '\u03C0',
       'moreKeys': {

@@ -18915,7 +18915,7 @@ i18n.input.chrome.inputview.content.compact.more.keyNAMoreCharacters =
      { 'text': '\u2022',
       'moreKeys': {
         'characters': ['\u266A', '\u2665', '\u2660', '\u2666', '\u2663']}},
-     { 'text': '\u23B7' },
+     { 'text': '\u221A' },
      { 'text': '\u03C0',
       'moreKeys': {
         'characters': ['\u03A0']}},
