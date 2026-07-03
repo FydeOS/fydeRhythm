@@ -5,22 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="manifest.open_in_tab" content="true" />
     <title>FydeRhythm Options</title>
-    <!-- Apply the persisted color scheme before first paint so a dark/system
-         preference doesn't flash light on load. Mirrors what MUI's
-         useColorScheme does at runtime: it reads the same 'mui-mode' key and
-         toggles a 'light'/'dark' class on <html> (colorSchemeSelector: 'class'
-         in theme.ts). Kept in sync with @mui/material's default storage key. -->
-    <script>
-      (function () {
-        try {
-          var mode = localStorage.getItem('mui-mode') || 'system';
-          var scheme = mode === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : mode;
-          document.documentElement.classList.add(scheme);
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Sets the color-scheme class on <html> before first paint (external, not
+         inline, because the extension CSP blocks inline scripts). See its file
+         header; MUI reconciles the class once it mounts. -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
