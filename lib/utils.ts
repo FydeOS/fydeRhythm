@@ -1,5 +1,5 @@
 import { FastIndexedDbFsController } from './fs'
-import type { LatinLayoutId, LayoutId } from './shared-types'
+import { kLatinLayoutIds, type LatinLayoutId, type LayoutId } from './shared-types'
 
 export function dec2hex(dec: number): string {
     return dec.toString(16).padStart(2, "0")
@@ -65,18 +65,32 @@ export interface ImeSettings {
     //   null      → disabled, no shortcut at all
     //   object    → a user-defined binding
     schemaSwitchKey?: SchemaSwitchKey | null;
-    // Preferred arrangement for Latin letters. Used in ASCII mode and password
-    // fields, and is the default layout for Latin-typed schemas. Undefined = qwerty.
-    latinLayout?: LatinLayoutId;
+    // Preferred arrangement for Latin letters in ASCII mode.
+    //   "follow" / undefined → follow the active schema's Latin layout binding
+    //                          (qwerty when the schema's layout is non-Latin)
+    //   a LatinLayoutId      → pinned; schema bindings never override it
+    latinLayout?: LatinLayoutId | "follow";
     // Per-schema InputView layout override, keyed by schema id. A schema with no
-    // entry follows latinLayout.
+    // entry uses the pinned latinLayout (or qwerty under "follow").
     schemaLayouts?: Record<string, LayoutId>;
 }
 
 export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [], horizontal: false };
 
-export function resolveLatinLayout(settings: Pick<ImeSettings, "latinLayout"> | undefined): LatinLayoutId {
-    return settings?.latinLayout ?? "qwerty";
+// Latin layout in effect for ASCII mode while a given schema is active. The
+// user picks it explicitly: "follow" (the default) tracks the schema's Latin
+// layout binding so toggling 中/英 never changes the arrangement; a concrete
+// layout is pinned and schema bindings never override it.
+export function resolveEffectiveLatinLayout(
+    settings: Pick<ImeSettings, "latinLayout" | "schemaLayouts"> | undefined,
+    schemaId: string,
+): LatinLayoutId {
+    const pref = settings?.latinLayout ?? "follow";
+    if (pref !== "follow") return pref;
+    const layout = resolveLayoutForSchema(settings, schemaId);
+    return (kLatinLayoutIds as readonly string[]).includes(layout)
+        ? layout as LatinLayoutId
+        : "qwerty";
 }
 
 // Best-effort layout guess for a schema the user hasn't bound explicitly.
@@ -112,16 +126,19 @@ export function guessScriptForSchema(
 }
 
 // Layout shown for a schema when not in ASCII mode: the user's per-schema
-// binding if set, then the keyword guess, then the global Latin layout
-// ("跟随" rule).
+// binding if set, then the keyword guess, then the pinned Latin layout
+// (qwerty when the Latin layout is set to "follow" — the follow direction is
+// Latin-follows-schema, never the reverse, which would be circular).
 export function resolveLayoutForSchema(
     settings: Pick<ImeSettings, "latinLayout" | "schemaLayouts"> | undefined,
     schemaId: string,
     schemaName?: string,
 ): LayoutId {
-    return settings?.schemaLayouts?.[schemaId]
-        ?? guessLayoutForSchema(schemaId, schemaName)
-        ?? resolveLatinLayout(settings);
+    const bound = settings?.schemaLayouts?.[schemaId]
+        ?? guessLayoutForSchema(schemaId, schemaName);
+    if (bound) return bound;
+    const pref = settings?.latinLayout ?? "follow";
+    return pref === "follow" ? "qwerty" : pref;
 }
 
 // The historical default — matches RIME's own Control+grave convention.

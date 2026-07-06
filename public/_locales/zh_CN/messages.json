@@ -200,5 +200,29 @@
     },
     "theme_dark": {
         "message": "深色"
+    },
+    "latin_layout": {
+        "message": "英文键盘布局"
+    },
+    "latin_layout_hint": {
+        "message": "英文模式固定使用所选的字母排列。"
+    },
+    "vk_layout": {
+        "message": "键盘布局"
+    },
+    "layout_zhuyin": {
+        "message": "注音"
+    },
+    "layout_kana": {
+        "message": "假名"
+    },
+    "layout_hangul": {
+        "message": "谚文"
+    },
+    "latin_layout_following": {
+        "message": "跟随当前方案的键盘布局，当前为 $1。"
+    },
+    "latin_layout_follow_option": {
+        "message": "跟随方案布局"
     }
 }

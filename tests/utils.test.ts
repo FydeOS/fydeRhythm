@@ -93,3 +93,38 @@ describe('guessScriptForSchema (poly regression)', () => {
         expect(guessScriptForSchema('custom', '日文', 'qwerty')).toBe('ja');
     });
 });
+
+describe('resolveEffectiveLatinLayout (English follows Latin schema bindings)', () => {
+    it('follows a Latin per-schema binding so 中/英 never changes the arrangement', async () => {
+        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
+        // Schema bound to Colemak → English mode is Colemak too, even though
+        // the global Latin layout is qwerty.
+        expect(resolveEffectiveLatinLayout(
+            { schemaLayouts: { aurora_pinyin: 'colemak' } }, 'aurora_pinyin')).toBe('colemak');
+    });
+
+    it('falls back to the global Latin layout for non-Latin schema layouts', async () => {
+        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
+        expect(resolveEffectiveLatinLayout(
+            { latinLayout: 'dvorak', schemaLayouts: { terra_zhuyin: 'zhuyin' } }, 'terra_zhuyin')).toBe('dvorak');
+        expect(resolveEffectiveLatinLayout(undefined, 'aurora_pinyin')).toBe('qwerty');
+    });
+});
+
+describe('latinLayout "follow" is an explicit choice', () => {
+    it('a pinned Latin layout is never overridden by schema bindings', async () => {
+        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
+        expect(resolveEffectiveLatinLayout(
+            { latinLayout: 'qwerty', schemaLayouts: { aurora_pinyin: 'colemak' } },
+            'aurora_pinyin')).toBe('qwerty');
+    });
+
+    it('follow (and the undefined default) tracks the schema binding', async () => {
+        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
+        expect(resolveEffectiveLatinLayout(
+            { latinLayout: 'follow', schemaLayouts: { aurora_pinyin: 'colemak' } },
+            'aurora_pinyin')).toBe('colemak');
+        expect(resolveEffectiveLatinLayout(
+            { schemaLayouts: { terra_zhuyin: 'zhuyin' } }, 'terra_zhuyin')).toBe('qwerty');
+    });
+});

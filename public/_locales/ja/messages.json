@@ -200,5 +200,29 @@
     },
     "theme_dark": {
         "message": "ダーク"
+    },
+    "latin_layout": {
+        "message": "英字キーボード配列"
+    },
+    "latin_layout_hint": {
+        "message": "英語モードは選択した配列に固定されます。"
+    },
+    "vk_layout": {
+        "message": "キーボード配列"
+    },
+    "layout_zhuyin": {
+        "message": "注音"
+    },
+    "layout_kana": {
+        "message": "かな"
+    },
+    "layout_hangul": {
+        "message": "ハングル"
+    },
+    "latin_layout_following": {
+        "message": "現在のスキーマのキーボード配列に従います（現在: $1）。"
+    },
+    "latin_layout_follow_option": {
+        "message": "スキーマの配列に従う"
     }
 }

@@ -1,5 +1,5 @@
 import { parse } from "yaml";
-import { getFs, guessScriptForSchema, kDefaultSettings, resolveLatinLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
+import { getFs, guessScriptForSchema, kDefaultSettings, resolveEffectiveLatinLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
 import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground } from "@/lib/shared-types";
 import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
@@ -130,7 +130,7 @@ export async function buildFastInputViewState(controller: InputController | unde
   return {
     asciiMode: false,
     layout,
-    latinLayout: resolveLatinLayout(settings),
+    latinLayout: resolveEffectiveLatinLayout(settings, schemaId),
     script: guessScriptForSchema(schemaId, undefined, layout),
     schemaId,
     schemaName: schemaId,

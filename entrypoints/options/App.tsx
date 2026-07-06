@@ -34,7 +34,11 @@ import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlin
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey } from "@/lib/utils";
+import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey, resolveLayoutForSchema, resolveEffectiveLatinLayout } from "@/lib/utils";
+import { kLatinLayoutIds, kLayoutIds, type LatinLayoutId, type LayoutId } from "@/lib/shared-types";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import Divider from "@mui/material/Divider";
 import { detectSchemaInZip, importSchemaFromZip } from "@/lib/import-schema";
 import { getInstalledSchemaIds } from "@/lib/schema-install";
 import { sendMessage } from "@/lib/messaging";
@@ -107,9 +111,11 @@ const kConventerUrl = 'https://rime-conf-translator.fydeos.io'
 function AppearanceToggle() {
     const { mode, setMode } = useColorScheme();
     const current = mode ?? 'system';
+    // System sits at the edge: light↔dark form a natural continuum, and a
+    // "follow system" wedged between them breaks it.
     const options = [
-        { value: 'light' as const, icon: <LightModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_light") },
         { value: 'system' as const, icon: <SettingsBrightnessIcon sx={{ fontSize: 18 }} />, label: $$("theme_system") },
+        { value: 'light' as const, icon: <LightModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_light") },
         { value: 'dark' as const, icon: <DarkModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_dark") },
     ];
     const size = 34;
@@ -498,6 +504,27 @@ function OptionsPage() {
             ? _.uniq([...base, id])
             : base.filter(x => x !== id);
         changeSettings({ enabledSchemas: next });
+    }
+
+    // Display names for InputView layouts. Latin layouts are proper nouns;
+    // the rest are localized.
+    const layoutNames: Record<LayoutId, string> = {
+        qwerty: "QWERTY",
+        colemak: "Colemak",
+        dvorak: "Dvorak",
+        zhuyin: $$("layout_zhuyin"),
+        kana: $$("layout_kana"),
+        hangul: $$("layout_hangul"),
+    };
+
+    // What "follow the schema" currently resolves to for the active schema —
+    // shown in the hint so the follow option is never opaque.
+    const effectiveLatin = resolveEffectiveLatinLayout(imeSettings, imeSettings.schema);
+    const latinFollowing = (imeSettings.latinLayout ?? "follow") === "follow";
+
+    // Per-schema keyboard layout binding (always explicit).
+    function setSchemaLayout(id: string, layout: LayoutId) {
+        changeSettings({ schemaLayouts: { ...(imeSettings.schemaLayouts ?? {}), [id]: layout } });
     }
 
     // Called at the end of each install path (download / convert / import).
@@ -1148,6 +1175,28 @@ function OptionsPage() {
                                                         </Box>
                                                     </Box>
 
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                            {$$("vk_layout")}
+                                                        </Box>
+                                                        <Select
+                                                            size="small"
+                                                            variant="standard"
+                                                            disableUnderline
+                                                            // Always show the RESOLVED layout (binding → keyword
+                                                            // guess → qwerty); picking a value writes an explicit
+                                                            // binding. No "follow Latin" indirection here — the
+                                                            // Latin setting is the one that follows the schema.
+                                                            value={resolveLayoutForSchema(imeSettings, schema.id, schema.name)}
+                                                            onChange={(e) => setSchemaLayout(schema.id, e.target.value as LayoutId)}
+                                                            sx={{ fontSize: '0.8rem', color: 'text.secondary', '& .MuiSelect-select': { py: 0.25 } }}
+                                                        >
+                                                            {kLayoutIds.map((id) => (
+                                                                <MenuItem key={id} value={id}>{layoutNames[id]}</MenuItem>
+                                                            ))}
+                                                        </Select>
+                                                    </Box>
+
                                                 </Box>
                                             )}
                                         </Box>
@@ -1305,11 +1354,8 @@ function OptionsPage() {
                         </Box>
                     </Box>
 
-                </div>
-            </div>
+                    <Divider sx={{ mx: 4 }} />
 
-            <div className={styles.formGroup}>
-                <div className={styles.formBox} style={{ padding: '8px 0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
                         <Box sx={{ pr: 2 }}>
                             <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
@@ -1358,6 +1404,34 @@ function OptionsPage() {
                     {switchKeyError && (
                         <Box role="alert" sx={{ px: 4, pb: 2, color: 'error.main', fontSize: '0.85rem' }}>{switchKeyError}</Box>
                     )}
+
+                    <Divider sx={{ mx: 4 }} />
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
+                        <Box sx={{ pr: 2 }}>
+                            <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
+                                {$$("latin_layout")}
+                            </Box>
+                            {/* Follow is an explicit choice; surface what it resolves
+                                to right now so the option is never opaque. */}
+                            <Box sx={{ fontSize: '13px', color: 'text.secondary', mt: 0.5 }}>
+                                {latinFollowing
+                                    ? $$("latin_layout_following", layoutNames[effectiveLatin])
+                                    : $$("latin_layout_hint")}
+                            </Box>
+                        </Box>
+                        <Select
+                            size="small"
+                            value={imeSettings.latinLayout ?? "follow"}
+                            onChange={(e) => changeSettings({ latinLayout: e.target.value as LatinLayoutId | "follow" })}
+                            sx={{ minWidth: 170 }}
+                        >
+                            <MenuItem value="follow">{$$("latin_layout_follow_option")}</MenuItem>
+                            {kLatinLayoutIds.map((id) => (
+                                <MenuItem key={id} value={id}>{layoutNames[id]}</MenuItem>
+                            ))}
+                        </Select>
+                    </Box>
                 </div>
             </div>
 

@@ -200,5 +200,29 @@
     },
     "theme_dark": {
         "message": "다크"
+    },
+    "latin_layout": {
+        "message": "영문 키보드 배열"
+    },
+    "latin_layout_hint": {
+        "message": "영문 모드는 선택한 배열로 고정됩니다."
+    },
+    "vk_layout": {
+        "message": "키보드 배열"
+    },
+    "layout_zhuyin": {
+        "message": "주음"
+    },
+    "layout_kana": {
+        "message": "가나"
+    },
+    "layout_hangul": {
+        "message": "한글"
+    },
+    "latin_layout_following": {
+        "message": "현재 스키마의 키보드 배열을 따릅니다(현재: $1)."
+    },
+    "latin_layout_follow_option": {
+        "message": "스키마 배열 따르기"
     }
 }

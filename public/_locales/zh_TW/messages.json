@@ -200,5 +200,29 @@
     },
     "theme_dark": {
         "message": "深色"
+    },
+    "latin_layout": {
+        "message": "英文鍵盤配置"
+    },
+    "latin_layout_hint": {
+        "message": "英文模式固定使用所選的字母排列。"
+    },
+    "vk_layout": {
+        "message": "鍵盤配置"
+    },
+    "layout_zhuyin": {
+        "message": "注音"
+    },
+    "layout_kana": {
+        "message": "假名"
+    },
+    "layout_hangul": {
+        "message": "諺文"
+    },
+    "latin_layout_following": {
+        "message": "跟隨目前方案的鍵盤配置，目前為 $1。"
+    },
+    "latin_layout_follow_option": {
+        "message": "跟隨方案配置"
     }
 }
