@@ -240,6 +240,13 @@ function OptionsPage() {
     async function loadSchemaList() {
         const { schemaList: storedSchemaList } = await chrome.storage.local.get(["schemaList"]) as { schemaList?: SchemaListFile };
         console.log("loadSchemaList:", storedSchemaList);
+        // Stale-while-revalidate: the cached copy (already merged with the
+        // self-defined schemas when it was written) renders immediately, so
+        // the page never waits on — or requires — the network round-trip.
+        const cached = storedSchemaList?.schemas?.length ? storedSchemaList : null;
+        if (cached) {
+            setSchemaList(cached);
+        }
         setFetchingList(true);
         let newData: SchemaListFile;
         try {
@@ -250,7 +257,13 @@ function OptionsPage() {
             }).then(x => x.text());
             newData = parse(text) as SchemaListFile;
         } catch (error) {
-            setFetchListError($$("error_fetch_schema_list") + String(error));
+            // A failed refresh with a usable cached list is not worth an
+            // error banner; only a first run with nothing to show is.
+            if (cached) {
+                console.warn("Schema list refresh failed; keeping cached copy:", error);
+            } else {
+                setFetchListError($$("error_fetch_schema_list") + String(error));
+            }
             return;
         } finally {
             setFetchingList(false);
@@ -1258,7 +1271,10 @@ function OptionsPage() {
                     <FormControl className={styles.formControl}>
                         <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
                             <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("select_schema")}</h2>
-                            {fetchingList && (
+                            {/* Only worth announcing while there is nothing to show yet
+                                (first run without a cached list); background refreshes
+                                of an already-rendered list stay silent. */}
+                            {fetchingList && schemaList.schemas.length === 0 && (
                                 <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{$$("fetching_schema_list")}</Box>
                             )}
                         </Box>
