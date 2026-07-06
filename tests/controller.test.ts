@@ -522,3 +522,195 @@ describe('InputController schema switching', () => {
         expect(chromeMock.sendMessage).toHaveBeenCalledWith({ rimeStatusChanged: true }, {}, expect.any(Function));
     });
 });
+
+describe('InputView candidate lifecycle (regression: zombie candidates)', () => {
+    function candidateHarness() {
+        stubChrome();
+        // refreshContext always hides the system candidate window while the VK
+        // is visible; give the stub that API.
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.inputViewVisible = true;
+        // No IME text field context in this harness — refreshContext skips
+        // setComposition and goes straight to the candidate flow.
+        controller.context = null as never;
+
+        const state = { preedit: '', words: [] as string[] };
+        controller.session = {
+            getContext: async () => ({
+                composition: {
+                    preedit: state.preedit,
+                    cursorPosition: 0,
+                    selectionStart: 0,
+                    selectionEnd: 0,
+                    length: state.preedit.length,
+                },
+                menu: {
+                    pageSize: 5,
+                    pageNumber: 0,
+                    isLastPage: true,
+                    highlightedCandidateIndex: 0,
+                    candidates: state.words.map((text) => ({ text, comment: '' })),
+                },
+                selectKeys: '',
+                commitTextPreview: '',
+                selectLabels: [],
+            }),
+            iterateCandidates: async () => {
+                const snapshot = [...state.words];
+                let i = -1;
+                return {
+                    advance: async () => { i++; },
+                    current: async () => (i >= 0 && i < snapshot.length
+                        ? { index: i, text: snapshot[i], comment: '' }
+                        : null),
+                    destroy: () => { },
+                };
+            },
+            clearComposition: () => { },
+        } as never;
+
+        const sent: string[][] = [];
+        controller.addListener('candidatesBack', (cands: Array<{ candidate: string }>) => {
+            sent.push(cands.map((c) => c.candidate));
+        });
+        return { controller, state, sent };
+    }
+
+    it('replaces candidates when the preedit changes (never appends across compositions)', async () => {
+        const { controller, state, sent } = candidateHarness();
+
+        state.preedit = 'p';
+        state.words = ['苹', '平'];
+        await controller.refreshContext();
+        expect(sent.at(-1)).toEqual(['苹', '平']);
+
+        state.preedit = 'pi';
+        state.words = ['品', '拼'];
+        await controller.refreshContext();
+        // The zombie bug appended: ['苹','平','品','拼'].
+        expect(sent.at(-1)).toEqual(['品', '拼']);
+    });
+
+    it('clears the keyboard when the composition ends', async () => {
+        const { controller, state, sent } = candidateHarness();
+
+        state.preedit = 'hao';
+        state.words = ['好', '号'];
+        await controller.refreshContext();
+        expect(sent.at(-1)).toEqual(['好', '号']);
+
+        state.preedit = '';
+        state.words = [];
+        await controller.refreshContext();
+        expect(sent.at(-1)).toEqual([]);
+    });
+
+    it('clears the keyboard when it is hidden and re-shown mid-composition', async () => {
+        const { controller, state, sent } = candidateHarness();
+
+        state.preedit = 'ni';
+        state.words = ['你', '尼'];
+        await controller.refreshContext();
+        expect(sent.at(-1)).toEqual(['你', '尼']);
+
+        // Hiding clears the engine composition; re-showing must sync the VK.
+        await controller.handleInputViewVisibilityChanged(false);
+        state.preedit = '';
+        state.words = [];
+        await controller.handleInputViewVisibilityChanged(true);
+        expect(sent.at(-1)).toEqual([]);
+    });
+});
+
+describe('InputView candidate lifecycle (regression: delete + stale fetch race)', () => {
+    function deleteHarness() {
+        stubChrome();
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.inputViewVisible = true;
+        controller.context = null as never;
+
+        const state = { preedit: 'hao', words: ['好', '号', '嚎'] };
+        controller.session = {
+            getContext: async () => ({
+                composition: {
+                    preedit: state.preedit, cursorPosition: 0,
+                    selectionStart: 0, selectionEnd: 0, length: state.preedit.length,
+                },
+                menu: {
+                    pageSize: 5, pageNumber: 0, isLastPage: true,
+                    highlightedCandidateIndex: 0,
+                    candidates: state.words.map((text) => ({ text, comment: '' })),
+                },
+                selectKeys: '', commitTextPreview: '', selectLabels: [],
+            }),
+            iterateCandidates: async () => {
+                const snapshot = [...state.words];
+                let i = -1;
+                return {
+                    advance: async () => { i++; },
+                    current: async () => (i >= 0 && i < snapshot.length
+                        ? { index: i, text: snapshot[i], comment: '' }
+                        : null),
+                    destroy: () => { },
+                };
+            },
+            actionCandidate: async (index: number, op: string) => {
+                if (op === 'delete') state.words.splice(index, 1);
+            },
+            clearComposition: () => { },
+        } as never;
+
+        const sent: string[][] = [];
+        controller.addListener('candidatesBack', (cands: Array<{ candidate: string }>) => {
+            sent.push(cands.map((c) => c.candidate));
+        });
+        return { controller, state, sent };
+    }
+
+    it('deleting a candidate removes it from the keyboard (preedit unchanged)', async () => {
+        const { controller, sent } = deleteHarness();
+        await controller.refreshContext();
+        expect(sent.at(-1)).toEqual(['好', '号', '嚎']);
+
+        // Long-press delete on the first candidate: the menu changes while
+        // the preedit stays 'hao' — the cache must still be rebuilt.
+        await controller.deleteCandidate(0, false);
+        expect(sent.at(-1)).toEqual(['号', '嚎']);
+    });
+
+    it('a superseded fetchMoreCandidates loop drops its results (no zombie resurrection)', async () => {
+        const { controller, sent } = deleteHarness();
+        await controller.refreshContext();
+        sent.length = 0;
+
+        // Make the iterator slow and controllable.
+        let releaseAdvance: (() => void) | null = null;
+        const gate = () => new Promise<void>((res) => { releaseAdvance = res; });
+        const slowWords = ['旧', '词'];
+        let i = -1;
+        controller.candidateIterator = {
+            advance: async () => { await gate(); i++; },
+            current: async () => (i >= 0 && i < slowWords.length
+                ? { index: 100 + i, text: slowWords[i], comment: '' }
+                : null),
+            destroy: () => { },
+        } as never;
+
+        const fetching = controller.fetchMoreCandidates(2);
+        await Promise.resolve();
+        // A new keystroke supersedes the fetch mid-flight.
+        await controller.invalidateCandidateCache();
+        releaseAdvance!();
+        await fetching;
+
+        // The stale loop must neither pollute the cache nor re-send.
+        expect(controller.candidateCache).toEqual([]);
+        expect(sent).toEqual([]);
+    });
+});

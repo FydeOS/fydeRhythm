@@ -487,7 +487,16 @@ export class InputController extends EventEmitter {
                     }
                 } else {
                     // Virtual keyboard is visible, send candidates to display them in virtual keyboard
-                    if (!this.candidateIterator) {
+                    const preedit = rimeContext.composition.preedit;
+                    if (this.candidateIterator && this.candidateIteratorPreedit !== preedit) {
+                        // A stale iterator keeps serving — and fetchMoreCandidates keeps
+                        // appending — the previous composition's candidates. Rebuild it
+                        // whenever the preedit changes, and send an empty list when the
+                        // composition ended so the keyboard returns to its idle toolbar.
+                        await this.invalidateCandidateCache();
+                    }
+                    if (!this.candidateIterator && preedit.length > 0) {
+                        this.candidateIteratorPreedit = preedit;
                         this.candidateIterator = await this.session.iterateCandidates(0);
                         await this.fetchMoreCandidates(10);
                     }
@@ -703,6 +712,11 @@ export class InputController extends EventEmitter {
 
     async deleteCandidate(index: number, currentPage: boolean = true) {
         await this.session?.actionCandidate(index, 'delete', currentPage);
+        // Deleting rewrites the menu WITHOUT changing the preedit, so the
+        // preedit-based staleness check in refreshContext won't fire — without
+        // an explicit invalidation the deleted word is re-sent from the old
+        // cache and appears to survive deletion.
+        await this.invalidateCandidateCache();
         await this.refreshContext();
     }
 
@@ -731,32 +745,48 @@ export class InputController extends EventEmitter {
 
     async handleInputViewVisibilityChanged(visible: boolean) {
         this.inputViewVisible = visible;
+        // Await both: fire-and-forget here let refreshContext read the engine
+        // context before the composition was actually cleared, resurrecting
+        // stale candidates when the keyboard was re-shown.
         if (!visible) {
-            this.session?.clearComposition();
+            await this.session?.clearComposition();
         }
-        this.refreshContext();
+        await this.refreshContext();
     }
 
     // Only used in input view
     candidateCache: RimeCandidate[];
     candidateIterator: RimeCandidateIterator | null;
+    // Preedit the iterator was created for; a mismatch means the iterator is stale.
+    candidateIteratorPreedit: string | null = null;
+    // Bumped on every invalidation. fetchMoreCandidates is a slow async loop;
+    // when a new keystroke/selection supersedes it mid-flight, the stale loop
+    // must drop its results instead of pushing old-composition candidates into
+    // the fresh cache and re-sending them AFTER the list was cleared.
+    candidateGeneration = 0;
 
     async fetchMoreCandidates(count: number) {
-        if (this.candidateIterator) {
-            for (let i = 0; i < count; i++) {
-                await this.candidateIterator.advance();
-                const c = await this.candidateIterator.current();
-                if (c == null)
-                    break;
-                this.candidateCache.push(c);
-            }
-            this.sendCandidateCacheToInputView();
+        const generation = this.candidateGeneration;
+        const iterator = this.candidateIterator;
+        if (!iterator) return;
+        for (let i = 0; i < count; i++) {
+            await iterator.advance();
+            if (generation !== this.candidateGeneration) return;
+            const c = await iterator.current();
+            if (generation !== this.candidateGeneration) return;
+            if (c == null)
+                break;
+            this.candidateCache.push(c);
         }
+        if (generation !== this.candidateGeneration) return;
+        this.sendCandidateCacheToInputView();
     }
 
     async invalidateCandidateCache() {
+        this.candidateGeneration++;
         this.candidateCache = [];
         this.candidateIterator?.destroy();
         this.candidateIterator = null;
+        this.candidateIteratorPreedit = null;
     }
 }

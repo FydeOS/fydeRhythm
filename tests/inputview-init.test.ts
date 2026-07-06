@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // index.ts calls defineBackground(...) and onMessage(...) at module load via the
 // wxt auto-import globals. Stub/mocks below keep the import side-effect-free so we
-// can exercise the exported postAsciiMode helper in isolation.
+// can exercise the exported state-building helpers in isolation.
 vi.stubGlobal('defineBackground', (def: unknown) => def);
 
 vi.mock('@/lib/messaging', () => ({
@@ -22,69 +22,131 @@ vi.mock('../entrypoints/background/schemas', () => ({
     listEnabledInstalledSchemas: vi.fn(async () => []),
 }));
 
-vi.mock('@/lib/utils', () => ({
+vi.mock('@/lib/utils', async (importOriginal) => ({
+    ...(await importOriginal() as Record<string, unknown>),
     getFs: vi.fn(),
-    kDefaultSettings: { schema: 'aurora', pageSize: 5, algebraList: [] },
 }));
 
 vi.mock('@/lib/schema-install', () => ({
     resolveInstalledSchemaId: vi.fn(),
 }));
 
-const { postAsciiMode } = await import('../entrypoints/background/index');
+const { buildFastInputViewState, refineInputViewState, postInputViewState, postRefinedInputViewState } =
+    await import('../entrypoints/background/index');
+const { listEnabledInstalledSchemas } = await import('../entrypoints/background/schemas');
 
-// Minimal stand-in for the part of InputController that postAsciiMode reads.
-function fakeController(session: unknown) {
-    return { session };
+// Minimal stand-in for the part of InputController that the state builders read.
+// There is no chrome global in this environment, so readSettings falls back to
+// activeSettings — the same path a real cold start takes when storage is empty.
+function fakeController(session: unknown, activeSettings?: object) {
+    return { session, activeSettings };
 }
 
-describe('postAsciiMode', () => {
-    let posted: object[];
-    let postToPort: (msg: object) => void;
+beforeEach(() => {
+    vi.mocked(listEnabledInstalledSchemas).mockReset();
+    vi.mocked(listEnabledInstalledSchemas).mockImplementation(async () => []);
+});
 
-    beforeEach(() => {
-        posted = [];
-        postToPort = (msg) => posted.push(msg);
+describe('buildFastInputViewState', () => {
+    it('never touches the engine and always resolves to a renderable snapshot', async () => {
+        // This is the invariant that keeps the keyboard from rendering blank on
+        // a cold start: the fast snapshot may only read settings.
+        const state = await buildFastInputViewState(undefined);
+        expect(state).toEqual({
+            asciiMode: false,
+            layout: 'qwerty',
+            latinLayout: 'qwerty',
+            script: 'zh',
+            schemaId: '',
+            schemaName: '',
+        });
     });
 
-    afterEach(() => {
-        vi.unstubAllGlobals();
+    it('resolves the per-schema layout binding', async () => {
+        const controller = fakeController(null, {
+            schema: 'terra_zhuyin',
+            schemaLayouts: { terra_zhuyin: 'zhuyin' },
+        });
+        const state = await buildFastInputViewState(controller as never);
+        expect(state.layout).toBe('zhuyin');
+        expect(state.latinLayout).toBe('qwerty');
     });
 
-    it('posts the real asciiMode when the session is ready', async () => {
-        const controller = fakeController({ getOption: vi.fn(async () => true) });
-        await postAsciiMode(controller as never, postToPort, 'init');
-        expect(posted).toEqual([{ name: 'init', msg: { asciiMode: true } }]);
+    it('follows the global Latin layout when a schema has no binding (跟随 rule)', async () => {
+        const controller = fakeController(null, {
+            schema: 'aurora_pinyin',
+            latinLayout: 'colemak',
+        });
+        const state = await buildFastInputViewState(controller as never);
+        expect(state.layout).toBe('colemak');
+        expect(state.latinLayout).toBe('colemak');
+    });
+});
+
+describe('refineInputViewState', () => {
+    it('fills in the real asciiMode and catalog label', async () => {
+        vi.mocked(listEnabledInstalledSchemas).mockImplementation(async () => [
+            { id: 'aurora_pinyin', label: '极光拼音' },
+        ]);
+        const controller = fakeController(
+            { getOption: vi.fn(async () => true) },
+            { schema: 'aurora_pinyin' },
+        );
+        const fast = await buildFastInputViewState(controller as never);
+        const refined = await refineInputViewState(controller as never, fast);
+        expect(refined.asciiMode).toBe(true);
+        expect(refined.schemaName).toBe('极光拼音');
     });
 
-    it('posts asciiMode=false on a cold start (session not loaded yet)', async () => {
-        // This is the invariant that keeps the keyboard from rendering as one row:
-        // the "init" must be sent even before RIME has loaded.
-        const controller = fakeController(null);
-        await postAsciiMode(controller as never, postToPort, 'init');
-        expect(posted).toEqual([{ name: 'init', msg: { asciiMode: false } }]);
-    });
-
-    it('posts asciiMode=false when the controller is undefined', async () => {
-        await postAsciiMode(undefined, postToPort, 'init');
-        expect(posted).toEqual([{ name: 'init', msg: { asciiMode: false } }]);
+    it('keeps the fast values when the engine/catalog fail or reject', async () => {
+        vi.mocked(listEnabledInstalledSchemas).mockImplementation(async () => { throw new Error('fs not ready'); });
+        const controller = fakeController(
+            { getOption: vi.fn(async () => { throw new Error('boom'); }) },
+            { schema: 'my_custom' },
+        );
+        const fast = await buildFastInputViewState(controller as never);
+        const refined = await refineInputViewState(controller as never, fast);
+        expect(refined.asciiMode).toBe(false);
+        expect(refined.schemaName).toBe('my_custom');
     });
 
     it('treats an undefined option value as false', async () => {
         const controller = fakeController({ getOption: vi.fn(async () => undefined) });
-        await postAsciiMode(controller as never, postToPort, 'init');
-        expect(posted).toEqual([{ name: 'init', msg: { asciiMode: false } }]);
+        const fast = await buildFastInputViewState(controller as never);
+        expect((await refineInputViewState(controller as never, fast)).asciiMode).toBe(false);
+    });
+});
+
+describe('postInputViewState', () => {
+    it('posts the fast snapshot first, then the refined one when it differs', async () => {
+        const posted: object[] = [];
+        const controller = fakeController(
+            { getOption: vi.fn(async () => true) },
+            { schema: 'aurora_pinyin' },
+        );
+        await postInputViewState(controller as never, (msg) => posted.push(msg));
+        expect(posted).toHaveLength(2);
+        expect(posted[0]).toMatchObject({ kind: 'state', state: { asciiMode: false } });
+        expect(posted[1]).toMatchObject({ kind: 'state', state: { asciiMode: true } });
     });
 
-    it('falls back to asciiMode=false when getOption rejects', async () => {
-        const controller = fakeController({ getOption: vi.fn(async () => { throw new Error('boom'); }) });
-        await postAsciiMode(controller as never, postToPort, 'init');
-        expect(posted).toEqual([{ name: 'init', msg: { asciiMode: false } }]);
+    it('posts only once when refinement changes nothing (cold start)', async () => {
+        const posted: object[] = [];
+        await postInputViewState(undefined, (msg) => posted.push(msg));
+        expect(posted).toHaveLength(1);
+        expect(posted[0]).toMatchObject({ kind: 'state', state: { layout: 'qwerty', asciiMode: false } });
     });
+});
 
-    it('uses the given message name (schema_switched correction path)', async () => {
-        const controller = fakeController({ getOption: vi.fn(async () => true) });
-        await postAsciiMode(controller as never, postToPort, 'schema_switched');
-        expect(posted).toEqual([{ name: 'schema_switched', msg: { asciiMode: true } }]);
+describe('postRefinedInputViewState', () => {
+    it('posts a single refined snapshot (no stale fast-first flash)', async () => {
+        const posted: Array<{ state: { asciiMode: boolean } }> = [];
+        const controller = fakeController(
+            { getOption: vi.fn(async () => true) },
+            { schema: 'aurora_pinyin' },
+        );
+        await postRefinedInputViewState(controller as never, (msg) => posted.push(msg as never));
+        expect(posted).toHaveLength(1);
+        expect(posted[0].state.asciiMode).toBe(true);
     });
 });

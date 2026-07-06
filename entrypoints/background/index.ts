@@ -1,5 +1,6 @@
 import { parse } from "yaml";
-import { getFs, kDefaultSettings, type ImeSettings } from "@/lib/utils";
+import { getFs, guessScriptForSchema, kDefaultSettings, resolveLatinLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
+import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground } from "@/lib/shared-types";
 import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
 import { onMessage } from "@/lib/messaging";
@@ -81,28 +82,132 @@ async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSetting
   return next;
 }
 
-// Read the engine's ascii_mode, defaulting to false when the session isn't ready
-// or the read fails. On a cold-started MV3 worker the inputview connects before
-// RIME has loaded, so the session is still null and we default to false.
+// Reject if the promise doesn't settle within ms. Used around engine/fs reads
+// that can stall for seconds while RIME is loading on a cold start.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
+// Read the engine's ascii_mode, defaulting to false when the session isn't
+// ready, the read fails, or the engine is too busy loading to answer promptly.
 async function readAsciiMode(controller: InputController | undefined): Promise<boolean> {
   try {
-    return (await controller?.session?.getOption("ascii_mode")) ?? false;
+    const read = controller?.session?.getOption("ascii_mode");
+    if (!read) return false;
+    return (await withTimeout(read, 3000)) ?? false;
   } catch {
     return false;
   }
 }
 
-// Post {name, msg:{asciiMode}} to a connected inputview port. The inputview needs
-// the "init" message to build its full keyset — without it the keyboard stays a
-// single row — so it is sent immediately on connect regardless of session state;
-// on a cold start the session is null and asciiMode defaults to false, and the
-// controller's "schemaSwitched" event re-posts the real value once RIME loads.
-export async function postAsciiMode(
+// Settings as stored (options-page writes land there first), falling back to the
+// controller's active copy. Read fresh on every state build so layout-binding
+// edits reach the InputView without an engine reload.
+async function readSettings(controller: InputController | undefined): Promise<ImeSettings | undefined> {
+  try {
+    const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
+    return obj.settings ?? controller?.activeSettings;
+  } catch {
+    return controller?.activeSettings;
+  }
+}
+
+// Fast snapshot: reads ONLY chrome.storage — never the engine or the schema
+// catalog. Both can stall for seconds on a cold start while RIME loads, and
+// the InputView cannot render any keys until it receives a state, so this
+// must always resolve promptly (asciiMode=false, name=id are acceptable
+// placeholders that the refined snapshot corrects).
+export async function buildFastInputViewState(controller: InputController | undefined): Promise<InputViewState> {
+  const settings = await readSettings(controller);
+  const schemaId = settings?.schema ?? "";
+  const layout = resolveLayoutForSchema(settings, schemaId);
+  return {
+    asciiMode: false,
+    layout,
+    latinLayout: resolveLatinLayout(settings),
+    script: guessScriptForSchema(schemaId, undefined, layout),
+    schemaId,
+    schemaName: schemaId,
+  };
+}
+
+// Fill in the engine/fs-dependent fields (real asciiMode, catalog label),
+// each guarded by a timeout so a busy engine degrades to the fast values.
+export async function refineInputViewState(
   controller: InputController | undefined,
-  postToPort: (msg: object) => void,
-  name: string,
+  base: InputViewState,
+): Promise<InputViewState> {
+  let schemaName = base.schemaName;
+  try {
+    const settings = await readSettings(controller);
+    const list = await withTimeout(listEnabledInstalledSchemas(base.schemaId, settings?.enabledSchemas), 3000);
+    schemaName = list.find((s) => s.id === base.schemaId)?.label ?? schemaName;
+  } catch {
+    // fs not readable yet — the schema id is an acceptable label.
+  }
+  return {
+    ...base,
+    asciiMode: await readAsciiMode(controller),
+    schemaName,
+    // The catalog label often carries the language signal the id lacks
+    // (e.g. an id like "custom_ime" with the name "日本語ローマ字").
+    script: guessScriptForSchema(base.schemaId, schemaName, base.layout),
+  };
+}
+
+// On connect: post the fast snapshot immediately so the keyboard paints, then
+// the refined one if it differs.
+export async function postInputViewState(
+  controller: InputController | undefined,
+  postToPort: (msg: BackgroundToInputView) => void,
 ): Promise<void> {
-  postToPort({ name, msg: { asciiMode: await readAsciiMode(controller) } });
+  const fast = await buildFastInputViewState(controller);
+  postToPort({ kind: "state", state: fast });
+  const refined = await refineInputViewState(controller, fast);
+  if (JSON.stringify(refined) !== JSON.stringify(fast)) {
+    postToPort({ kind: "state", state: refined });
+  }
+}
+
+// On engine events (ascii toggled, schema switched): the engine is up, so post
+// a single refined snapshot — a fast-first pair would flash stale asciiMode.
+export async function postRefinedInputViewState(
+  controller: InputController | undefined,
+  postToPort: (msg: BackgroundToInputView) => void,
+): Promise<void> {
+  const fast = await buildFastInputViewState(controller);
+  postToPort({ kind: "state", state: await refineInputViewState(controller, fast) });
+}
+
+async function postSchemaList(
+  controller: InputController | undefined,
+  postToPort: (msg: BackgroundToInputView) => void,
+): Promise<void> {
+  const settings = await readSettings(controller);
+  const active = settings?.schema ?? "";
+  const schemas = await listEnabledInstalledSchemas(active, settings?.enabledSchemas);
+  postToPort({ kind: "schemaList", schemas, activeSchema: active });
+}
+
+// One poster per connected InputView, so global events (settings edits in the
+// options page) can push fresh state without the page asking.
+const inputViewPosters = new Set<(msg: BackgroundToInputView) => void>();
+
+// Change the active schema and reload the engine. Shared by the IME tray menu
+// and the InputView's long-press schema menu.
+async function activateSchema(schemaId: string): Promise<void> {
+  const current = self.controller.activeSettings?.schema;
+  if (current === schemaId) return;
+  const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
+  const next: ImeSettings = { ...(obj.settings ?? kDefaultSettings), schema: schemaId };
+  await chrome.storage.sync.set({ settings: next });
+  await self.controller.loadRime(true);
 }
 
 export default defineBackground({
@@ -162,12 +267,7 @@ export default defineBackground({
       });
 
       chrome.input.ime.onMenuItemActivated.addListener(async (engineID, menuId) => {
-        const current = self.controller.activeSettings?.schema;
-        if (current === menuId) return;
-        const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
-        const next: ImeSettings = { ...(obj.settings ?? kDefaultSettings), schema: menuId };
-        await chrome.storage.sync.set({ settings: next });
-        await self.controller.loadRime(true);
+        await activateSchema(menuId);
       });
     }
 
@@ -218,6 +318,11 @@ export default defineBackground({
         // which would otherwise stay stale until the next loadRime().
         self.controller?.applySchemaSwitchKey((changes.settings.newValue as ImeSettings | undefined)?.schemaSwitchKey);
         refreshImeMenuItems();
+        // Layout bindings / Latin layout may have changed — push fresh state to
+        // any connected InputView.
+        for (const poster of inputViewPosters) {
+          void postRefinedInputViewState(self.controller, poster);
+        }
       }
     });
 
@@ -261,13 +366,13 @@ export default defineBackground({
       return { handled: false };
     });
 
-    // Port listeners for inputview
+    // Port listener for the InputView (protocol types in lib/shared-types.ts)
     chrome.runtime.onConnect.addListener((port) => {
-      if (port.name == "inputviewMessages") {
+      if (port.name == kInputViewPortName) {
         console.log("InputView Port Connecting");
 
         let inputViewDisconnected = false;
-        const postToPort = (msg: object) => {
+        const postToPort = (msg: BackgroundToInputView) => {
           if (inputViewDisconnected) return;
           try {
             port.postMessage(msg);
@@ -275,45 +380,67 @@ export default defineBackground({
             inputViewDisconnected = true;
           }
         };
+        inputViewPosters.add(postToPort);
 
-        void postAsciiMode(self.controller, postToPort, "init");
+        void postInputViewState(self.controller, postToPort);
+        // Sync the candidate list too: after an MV3 worker restart the page
+        // reconnects holding whatever it displayed last — usually this posts
+        // an empty list and unfreezes a stale candidate bar.
+        postToPort({
+          kind: "candidates",
+          candidates: (self.controller?.candidateCache ?? []).map(
+            (c: { text: string; index: number }) => ({ text: c.text, index: c.index }),
+          ),
+        });
 
-        port.onMessage.addListener((msg) => {
-          console.log("Message from inputview:", msg);
-          if (!msg || typeof msg !== "object") return;
-          if (msg.name == "visibility_change") {
-            self.controller.handleInputViewVisibilityChanged(msg.visibility);
-          } else if (msg.name == "toggle_language_state") {
-            self.controller.setAsciiMode(!msg.msg);
-          } else if (msg.name == "select_candidate") {
-            self.controller.selectCandidate(msg.candidate.ix, false);
-          } else if (msg.name == "load_more_candidate") {
-            self.controller.fetchMoreCandidates(msg.more_candidate_count);
+        port.onMessage.addListener((raw) => {
+          console.log("Message from inputview:", raw);
+          if (!raw || typeof raw !== "object" || typeof (raw as { kind?: unknown }).kind !== "string") return;
+          const msg = raw as InputViewToBackground;
+          switch (msg.kind) {
+            case "visibility":
+              self.controller.handleInputViewVisibilityChanged(msg.visible);
+              break;
+            case "setAsciiMode":
+              self.controller.setAsciiMode(msg.asciiMode);
+              break;
+            case "selectCandidate":
+              self.controller.selectCandidate(msg.index, false);
+              break;
+            case "deleteCandidate":
+              self.controller.deleteCandidate(msg.index, false);
+              break;
+            case "loadMoreCandidates":
+              self.controller.fetchMoreCandidates(msg.count);
+              break;
+            case "switchSchema":
+              void activateSchema(msg.schemaId);
+              break;
+            case "getSchemaList":
+              void postSchemaList(self.controller, postToPort);
+              break;
           }
         });
 
-        const onToggleLanguageState = function (asciiMode: boolean) {
-          postToPort({ name: 'front_toggle_language_state', msg: !asciiMode });
+        const onStateChanged = function () {
+          void postRefinedInputViewState(self.controller, postToPort);
         }
 
         const onCandidatesBack = function (candidates: Array<{ candidate: string, ix: number }>) {
-          postToPort({ name: "candidates_back", msg: { source: "source", candidates } });
+          postToPort({ kind: "candidates", candidates: candidates.map((c) => ({ text: c.candidate, index: c.ix })) });
         }
 
-        const onSchemaSwitched = function () {
-          void postAsciiMode(self.controller, postToPort, "schema_switched");
-        }
-
-        self.controller.addListener("toggleLanguageState", onToggleLanguageState);
+        self.controller.addListener("toggleLanguageState", onStateChanged);
         self.controller.addListener("candidatesBack", onCandidatesBack);
-        self.controller.addListener("schemaSwitched", onSchemaSwitched);
+        self.controller.addListener("schemaSwitched", onStateChanged);
 
         port.onDisconnect.addListener(() => {
           console.log("InputView disconnected");
           inputViewDisconnected = true;
-          self.controller.removeListener("toggleLanguageState", onToggleLanguageState);
+          inputViewPosters.delete(postToPort);
+          self.controller.removeListener("toggleLanguageState", onStateChanged);
           self.controller.removeListener("candidatesBack", onCandidatesBack);
-          self.controller.removeListener("schemaSwitched", onSchemaSwitched);
+          self.controller.removeListener("schemaSwitched", onStateChanged);
           self.controller.handleInputViewVisibilityChanged(false);
         });
       }
