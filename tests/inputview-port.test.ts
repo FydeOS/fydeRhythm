@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => {
         setAsciiMode: vi.fn(async () => { }),
         fetchMoreCandidates: vi.fn(async () => { }),
         refreshContext: vi.fn(async () => { }),
-        clearContext: vi.fn(),
+        clearContext: vi.fn(async () => { }),
         getAsciiMode: vi.fn(async () => false),
         getCurrentSchema: vi.fn(async () => 'aurora'),
         getRimeStatus: vi.fn(async () => ({ loading: false, loaded: true })),
@@ -71,7 +71,9 @@ vi.mock('@/lib/schema-install', () => ({
     resolveInstalledSchemaId: vi.fn(() => 'aurora'),
 }));
 
-const background = (await import('../entrypoints/background/index')).default as { main: () => void };
+const backgroundModule = await import('../entrypoints/background/index');
+const background = backgroundModule.default as { main: () => void };
+const { refreshImeMenuItems } = backgroundModule;
 
 type Listener = (...args: never[]) => unknown;
 
@@ -143,12 +145,14 @@ async function bootBackground() {
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.controller.engineId = 'engine-1';
+    mocks.controller.context = null;
     mocks.controller.selectCandidate.mockResolvedValue(undefined);
     mocks.controller.deleteCandidate.mockResolvedValue(undefined);
     mocks.controller.handleInputViewVisibilityChanged.mockResolvedValue(undefined);
     mocks.controller.setAsciiMode.mockResolvedValue(undefined);
     mocks.controller.fetchMoreCandidates.mockResolvedValue(undefined);
     mocks.controller.refreshContext.mockResolvedValue(undefined);
+    mocks.controller.clearContext.mockResolvedValue(undefined);
     mocks.controller.loadRime.mockResolvedValue(true);
     mocks.controller.getCandidateSnapshot.mockReturnValue({ streamId: 'test', sequence: 0, candidates: [] });
 });
@@ -229,6 +233,43 @@ describe('system candidate window and key events', () => {
         expect(result).toBeUndefined();
         expect((globalThis.chrome as never as { input: { ime: { keyEventHandled: ReturnType<typeof vi.fn> } } })
             .input.ime.keyEventHandled).toHaveBeenCalledWith('req-7', false);
+    });
+
+    it('refreshImeMenuItems never rejects, even when storage fails', async () => {
+        await bootBackground();
+        const chromeStub = globalThis.chrome as never as {
+            storage: { sync: { get: ReturnType<typeof vi.fn> } };
+        };
+        chromeStub.storage.sync.get.mockRejectedValueOnce(new Error('storage gone'));
+
+        // It is fired unawaited from several listeners; a rejection here
+        // would be uncaught.
+        await expect(refreshImeMenuItems()).resolves.toBeUndefined();
+    });
+
+    it('menu item activation survives a storage failure', async () => {
+        const { ime } = await bootBackground();
+        const chromeStub = globalThis.chrome as never as {
+            storage: { sync: { get: ReturnType<typeof vi.fn> } };
+        };
+        mocks.controller.activeSettings = { schema: 'aurora' };
+        chromeStub.storage.sync.get.mockRejectedValueOnce(new Error('storage gone'));
+
+        ime.onMenuItemActivated.listeners[0]('engine-1' as never, 'luna' as never);
+        await flush();
+
+        expect(mocks.controller.loadRime).not.toHaveBeenCalledWith(true);
+    });
+
+    it('a failing clearContext on blur is swallowed', async () => {
+        const { ime } = await bootBackground();
+        mocks.controller.context = { contextID: 9 };
+        mocks.controller.clearContext.mockRejectedValueOnce(new Error('boom'));
+
+        ime.onBlur.listeners[0](9 as never);
+        await flush();
+
+        expect(mocks.controller.clearContext).toHaveBeenCalledTimes(1);
     });
 
     it('a successful async feedKey answers with the handled flag', async () => {

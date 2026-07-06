@@ -444,7 +444,7 @@ describe('InputController schema switching', () => {
     it('clears active RIME composition when deactivated', async () => {
         stubChrome(settings());
         const controller = new InputController();
-        const clearComposition = vi.fn();
+        const clearComposition = vi.fn(async () => { });
         const candidateIterator = { destroy: vi.fn() };
         const candidatesBack = vi.fn();
 

@@ -192,6 +192,68 @@ describe('inputview candidate cache', () => {
         expect(iterator.destroy).toHaveBeenCalled();
     });
 
+    it('commitIfAvailable reads lastError and rejects with a descriptive Error', async () => {
+        // Regression class: "Unchecked runtime.lastError" — the commitText
+        // callback used to ignore lastError and reject with undefined.
+        let lastErrorReads = 0;
+        vi.stubGlobal('chrome', {
+            i18n: { getMessage: (key: string) => key },
+            runtime: {
+                get lastError() {
+                    lastErrorReads++;
+                    return { message: 'No active context' };
+                },
+                sendMessage: vi.fn(),
+            },
+            input: {
+                ime: {
+                    commitText: vi.fn((_p: unknown, cb: (ok: boolean) => void) => cb(false)),
+                },
+            },
+        });
+        const controller = new InputController();
+        controller.context = { contextID: 1 } as chrome.input.ime.InputContext;
+        controller.session = { getCommit: vi.fn(async () => ({ text: '你好' })) } as never;
+
+        await expect(controller.commitIfAvailable()).rejects.toThrow('commitText: No active context');
+        expect(lastErrorReads).toBeGreaterThan(0);
+    });
+
+    it('handleInputViewVisibilityChanged propagates refresh failures to the caller', async () => {
+        // The internal refreshContext() used to be fire-and-forget, so its
+        // rejection bypassed the caller's catch and surfaced as uncaught.
+        const controller = makeController([]);
+        (controller.session as never as { getContext: ReturnType<typeof vi.fn> })
+            .getContext
+            .mockRejectedValueOnce(new Error('refresh boom'));
+
+        await expect(controller.handleInputViewVisibilityChanged(true)).rejects.toThrow('refresh boom');
+    });
+
+    it('hiding the keyboard still refreshes when clearComposition fails', async () => {
+        const controller = makeController([]);
+        const clearComposition = vi.fn(async () => { throw new Error('engine dead'); });
+        controller.session = { ...(controller.session as object), clearComposition } as never;
+        const getContext = (controller.session as never as { getContext: ReturnType<typeof vi.fn> }).getContext;
+
+        await controller.handleInputViewVisibilityChanged(false);
+
+        expect(clearComposition).toHaveBeenCalledTimes(1);
+        expect(getContext).toHaveBeenCalledTimes(1);
+    });
+
+    it('deactivate survives a rejecting clearComposition', async () => {
+        const controller = makeController([]);
+        controller.session = {
+            ...(controller.session as object),
+            clearComposition: vi.fn(async () => { throw new Error('boom'); }),
+        } as never;
+
+        await controller.deactivate('engine');
+
+        expect(controller.engineId).toBeNull();
+    });
+
     it('rightClick swallows a rejected delete instead of leaving an unhandled rejection', async () => {
         const controller = makeController([]);
         (controller.session as never as { actionCandidate: ReturnType<typeof vi.fn> })

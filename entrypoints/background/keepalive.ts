@@ -26,15 +26,16 @@ export function serviceWorkerKeepalive() {
             }
 
             if (alivePort) {
-
-                alivePort.postMessage({ content: "ping" });
-
-                if (chrome.runtime.lastError) {
-                    console.log(`(DEBUG StayAlive): postMessage error: ${chrome.runtime.lastError.message}`)
-                } else {
+                // postMessage throws synchronously on a dead port (it does not
+                // set runtime.lastError); an uncaught throw here would kill
+                // the interval tick.
+                try {
+                    alivePort.postMessage({ content: "ping" });
                     console.log(`(DEBUG StayAlive): "ping" sent through ${alivePort.name} port`)
+                } catch (e) {
+                    console.log(`(DEBUG StayAlive): postMessage failed: ${e}`)
+                    alivePort = null;
                 }
-
             }
         }, 25000);
     }
