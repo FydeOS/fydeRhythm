@@ -3,6 +3,7 @@ import { kEmojiCategories, skinVariants, type EmojiDef } from '../emoji/data';
 import { AltBubble } from './AltBubble';
 import { commit, type KeyAction } from '../layouts/types';
 import { BackspaceIcon, ScheduleIcon } from './icons';
+import { t } from '../i18n';
 
 const kRecentsKey = 'emojiRecents';
 const kMaxRecents = 40;
@@ -100,7 +101,7 @@ function RepeatBackspace({ onBackspace }: { onBackspace: () => void }) {
     return (
         <button
             className="kb-key fn kb-emoji-side"
-            aria-label="backspace"
+            aria-label={t('vk_key_backspace')}
             onPointerDown={() => {
                 onBackspace();
                 timer.current = window.setTimeout(() => {
@@ -165,13 +166,13 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                 ))}
             </div>
             <div className="kb-emoji-bottom">
-                <button className="kb-key fn kb-emoji-side" aria-label="back to keyboard" onClick={onBack}>
+                <button className="kb-key fn kb-emoji-side" aria-label={t('vk_back_to_keyboard')} onClick={onBack}>
                     ABC
                 </button>
                 <div className="kb-emoji-tabs">
                     <button
                         className={`tab${category === 'recents' ? ' active' : ''}`}
-                        aria-label="最近使用"
+                        aria-label={t('vk_recent_emoji')}
                         onClick={() => pick('recents')}
                     >
                         <ScheduleIcon />
@@ -180,7 +181,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                         <button
                             key={c.id}
                             className={`tab${category === c.id ? ' active' : ''}`}
-                            aria-label={c.name}
+                            aria-label={t(`vk_emoji_${c.id}`)}
                             onClick={() => pick(c.id)}
                         >
                             {c.icon}

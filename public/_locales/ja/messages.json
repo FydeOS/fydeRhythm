@@ -224,5 +224,107 @@
     },
     "latin_layout_follow_option": {
         "message": "スキーマの配列に従う"
+    },
+    "vk_delete_word_confirm": {
+        "message": "「$1」を削除しますか?"
+    },
+    "vk_delete": {
+        "message": "削除"
+    },
+    "vk_cancel": {
+        "message": "キャンセル"
+    },
+    "vk_candidates_announce": {
+        "message": "候補 $1 件"
+    },
+    "vk_alt_characters": {
+        "message": "代替文字"
+    },
+    "vk_settings": {
+        "message": "設定"
+    },
+    "vk_emoji": {
+        "message": "絵文字"
+    },
+    "vk_switch_schema": {
+        "message": "スキーマ切り替え"
+    },
+    "vk_prev_page": {
+        "message": "前のページ"
+    },
+    "vk_next_page": {
+        "message": "次のページ"
+    },
+    "vk_expand_candidates": {
+        "message": "候補を展開"
+    },
+    "vk_collapse_candidates": {
+        "message": "候補を折りたたむ"
+    },
+    "vk_recent_emoji": {
+        "message": "最近使用した絵文字"
+    },
+    "vk_back_to_keyboard": {
+        "message": "キーボードに戻る"
+    },
+    "vk_key_shift": {
+        "message": "Shift"
+    },
+    "vk_key_backspace": {
+        "message": "バックスペース"
+    },
+    "vk_key_enter": {
+        "message": "Enter"
+    },
+    "vk_key_space": {
+        "message": "スペース"
+    },
+    "vk_key_hide": {
+        "message": "キーボードを隠す"
+    },
+    "vk_key_symbols": {
+        "message": "記号"
+    },
+    "vk_key_more_symbols": {
+        "message": "その他の記号"
+    },
+    "vk_key_letters": {
+        "message": "文字"
+    },
+    "vk_key_toggle_language": {
+        "message": "言語切り替え"
+    },
+    "vk_emoji_smileys": {
+        "message": "顔文字"
+    },
+    "vk_emoji_gestures": {
+        "message": "ジェスチャー"
+    },
+    "vk_emoji_people": {
+        "message": "人物"
+    },
+    "vk_emoji_hearts": {
+        "message": "ハート"
+    },
+    "vk_emoji_animals": {
+        "message": "動物"
+    },
+    "vk_emoji_food": {
+        "message": "食べ物"
+    },
+    "vk_emoji_activities": {
+        "message": "アクティビティ"
+    },
+    "vk_emoji_travel": {
+        "message": "旅行"
+    },
+    "vk_emoji_objects": {
+        "message": "物"
+    },
+    "vk_emoji_symbols": {
+        "message": "記号"
+    },
+    "vk_emoji_flags": {
+        "message": "旗"
     }
 }

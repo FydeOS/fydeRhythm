@@ -224,5 +224,107 @@
     },
     "latin_layout_follow_option": {
         "message": "跟隨方案配置"
+    },
+    "vk_delete_word_confirm": {
+        "message": "刪除「$1」?"
+    },
+    "vk_delete": {
+        "message": "刪除"
+    },
+    "vk_cancel": {
+        "message": "取消"
+    },
+    "vk_candidates_announce": {
+        "message": "$1 個候選"
+    },
+    "vk_alt_characters": {
+        "message": "候選字元"
+    },
+    "vk_settings": {
+        "message": "設定"
+    },
+    "vk_emoji": {
+        "message": "表情符號"
+    },
+    "vk_switch_schema": {
+        "message": "切換方案"
+    },
+    "vk_prev_page": {
+        "message": "上一頁"
+    },
+    "vk_next_page": {
+        "message": "下一頁"
+    },
+    "vk_expand_candidates": {
+        "message": "展開候選"
+    },
+    "vk_collapse_candidates": {
+        "message": "收起候選"
+    },
+    "vk_recent_emoji": {
+        "message": "最近使用"
+    },
+    "vk_back_to_keyboard": {
+        "message": "返回鍵盤"
+    },
+    "vk_key_shift": {
+        "message": "Shift"
+    },
+    "vk_key_backspace": {
+        "message": "退格"
+    },
+    "vk_key_enter": {
+        "message": "Enter"
+    },
+    "vk_key_space": {
+        "message": "空格"
+    },
+    "vk_key_hide": {
+        "message": "收起鍵盤"
+    },
+    "vk_key_symbols": {
+        "message": "符號鍵盤"
+    },
+    "vk_key_more_symbols": {
+        "message": "更多符號"
+    },
+    "vk_key_letters": {
+        "message": "字母鍵盤"
+    },
+    "vk_key_toggle_language": {
+        "message": "中英切換"
+    },
+    "vk_emoji_smileys": {
+        "message": "表情"
+    },
+    "vk_emoji_gestures": {
+        "message": "手勢"
+    },
+    "vk_emoji_people": {
+        "message": "人物"
+    },
+    "vk_emoji_hearts": {
+        "message": "心形"
+    },
+    "vk_emoji_animals": {
+        "message": "動物"
+    },
+    "vk_emoji_food": {
+        "message": "食物"
+    },
+    "vk_emoji_activities": {
+        "message": "活動"
+    },
+    "vk_emoji_travel": {
+        "message": "旅行"
+    },
+    "vk_emoji_objects": {
+        "message": "物品"
+    },
+    "vk_emoji_symbols": {
+        "message": "符號"
+    },
+    "vk_emoji_flags": {
+        "message": "旗幟"
     }
 }

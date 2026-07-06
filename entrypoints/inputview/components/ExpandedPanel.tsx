@@ -1,6 +1,7 @@
 import React from 'react';
 import type { InputViewCandidate } from '@/lib/shared-types';
 import { CandidateChip } from './CandidateBar';
+import { t } from '../i18n';
 import { ExpandLessIcon } from './icons';
 
 export interface ExpandedPanelProps {
@@ -35,7 +36,7 @@ export function ExpandedPanel(props: ExpandedPanelProps) {
                     ))}
                 </div>
                 <div className="side">
-                    <button className="icon-btn" aria-label="collapse candidates" onClick={props.onCollapse}><ExpandLessIcon /></button>
+                    <button className="icon-btn" aria-label={t('vk_collapse_candidates')} onClick={props.onCollapse}><ExpandLessIcon /></button>
                 </div>
             </div>
         </div>

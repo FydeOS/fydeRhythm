@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import type { InputViewCandidate } from '@/lib/shared-types';
+import { t } from '../i18n';
 import { ChevronLeftIcon, ChevronRightIcon, ExpandMoreIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
 
 export interface CandidateBarProps {
@@ -68,11 +69,11 @@ export function CandidateBar(props: CandidateBarProps) {
         return (
             <div className="kb-bar">
                 <div className="kb-toolbar">
-                    <button className="icon-btn" aria-label="settings" onClick={props.onOpenSettings}><SettingsIcon /></button>
-                    <button className="icon-btn" aria-label="emoji" onClick={props.onEmoji}><MoodIcon /></button>
+                    <button className="icon-btn" aria-label={t('vk_settings')} onClick={props.onOpenSettings}><SettingsIcon /></button>
+                    <button className="icon-btn" aria-label={t('vk_emoji')} onClick={props.onEmoji}><MoodIcon /></button>
                     <button
                         className="icon-btn"
-                        aria-label="switch schema"
+                        aria-label={t('vk_switch_schema')}
                         onClick={(e) => props.onSchemaMenu(e.currentTarget.getBoundingClientRect())}
                     >
                         <LanguageIcon />
@@ -110,9 +111,9 @@ export function CandidateBar(props: CandidateBarProps) {
                     />
                 ))}
             </div>
-            <button className="icon-btn" aria-label="previous page" onClick={() => page(-1)}><ChevronLeftIcon /></button>
-            <button className="icon-btn" aria-label="next page" onClick={() => page(1)}><ChevronRightIcon /></button>
-            <button className="icon-btn" aria-label="expand candidates" onClick={props.onExpand}><ExpandMoreIcon /></button>
+            <button className="icon-btn" aria-label={t('vk_prev_page')} onClick={() => page(-1)}><ChevronLeftIcon /></button>
+            <button className="icon-btn" aria-label={t('vk_next_page')} onClick={() => page(1)}><ChevronRightIcon /></button>
+            <button className="icon-btn" aria-label={t('vk_expand_candidates')} onClick={props.onExpand}><ExpandMoreIcon /></button>
         </div>
     );
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AltDef, KeyAction } from '../layouts/types';
+import { t } from '../i18n';
 
 export interface AltBubbleProps {
     alts: AltDef[];
@@ -62,7 +63,7 @@ export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBub
     }, [alts, onClose, onSelect, pointerId]);
 
     return (
-        <div className="kb-bubble" role="listbox" aria-label="alternate characters" style={style} ref={listRef}>
+        <div className="kb-bubble" role="listbox" aria-label={t('vk_alt_characters')} style={style} ref={listRef}>
             {alts.map((alt, i) => (
                 <button
                     key={alt.label}

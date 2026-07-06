@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../i18n';
 
 // Confirm chip for deleting a user-learned word (long-press on a candidate).
 export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
@@ -13,9 +14,9 @@ export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
         <>
             <div className="kb-scrim" aria-hidden="true" onPointerDown={onCancel} />
             <div className="kb-confirm" style={{ top, left }}>
-                <span className="word">删除「{text}」?</span>
-                <button className="plain" onClick={onCancel}>取消</button>
-                <button onClick={onConfirm}>删除</button>
+                <span className="word">{t('vk_delete_word_confirm', text)}</span>
+                <button className="plain" onClick={onCancel}>{t('vk_cancel')}</button>
+                <button onClick={onConfirm}>{t('vk_delete')}</button>
             </div>
         </>
     );

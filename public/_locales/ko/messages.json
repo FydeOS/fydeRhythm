@@ -224,5 +224,107 @@
     },
     "latin_layout_follow_option": {
         "message": "스키마 배열 따르기"
+    },
+    "vk_delete_word_confirm": {
+        "message": "“$1”을(를) 삭제할까요?"
+    },
+    "vk_delete": {
+        "message": "삭제"
+    },
+    "vk_cancel": {
+        "message": "취소"
+    },
+    "vk_candidates_announce": {
+        "message": "후보 $1개"
+    },
+    "vk_alt_characters": {
+        "message": "대체 문자"
+    },
+    "vk_settings": {
+        "message": "설정"
+    },
+    "vk_emoji": {
+        "message": "이모티콘"
+    },
+    "vk_switch_schema": {
+        "message": "스키마 전환"
+    },
+    "vk_prev_page": {
+        "message": "이전 페이지"
+    },
+    "vk_next_page": {
+        "message": "다음 페이지"
+    },
+    "vk_expand_candidates": {
+        "message": "후보 펼치기"
+    },
+    "vk_collapse_candidates": {
+        "message": "후보 접기"
+    },
+    "vk_recent_emoji": {
+        "message": "최근 사용"
+    },
+    "vk_back_to_keyboard": {
+        "message": "키보드로 돌아가기"
+    },
+    "vk_key_shift": {
+        "message": "Shift"
+    },
+    "vk_key_backspace": {
+        "message": "백스페이스"
+    },
+    "vk_key_enter": {
+        "message": "Enter"
+    },
+    "vk_key_space": {
+        "message": "스페이스"
+    },
+    "vk_key_hide": {
+        "message": "키보드 숨기기"
+    },
+    "vk_key_symbols": {
+        "message": "기호"
+    },
+    "vk_key_more_symbols": {
+        "message": "더 많은 기호"
+    },
+    "vk_key_letters": {
+        "message": "문자"
+    },
+    "vk_key_toggle_language": {
+        "message": "언어 전환"
+    },
+    "vk_emoji_smileys": {
+        "message": "표정"
+    },
+    "vk_emoji_gestures": {
+        "message": "손동작"
+    },
+    "vk_emoji_people": {
+        "message": "인물"
+    },
+    "vk_emoji_hearts": {
+        "message": "하트"
+    },
+    "vk_emoji_animals": {
+        "message": "동물"
+    },
+    "vk_emoji_food": {
+        "message": "음식"
+    },
+    "vk_emoji_activities": {
+        "message": "활동"
+    },
+    "vk_emoji_travel": {
+        "message": "여행"
+    },
+    "vk_emoji_objects": {
+        "message": "사물"
+    },
+    "vk_emoji_symbols": {
+        "message": "기호"
+    },
+    "vk_emoji_flags": {
+        "message": "깃발"
     }
 }

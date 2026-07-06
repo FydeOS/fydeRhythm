@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { KeyPress, kDefaultPressTiming, type PressUpdate } from '../gestures/press';
 import type { KeyAction, KeyDef } from '../layouts/types';
+import { t } from '../i18n';
 import { BackspaceIcon, CapsLockIcon, EnterIcon, KeyboardHideIcon, ShiftFilledIcon, ShiftIcon } from './icons';
 
 export type ShiftState = 'off' | 'shift' | 'caps';
@@ -38,17 +39,17 @@ function previewStyle(anchor: DOMRect): React.CSSProperties {
     };
 }
 
-// Accessible names for keys whose visible label is an icon or an internal id.
-const kAriaNames: Record<string, string> = {
-    Shift: 'shift',
-    Backspace: 'backspace',
-    Enter: 'enter',
-    Space: 'space',
-    hide: 'hide keyboard',
-    'to-sym': 'symbols',
-    'to-sym2': 'more symbols',
-    'to-main': 'letters',
-    'ascii-toggle': 'toggle language',
+// i18n keys for keys whose visible label is an icon or an internal id.
+const kAriaKeys: Record<string, string> = {
+    Shift: 'vk_key_shift',
+    Backspace: 'vk_key_backspace',
+    Enter: 'vk_key_enter',
+    Space: 'vk_key_space',
+    hide: 'vk_key_hide',
+    'to-sym': 'vk_key_symbols',
+    'to-sym2': 'vk_key_more_symbols',
+    'to-main': 'vk_key_letters',
+    'ascii-toggle': 'vk_key_toggle_language',
 };
 
 export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, active }: KeyProps) {
@@ -174,7 +175,7 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
         <button
             ref={ref}
             className={classes.join(' ')}
-            aria-label={kAriaNames[def.id] ?? label}
+            aria-label={kAriaKeys[def.id] ? t(kAriaKeys[def.id]) : label}
             aria-hidden={def.kind === 'spacer' || undefined}
             tabIndex={def.kind === 'spacer' ? -1 : undefined}
             onPointerDown={onPointerDown}

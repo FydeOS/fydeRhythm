@@ -224,5 +224,107 @@
     },
     "latin_layout_follow_option": {
         "message": "Follow schema layout"
+    },
+    "vk_delete_word_confirm": {
+        "message": "Delete “$1”?"
+    },
+    "vk_delete": {
+        "message": "Delete"
+    },
+    "vk_cancel": {
+        "message": "Cancel"
+    },
+    "vk_candidates_announce": {
+        "message": "$1 candidates"
+    },
+    "vk_alt_characters": {
+        "message": "Alternate characters"
+    },
+    "vk_settings": {
+        "message": "Settings"
+    },
+    "vk_emoji": {
+        "message": "Emoji"
+    },
+    "vk_switch_schema": {
+        "message": "Switch schema"
+    },
+    "vk_prev_page": {
+        "message": "Previous page"
+    },
+    "vk_next_page": {
+        "message": "Next page"
+    },
+    "vk_expand_candidates": {
+        "message": "Expand candidates"
+    },
+    "vk_collapse_candidates": {
+        "message": "Collapse candidates"
+    },
+    "vk_recent_emoji": {
+        "message": "Recently used"
+    },
+    "vk_back_to_keyboard": {
+        "message": "Back to keyboard"
+    },
+    "vk_key_shift": {
+        "message": "Shift"
+    },
+    "vk_key_backspace": {
+        "message": "Backspace"
+    },
+    "vk_key_enter": {
+        "message": "Enter"
+    },
+    "vk_key_space": {
+        "message": "Space"
+    },
+    "vk_key_hide": {
+        "message": "Hide keyboard"
+    },
+    "vk_key_symbols": {
+        "message": "Symbols"
+    },
+    "vk_key_more_symbols": {
+        "message": "More symbols"
+    },
+    "vk_key_letters": {
+        "message": "Letters"
+    },
+    "vk_key_toggle_language": {
+        "message": "Toggle language"
+    },
+    "vk_emoji_smileys": {
+        "message": "Smileys"
+    },
+    "vk_emoji_gestures": {
+        "message": "Gestures"
+    },
+    "vk_emoji_people": {
+        "message": "People"
+    },
+    "vk_emoji_hearts": {
+        "message": "Hearts"
+    },
+    "vk_emoji_animals": {
+        "message": "Animals"
+    },
+    "vk_emoji_food": {
+        "message": "Food"
+    },
+    "vk_emoji_activities": {
+        "message": "Activities"
+    },
+    "vk_emoji_travel": {
+        "message": "Travel"
+    },
+    "vk_emoji_objects": {
+        "message": "Objects"
+    },
+    "vk_emoji_symbols": {
+        "message": "Symbols"
+    },
+    "vk_emoji_flags": {
+        "message": "Flags"
     }
 }

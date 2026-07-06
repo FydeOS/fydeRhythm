@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
 import { strokeForChar } from '@/lib/latin-remap';
 import { createHost } from './chrome-shim';
+import { t } from './i18n';
 import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation } from './layouts';
 import type { AltDef, KeyAction, KeyDef, LayerId } from './layouts/types';
 import { Key, type ShiftState } from './components/Key';
@@ -215,7 +216,7 @@ export default function App() {
         <div className="kb-root">
             {/* Announce candidate updates for screen readers (ChromeVox). */}
             <div aria-live="polite" className="sr-only">
-                {candidates.length > 0 ? `${candidates.length} 个候选` : ''}
+                {candidates.length > 0 ? t('vk_candidates_announce', String(candidates.length)) : ''}
             </div>
             <CandidateBar
                 candidates={candidates}

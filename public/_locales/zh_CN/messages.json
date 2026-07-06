@@ -224,5 +224,107 @@
     },
     "latin_layout_follow_option": {
         "message": "跟随方案布局"
+    },
+    "vk_delete_word_confirm": {
+        "message": "删除「$1」?"
+    },
+    "vk_delete": {
+        "message": "删除"
+    },
+    "vk_cancel": {
+        "message": "取消"
+    },
+    "vk_candidates_announce": {
+        "message": "$1 个候选"
+    },
+    "vk_alt_characters": {
+        "message": "候选字符"
+    },
+    "vk_settings": {
+        "message": "设置"
+    },
+    "vk_emoji": {
+        "message": "表情符号"
+    },
+    "vk_switch_schema": {
+        "message": "切换方案"
+    },
+    "vk_prev_page": {
+        "message": "上一页"
+    },
+    "vk_next_page": {
+        "message": "下一页"
+    },
+    "vk_expand_candidates": {
+        "message": "展开候选"
+    },
+    "vk_collapse_candidates": {
+        "message": "收起候选"
+    },
+    "vk_recent_emoji": {
+        "message": "最近使用"
+    },
+    "vk_back_to_keyboard": {
+        "message": "返回键盘"
+    },
+    "vk_key_shift": {
+        "message": "Shift"
+    },
+    "vk_key_backspace": {
+        "message": "退格"
+    },
+    "vk_key_enter": {
+        "message": "回车"
+    },
+    "vk_key_space": {
+        "message": "空格"
+    },
+    "vk_key_hide": {
+        "message": "收起键盘"
+    },
+    "vk_key_symbols": {
+        "message": "符号键盘"
+    },
+    "vk_key_more_symbols": {
+        "message": "更多符号"
+    },
+    "vk_key_letters": {
+        "message": "字母键盘"
+    },
+    "vk_key_toggle_language": {
+        "message": "中英切换"
+    },
+    "vk_emoji_smileys": {
+        "message": "表情"
+    },
+    "vk_emoji_gestures": {
+        "message": "手势"
+    },
+    "vk_emoji_people": {
+        "message": "人物"
+    },
+    "vk_emoji_hearts": {
+        "message": "心形"
+    },
+    "vk_emoji_animals": {
+        "message": "动物"
+    },
+    "vk_emoji_food": {
+        "message": "食物"
+    },
+    "vk_emoji_activities": {
+        "message": "活动"
+    },
+    "vk_emoji_travel": {
+        "message": "旅行"
+    },
+    "vk_emoji_objects": {
+        "message": "物品"
+    },
+    "vk_emoji_symbols": {
+        "message": "符号"
+    },
+    "vk_emoji_flags": {
+        "message": "旗帜"
     }
 }

@@ -24,6 +24,10 @@ window.addEventListener('storage', (e) => {
 });
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
+try {
+    document.documentElement.lang = chrome.i18n.getUILanguage();
+} catch { /* dev tab — keep the static lang */ }
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <App />
