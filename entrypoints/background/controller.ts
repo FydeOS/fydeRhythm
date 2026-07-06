@@ -1,8 +1,9 @@
 import { Mutex } from "async-mutex";
-import { getFs, kDefaultSettings, matchesSchemaSwitchKey, type ImeSettings, type SchemaSwitchKey } from "@/lib/utils";
+import { getFs, kDefaultSettings, matchesSchemaSwitchKey, resolveEffectiveLatinLayout, resolveLayoutForSchema, type ImeSettings, type SchemaSwitchKey } from "@/lib/utils";
 import { type RimeCandidateIterator, RimeEngine, type RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
-import type { RimeCandidate } from "@/lib/shared-types";
+import { kLatinLayoutIds, type LatinLayoutId, type RimeCandidate } from "@/lib/shared-types";
+import { remapPhysicalKey } from "@/lib/latin-remap";
 import EventEmitter from "events";
 import { listEnabledInstalledSchemas } from "./schemas";
 
@@ -580,6 +581,33 @@ export class InputController extends EventEmitter {
         this.activeSettings.schemaSwitchKey = key;
     }
 
+    // Same hot-path treatment for the layout bindings: feedKey remaps physical
+    // keys through these, and they must not stay stale until the next loadRime().
+    applyLayoutSettings(settings?: Pick<ImeSettings, "latinLayout" | "schemaLayouts">): void {
+        this.activeSettings.latinLayout = settings?.latinLayout;
+        this.activeSettings.schemaLayouts = settings?.schemaLayouts;
+    }
+
+    // Layouts the physical-key remap uses. Composing (Chinese/Japanese/…)
+    // follows the schema's layout only when it IS Latin — a 注音 schema must
+    // keep raw QWERTY strokes for the engine's own mapping even when the
+    // global Latin layout is Colemak. ASCII mode follows the effective Latin
+    // layout (schema's Latin binding, else the global setting).
+    remapLayouts(): { composing: LatinLayoutId; ascii: LatinLayoutId } {
+        const schema = this.activeSettings.schema;
+        const layout = resolveLayoutForSchema(this.activeSettings, schema);
+        const composing = (kLatinLayoutIds as readonly string[]).includes(layout)
+            ? layout as LatinLayoutId
+            : "qwerty";
+        return { composing, ascii: resolveEffectiveLatinLayout(this.activeSettings, schema) };
+    }
+
+    // Whether a key event is a plain printable keystroke eligible for layout
+    // remapping (modifier combos are shortcuts and must keep US positions).
+    private isPlainPrintable(keyData: chrome.input.ime.KeyboardEvent): boolean {
+        return keyData.key.length === 1 && !keyData.altKey && !keyData.ctrlKey;
+    }
+
     async cycleToNextSchema(): Promise<void> {
         const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
         const settings = obj.settings ?? kDefaultSettings;
@@ -647,7 +675,13 @@ export class InputController extends EventEmitter {
                 if ((keyData.altKey || keyData.ctrlKey) && keyData.code in kConventionalKeys) {
                     code = kConventionalKeys[keyData.code];
                 } else {
-                    code = keyData.key.charCodeAt(0);
+                    // Physical keyboards always report US chars (the manifest
+                    // pins the system layout); remap by key POSITION so the
+                    // chosen Latin layout applies to external keyboards too.
+                    const composed = this.isPlainPrintable(keyData)
+                        ? remapPhysicalKey(this.remapLayouts().composing, keyData.code, !!keyData.shiftKey)
+                        : null;
+                    code = (composed ?? keyData.key).charCodeAt(0);
                 }
             }
             this.invalidateCandidateCache();
@@ -659,6 +693,21 @@ export class InputController extends EventEmitter {
                     this.printErr("Error while processing key " + String(ex));
                     console.error(ex);
                     handled = false;
+                }
+                // The engine passed the key through (ASCII mode / plain text):
+                // the system would insert the ORIGINAL US char, so under a
+                // non-QWERTY Latin layout we must insert the remapped char
+                // ourselves and swallow the event. keydown only — the system
+                // inserts nothing on keyup.
+                if (!handled && !release && this.isPlainPrintable(keyData) && this.context) {
+                    const asciiChar = remapPhysicalKey(this.remapLayouts().ascii, keyData.code, !!keyData.shiftKey);
+                    if (asciiChar !== null && asciiChar !== keyData.key) {
+                        const contextId = this.context.contextID;
+                        await new Promise<void>((res) => {
+                            chrome.input.ime.commitText({ contextID: contextId, text: asciiChar }, () => res());
+                        });
+                        handled = true;
+                    }
                 }
                 await this.refreshContext();
                 await this.commitIfAvailable();
@@ -689,7 +738,9 @@ export class InputController extends EventEmitter {
                         return false;
                     }
                 } else {
-                    const char = keyData.key;
+                    const char = (this.isPlainPrintable(keyData)
+                        ? remapPhysicalKey(this.remapLayouts().composing, keyData.code, !!keyData.shiftKey)
+                        : null) ?? keyData.key;
                     if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
                         // If buffer is empty and input is not letter, just put it to screen directly
                         return false;

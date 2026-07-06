@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { InputViewCandidate, InputViewState, InputViewToBackground } from '@/lib/shared-types';
+import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
+import { strokeForChar } from '@/lib/latin-remap';
 import { createHost } from './chrome-shim';
 import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation } from './layouts';
 import type { AltDef, KeyAction, KeyDef, LayerId } from './layouts/types';
@@ -114,10 +115,27 @@ export default function App() {
         }
     }, [vk, containerReady, host]);
 
+    // The background remaps physical keys by POSITION (Colemak/Dvorak on
+    // external keyboards). Our synthesized strokes travel the same path, so
+    // for printable chars we must send the position whose remap yields the
+    // intended char — otherwise the remap would double-apply to VK taps.
+    const layoutStroke = (stroke: { key: string; code: string; shiftKey?: boolean }) => {
+        if (!vk || stroke.key.length !== 1) return stroke;
+        const remapLayout: LatinLayoutId = vk.asciiMode
+            ? vk.latinLayout
+            : (kLatinLayoutIds as readonly string[]).includes(vk.layout)
+                ? vk.layout as LatinLayoutId
+                : 'qwerty';
+        if (remapLayout === 'qwerty') return stroke;
+        const inverse = strokeForChar(remapLayout, stroke.key);
+        if (!inverse) return stroke;
+        return { key: stroke.key, code: inverse.code, ...(inverse.shiftKey ? { shiftKey: true } : {}) };
+    };
+
     const performAction = (action: KeyAction) => {
         switch (action.type) {
             case 'stroke':
-                host.typeStroke(action.stroke);
+                host.typeStroke(layoutStroke(action.stroke));
                 if (shift === 'shift') setShift('off');
                 break;
             case 'commit':

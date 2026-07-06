@@ -317,6 +317,7 @@ export default defineBackground({
         // for a full engine reload — feedKey reads activeSettings.schemaSwitchKey,
         // which would otherwise stay stale until the next loadRime().
         self.controller?.applySchemaSwitchKey((changes.settings.newValue as ImeSettings | undefined)?.schemaSwitchKey);
+        self.controller?.applyLayoutSettings(changes.settings.newValue as ImeSettings | undefined);
         refreshImeMenuItems();
         // Layout bindings / Latin layout may have changed — push fresh state to
         // any connected InputView.

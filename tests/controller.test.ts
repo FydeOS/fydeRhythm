@@ -714,3 +714,64 @@ describe('InputView candidate lifecycle (regression: delete + stale fetch race)'
         expect(sent).toEqual([]);
     });
 });
+
+describe('physical-key Latin layout remap', () => {
+    function remapHarness(layoutSettings: Partial<ImeSettings>) {
+        stubChrome();
+        const commits: string[] = [];
+        (chrome.input.ime as unknown as Record<string, unknown>).commitText =
+            (opts: { text: string }, cb: (ok: boolean) => void) => { commits.push(opts.text); cb(true); };
+        for (const api of ['setCandidateWindowProperties', 'setComposition', 'setCandidates', 'setCursorPosition']) {
+            (chrome.input.ime as unknown as Record<string, unknown>)[api] =
+                (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        }
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.context = { contextID: 7 } as never;
+        controller.activeSettings = { ...kDefaultSettings, ...layoutSettings } as ImeSettings;
+
+        const fed: number[] = [];
+        let handled = true;
+        controller.session = {
+            processKey: async (code: number) => { fed.push(code); return handled; },
+            getContext: async () => null,
+            getCommit: async () => null,
+        } as never;
+        // refreshContext hits resetUI paths; context/engine mocks above keep it quiet.
+        return { controller, fed, commits, setHandled: (h: boolean) => { handled = h; } };
+    }
+
+    const keyS = { type: 'keydown', key: 's', code: 'KeyS', ctrlKey: false, altKey: false, shiftKey: false } as chrome.input.ime.KeyboardEvent;
+
+    it('feeds the engine the remapped char while composing (dvorak KeyS → o)', async () => {
+        const { controller, fed } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        await controller.feedKey(keyS);
+        expect(fed).toEqual(['o'.charCodeAt(0)]);
+    });
+
+    it('commits the remapped char itself when the engine passes the key through (ASCII mode)', async () => {
+        const { controller, commits, setHandled } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        setHandled(false);
+        const result = await controller.feedKey(keyS);
+        expect(commits).toEqual(['o']);
+        expect(result).toBe(true); // swallowed — the system must not also insert 's'
+    });
+
+    it('does not remap while composing a non-Latin schema even with a global Latin layout', async () => {
+        const { controller, fed } = remapHarness({
+            latinLayout: 'colemak',
+            schemaLayouts: { aurora: 'zhuyin' },
+        });
+        await controller.feedKey(keyS);
+        expect(fed).toEqual(['s'.charCodeAt(0)]); // raw stroke for the engine's own mapping
+    });
+
+    it('leaves modifier shortcuts on US positions', async () => {
+        const { controller, fed, commits } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        await controller.feedKey({ ...keyS, ctrlKey: true, key: 's' } as never);
+        // Pre-existing shortcut convention: Ctrl combos feed the uppercase
+        // keysym from the code field (83 = 'S'). The point here: NOT dvorak 'o'.
+        expect(fed).toEqual(['S'.charCodeAt(0)]);
+        expect(commits).toEqual([]);
+    });
+});
