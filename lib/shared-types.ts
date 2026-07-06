@@ -50,3 +50,60 @@ export interface RimeCandidate {
     text: string;
     comment: string;
 }
+
+// ---------------------------------------------------------------------------
+// InputView ↔ background port protocol
+//
+// The InputView (on-screen keyboard page) talks to the background over a
+// long-lived runtime port. Key presses do NOT travel this port — they are
+// injected via chrome.virtualKeyboardPrivate.sendKeyEvent so they take the
+// same path as physical keys (see docs/adr/0001). The port only carries
+// IME-state sync and candidate traffic.
+// ---------------------------------------------------------------------------
+
+export const kInputViewPortName = "inputviewMessages";
+
+export const kLatinLayoutIds = ["qwerty", "colemak", "dvorak"] as const;
+export type LatinLayoutId = typeof kLatinLayoutIds[number];
+export const kLayoutIds = [...kLatinLayoutIds, "zhuyin", "kana", "hangul"] as const;
+export type LayoutId = typeof kLayoutIds[number];
+
+/** A candidate as displayed in the InputView candidate bar. `index` is the
+ *  global candidate index understood by InputController.selectCandidate. */
+export interface InputViewCandidate {
+    text: string;
+    index: number;
+}
+
+/** Writing system of the active schema — drives the language badge on the
+ *  ASCII toggle (中/英 vs あ/A vs 한/A). Independent of the layout: Japanese
+ *  Rime schemas are typically romaji-driven, so their LAYOUT is qwerty while
+ *  their script is 'ja'. */
+export type ScriptId = "zh" | "ja" | "ko";
+
+/** Everything the InputView needs to render the right keyboard. Sent as one
+ *  atomic snapshot so the page never sees layout and ASCII state out of sync. */
+export interface InputViewState {
+    asciiMode: boolean;
+    /** Layout bound to the active schema; shown when not in ASCII mode. */
+    layout: LayoutId;
+    /** Global Latin layout; shown in ASCII mode and password fields. */
+    latinLayout: LatinLayoutId;
+    script: ScriptId;
+    schemaId: string;
+    schemaName: string;
+}
+
+export type BackgroundToInputView =
+    | { kind: "state"; state: InputViewState }
+    | { kind: "candidates"; candidates: InputViewCandidate[] }
+    | { kind: "schemaList"; schemas: Array<{ id: string; label: string }>; activeSchema: string };
+
+export type InputViewToBackground =
+    | { kind: "visibility"; visible: boolean }
+    | { kind: "setAsciiMode"; asciiMode: boolean }
+    | { kind: "selectCandidate"; index: number }
+    | { kind: "deleteCandidate"; index: number }
+    | { kind: "loadMoreCandidates"; count: number }
+    | { kind: "switchSchema"; schemaId: string }
+    | { kind: "getSchemaList" };

@@ -1,4 +1,5 @@
 import { FastIndexedDbFsController } from './fs'
+import type { LatinLayoutId, LayoutId } from './shared-types'
 
 export function dec2hex(dec: number): string {
     return dec.toString(16).padStart(2, "0")
@@ -64,9 +65,64 @@ export interface ImeSettings {
     //   null      → disabled, no shortcut at all
     //   object    → a user-defined binding
     schemaSwitchKey?: SchemaSwitchKey | null;
+    // Preferred arrangement for Latin letters. Used in ASCII mode and password
+    // fields, and is the default layout for Latin-typed schemas. Undefined = qwerty.
+    latinLayout?: LatinLayoutId;
+    // Per-schema InputView layout override, keyed by schema id. A schema with no
+    // entry follows latinLayout.
+    schemaLayouts?: Record<string, LayoutId>;
 }
 
 export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [], horizontal: false };
+
+export function resolveLatinLayout(settings: Pick<ImeSettings, "latinLayout"> | undefined): LatinLayoutId {
+    return settings?.latinLayout ?? "qwerty";
+}
+
+// Best-effort layout guess for a schema the user hasn't bound explicitly.
+// Keyword matching on id+name is deliberately simple and transparent — schemas
+// are arbitrary user imports, so anything cleverer (parsing schema YAML) would
+// still be a guess, just a slower one. Returns undefined for Latin-typed
+// schemas (pinyin, wubi, cangjie…), which follow the global Latin layout.
+export function guessLayoutForSchema(schemaId: string, schemaName?: string): LayoutId | undefined {
+    const haystack = `${schemaId} ${schemaName ?? ""}`.toLowerCase();
+    if (/zhuyin|bopomofo|注音/.test(haystack)) return "zhuyin";
+    if (/kana|japanese|japan|日本|假名|かな/.test(haystack)) return "kana";
+    if (/hangul|korean|谚文|한글/.test(haystack)) return "hangul";
+    return undefined;
+}
+
+// Writing system of a schema, for the ASCII-toggle badge. Keyword matching on
+// id+name (like guessLayoutForSchema), with the bound layout as a fallback
+// signal: romaji-driven Japanese schemas have a qwerty LAYOUT but are still
+// Japanese, so the layout alone can't decide this.
+export function guessScriptForSchema(
+    schemaId: string,
+    schemaName: string | undefined,
+    layout: LayoutId,
+): "zh" | "ja" | "ko" {
+    const haystack = `${schemaId} ${schemaName ?? ""}`.toLowerCase();
+    // "poly" is the well-known Japanese kana-kanji Rime schema; 日语/日文 are
+    // the usual Chinese-catalog names for Japanese schemas.
+    if (/japan|kana|romaji|nihon|poly|日本|日语|日文|假名|かな|カナ|ローマ字/.test(haystack)) return "ja";
+    if (/korean|hangul|hangeul|谚文|한글|韩|韓|朝鲜/.test(haystack)) return "ko";
+    if (layout === "kana") return "ja";
+    if (layout === "hangul") return "ko";
+    return "zh";
+}
+
+// Layout shown for a schema when not in ASCII mode: the user's per-schema
+// binding if set, then the keyword guess, then the global Latin layout
+// ("跟随" rule).
+export function resolveLayoutForSchema(
+    settings: Pick<ImeSettings, "latinLayout" | "schemaLayouts"> | undefined,
+    schemaId: string,
+    schemaName?: string,
+): LayoutId {
+    return settings?.schemaLayouts?.[schemaId]
+        ?? guessLayoutForSchema(schemaId, schemaName)
+        ?? resolveLatinLayout(settings);
+}
 
 // The historical default — matches RIME's own Control+grave convention.
 export const kDefaultSchemaSwitchKey: SchemaSwitchKey = { code: "Backquote", ctrlKey: true, altKey: false, shiftKey: false };
