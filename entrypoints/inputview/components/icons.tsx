@@ -4,9 +4,12 @@ import React from 'react';
 // are unusable here: the device font stack renders some in colored emoji
 // presentation and others as monochrome text, at inconsistent sizes.
 
-function Icon({ d, size = 22 }: { d: string; size?: number }) {
+// Icons render at 1em so they scale with their container's font-size — the
+// keyboard's type scale is vh-based, and fixed-px icons read undersized next
+// to the scaled letter glyphs (containers set the size via CSS).
+function Icon({ d }: { d: string }) {
     return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d={d} />
         </svg>
     );

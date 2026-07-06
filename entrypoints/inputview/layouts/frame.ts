@@ -11,7 +11,7 @@ import { backspaceKey, charAlts, charKey, letterKey, shiftKey, stroke, withSymbo
 export const kFrameUnits = 11.5;
 
 // Positional long-press data, FlorisBoard-style: digits over row 1, symbols
-// over rows 2/3, diacritics merged per letter.
+// over rows 2/3, Latin diacritics merged per letter.
 const kRow1Digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const kRow2Symbols = ['@', '#', '$', '%', '&', '-', '+', '(', ')'];
 const kRow3Symbols = ['*', '"', "'", ':', ';', '!', '?'];

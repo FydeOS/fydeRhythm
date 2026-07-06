@@ -25,6 +25,7 @@
   --kb-secondary: #ff9800;        /* caps-lock indicator */
   --kb-popup-shadow: rgba(0, 0, 0, 0.25);
   --kb-scrim: rgba(0, 0, 0, 0.25);
+  --kb-preview: #f1f3f4;
 }
 
 :root.dark {
@@ -44,6 +45,9 @@
   --kb-secondary: #f57c00;
   --kb-popup-shadow: rgba(0, 0, 0, 0.40);
   --kb-scrim: rgba(0, 0, 0, 0.40);
+  /* Lighter than the popup tone: a near-black preview over dark keys reads
+     as a heavy black box. */
+  --kb-preview: #5f6368;
 }
 
 :root {
@@ -59,9 +63,13 @@
    * of the keyboard height. Baselines calibrated at the 372px-tall keyboard
    * (28px letters ≈ 7.5vh), clamped so tiny/huge screens stay sane.
    * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 60%. */
-  --kb-key-font: clamp(19px, 7.5vh, 34px);
-  --kb-key-font-fn: clamp(13px, 4.6vh, 21px);
-  --kb-hint-font: clamp(11px, 4vh, 18px);
+  /* Glyphs at ~42% of key height — the Gboard-tablet/ChromeOS-native tier
+   * (FlorisBoard's phone keys run ~50%, too loud on wide desktop keys).
+   * Icons hold ~88% of letter size, hints ~53%. */
+  --kb-key-font: clamp(21px, 8.2vh, 37px);
+  --kb-key-font-fn: clamp(15px, 5.4vh, 24px);
+  --kb-icon-font: clamp(21px, 7.2vh, 33px);
+  --kb-hint-font: clamp(12px, 4.3vh, 19px);
   --kb-candidate-font: clamp(16px, 5.9vh, 26px);
   --kb-bar-height: 48px;
 
@@ -93,6 +101,48 @@ body {
 
 :root.light { color-scheme: light; }
 :root.dark { color-scheme: dark; }
+
+/* Visually hidden, still announced (aria-live region) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Hover feedback for pointer-fine users (ChromeOS mice/touchpads click the
+   VK too); guarded so touch devices don't get sticky hover fills. */
+@media (hover: hover) {
+  .kb-key:not(.pressed):not(.spacer):not(.enter):hover {
+    background: var(--kb-surface-variant);
+  }
+
+  .kb-key.enter:not(.pressed):hover {
+    background: var(--kb-primary-variant);
+  }
+
+  .icon-btn:hover,
+  .kb-candidate:hover,
+  .kb-emoji-cell:hover {
+    background: var(--kb-surface);
+  }
+
+  .kb-menu .item:hover {
+    background: var(--kb-popup-focused);
+  }
+
+  .kb-emoji-tabs .tab:hover {
+    filter: grayscale(1) opacity(0.85);
+  }
+
+  .kb-emoji-tabs .tab.active:hover {
+    filter: none;
+  }
+}
 
 /* Web Interface Guidelines: keyboard-focus visibility + reduced motion */
 :focus-visible {
@@ -165,6 +215,17 @@ body {
   background: var(--kb-surface-variant);
 }
 
+/* Icons are 1em; give key icons their own scaled size so shift/backspace/
+   enter don't read smaller than the letter glyphs. */
+.kb-key svg {
+  font-size: var(--kb-icon-font);
+}
+
+.icon-btn svg,
+.kb-emoji-tabs .tab svg {
+  font-size: 22px;
+}
+
 /* Frame filler: invisible, non-interactive */
 .kb-key.spacer {
   background: transparent;
@@ -185,7 +246,7 @@ body {
 }
 
 .kb-key.space {
-  font-size: clamp(11px, 3.6vh, 16px);
+  font-size: clamp(12px, 3.9vh, 17px);
   color: var(--kb-on-surface-variant);
 }
 
@@ -197,6 +258,17 @@ body {
 /* Caps lock: FlorisBoard turns the shift glyph secondary/orange */
 .kb-key.caps {
   color: var(--kb-secondary);
+}
+
+/* Glyph wrapper: lets long labels (schema name on space, long candidates)
+   truncate inside flex-centered buttons. */
+.kb-key .glyph,
+.kb-candidate .glyph {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kb-key .hint {
@@ -218,16 +290,18 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--kb-key-radius);
-  background: var(--kb-popup);
+  background: var(--kb-preview);
   color: var(--kb-on-surface);
-  font-size: clamp(22px, 8.6vh, 38px);
+  font-size: var(--kb-key-font);
   line-height: 1;
-  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  box-shadow: 0 1px 4px var(--kb-popup-shadow);
   pointer-events: none;
 }
 
 /* ---- alt-character bubble ---- */
 
+/* Alt/tone picker: light panel (never darker than the keys — a dark slab
+   over the keyboard reads as a black box) with an accent-filled selection. */
 .kb-bubble {
   position: fixed;
   z-index: 40;
@@ -235,8 +309,8 @@ body {
   padding: 4px;
   gap: 2px;
   border-radius: var(--kb-key-radius);
-  background: var(--kb-popup);
-  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  background: var(--kb-preview);
+  box-shadow: 0 1px 4px var(--kb-popup-shadow);
 }
 
 .kb-bubble .alt {
@@ -245,14 +319,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--kb-key-radius);
-  font-size: clamp(17px, 5.9vh, 26px);
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: clamp(18px, 6.4vh, 28px);
   line-height: 1;
   color: var(--kb-on-surface);
 }
 
 .kb-bubble .alt.selected {
-  background: var(--kb-popup-focused);
+  background: var(--kb-primary);
+  color: var(--kb-on-primary);
 }
 
 /* ---- candidate bar / toolbar ---- */
@@ -303,6 +382,7 @@ body {
 
 .kb-candidate {
   flex: none;
+  max-width: 45vw;
   border: none;
   background: transparent;
   border-radius: var(--kb-key-radius);
@@ -361,6 +441,9 @@ body {
   justify-content: center;
   height: 52px;
   background: var(--kb-surface);
+  max-width: none;
+  content-visibility: auto;
+  contain-intrinsic-size: 52px;
 }
 
 .kb-expanded .side {
@@ -407,6 +490,12 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.kb-emoji-cell {
+  /* Big categories render ~200 cells; skip offscreen rows */
+  content-visibility: auto;
+  contain-intrinsic-size: 52px;
 }
 
 .kb-emoji-cell:active {
@@ -482,6 +571,13 @@ body {
   font-size: 15px;
 }
 
+.kb-confirm .word {
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .kb-confirm button {
   border: none;
   border-radius: 999px;
@@ -523,6 +619,10 @@ body {
   color: var(--kb-on-surface);
   text-align: left;
   cursor: pointer;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kb-menu .item:active {

@@ -10,6 +10,8 @@ export interface EmojiDef {
 export interface EmojiCategory {
     id: string;
     icon: string;
+    /** Accessible/display name for the category tab. */
+    name: string;
     emoji: EmojiDef[];
 }
 
@@ -31,6 +33,7 @@ export function skinVariants(base: string): string[] {
 export const kEmojiCategories: EmojiCategory[] = [
     {
         id: 'smileys',
+        name: '表情',
         icon: '😀',
         emoji: [
             '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇',
@@ -45,6 +48,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'gestures',
+        name: '手势',
         icon: '👍',
         emoji: [
             s('👍'), s('👎'), s('👌'), s('🤌'), s('🤏'), s('✌️'), s('🤞'), s('🤟'), s('🤘'),
@@ -57,6 +61,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'people',
+        name: '人物',
         icon: '🧑',
         emoji: [
             s('👶'), s('🧒'), s('👦'), s('👧'), s('🧑'), s('👨'), s('👩'), s('🧓'), s('👴'),
@@ -69,6 +74,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'hearts',
+        name: '心形',
         icon: '❤️',
         emoji: [
             '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞',
@@ -78,6 +84,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'animals',
+        name: '动物',
         icon: '🐱',
         emoji: [
             '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷',
@@ -93,6 +100,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'food',
+        name: '食物',
         icon: '🍜',
         emoji: [
             '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑',
@@ -108,6 +116,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'activities',
+        name: '活动',
         icon: '⚽',
         emoji: [
             '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸',
@@ -122,6 +131,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'travel',
+        name: '旅行',
         icon: '🚗',
         emoji: [
             '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛',
@@ -138,6 +148,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'objects',
+        name: '物品',
         icon: '💡',
         emoji: [
             '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾',
@@ -161,6 +172,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'symbols',
+        name: '符号',
         icon: '🔣',
         emoji: [
             '✨', '🌟', '💫', '⭐', '🌠', '☀️', '🌤️', '⛅', '🌥️', '☁️', '🌦️', '🌧️', '⛈️',
@@ -181,6 +193,7 @@ export const kEmojiCategories: EmojiCategory[] = [
     },
     {
         id: 'flags',
+        name: '旗帜',
         icon: '🚩',
         emoji: [
             '🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇨🇳', '🇭🇰', '🇲🇴', '🇹🇼',

@@ -27,21 +27,38 @@ function hasPreview(def: KeyDef): boolean {
 // own ChromeOS window, so anything positioned past its edges is simply cut
 // off — top-row previews must slide down over the key instead.
 function previewStyle(anchor: DOMRect): React.CSSProperties {
-    const width = anchor.width + 12;
-    const height = anchor.height + 8;
+    // Key-sized, not magnified — an oversized preview reads as a heavy box.
+    const width = anchor.width;
+    const height = anchor.height;
     return {
-        left: Math.max(4, Math.min(anchor.left - 6, window.innerWidth - width - 4)),
+        left: Math.max(4, Math.min(anchor.left, window.innerWidth - width - 4)),
         top: Math.max(4, anchor.top - height - 6),
         width,
         height,
     };
 }
 
+// Accessible names for keys whose visible label is an icon or an internal id.
+const kAriaNames: Record<string, string> = {
+    Shift: 'shift',
+    Backspace: 'backspace',
+    Enter: 'enter',
+    Space: 'space',
+    hide: 'hide keyboard',
+    'to-sym': 'symbols',
+    'to-sym2': 'more symbols',
+    'to-main': 'letters',
+    'ascii-toggle': 'toggle language',
+};
+
 export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, active }: KeyProps) {
     const ref = useRef<HTMLButtonElement>(null);
     const [pressed, setPressed] = useState(false);
     const machineRef = useRef<KeyPress | null>(null);
     const timerRef = useRef<number | null>(null);
+    // Key rect captured once per press: pointermove fires dozens of times and
+    // the preview renders repeatedly — neither should hit layout again.
+    const pressRect = useRef<DOMRect | null>(null);
 
     const shifted = shift !== 'off';
     const label = shifted && def.shiftLabel ? def.shiftLabel : def.label;
@@ -63,7 +80,7 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
             if (effect === 'activate') {
                 onAction(action);
             } else if (effect === 'openBubble') {
-                const anchor = ref.current?.getBoundingClientRect();
+                const anchor = pressRect.current;
                 if (anchor) {
                     if (pointerId !== undefined) {
                         try {
@@ -93,6 +110,7 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
 
     const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
         if (def.kind === 'spacer') return;
+        pressRect.current = e.currentTarget.getBoundingClientRect();
         try {
             e.currentTarget.setPointerCapture(e.pointerId);
         } catch { /* synthetic or already-released pointer */ }
@@ -117,7 +135,7 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
         const m = machineRef.current;
         if (!m || m.isBubbling) return;
         // Slide well off the key = cancel, so a mistaken press can be aborted.
-        const r = ref.current?.getBoundingClientRect();
+        const r = pressRect.current;
         if (r && (e.clientX < r.left - 24 || e.clientX > r.right + 24
             || e.clientY < r.top - 32 || e.clientY > r.bottom + 32)) {
             finish('cancel');
@@ -150,20 +168,29 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
     if (active) classes.push('active');
     if (def.id === 'Shift' && shift === 'caps') classes.push('caps');
 
-    const anchor = pressed && hasPreview(def) ? ref.current?.getBoundingClientRect() : undefined;
+    const anchor = pressed && hasPreview(def) ? pressRect.current : undefined;
 
     return (
         <button
             ref={ref}
             className={classes.join(' ')}
-            aria-label={def.id}
+            aria-label={kAriaNames[def.id] ?? label}
+            aria-hidden={def.kind === 'spacer' || undefined}
+            tabIndex={def.kind === 'spacer' ? -1 : undefined}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={() => finish('up')}
             onPointerCancel={() => finish('cancel')}
+            onKeyDown={(e) => {
+                // Physical-keyboard activation for focus-ring users.
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (def.kind !== 'spacer') onAction(action);
+                }
+            }}
             onContextMenu={(e) => e.preventDefault()}
         >
-            {icon ?? label}
+            {icon ?? <span className="glyph">{label}</span>}
             {def.hint && <span className="hint">{shifted ? '' : def.hint}</span>}
             {anchor && createPortal(
                 <div

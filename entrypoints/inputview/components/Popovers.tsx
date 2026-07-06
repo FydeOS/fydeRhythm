@@ -11,9 +11,9 @@ export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
     const left = Math.max(4, Math.min(anchor.left, window.innerWidth - 240));
     return (
         <>
-            <div className="kb-scrim" onPointerDown={onCancel} />
+            <div className="kb-scrim" aria-hidden="true" onPointerDown={onCancel} />
             <div className="kb-confirm" style={{ top, left }}>
-                <span>删除「{text}」?</span>
+                <span className="word">删除「{text}」?</span>
                 <button className="plain" onClick={onCancel}>取消</button>
                 <button onClick={onConfirm}>删除</button>
             </div>
@@ -38,7 +38,7 @@ export function SchemaMenu({ schemas, activeSchema, anchor, onPick, onClose }: {
     const left = Math.max(4, Math.min(anchor.left, window.innerWidth - 200));
     return (
         <>
-            <div className="kb-scrim" onPointerDown={onClose} />
+            <div className="kb-scrim" aria-hidden="true" onPointerDown={onClose} />
             <div className="kb-menu" style={{ top, left }}>
                 {schemas.map((s) => (
                     <button

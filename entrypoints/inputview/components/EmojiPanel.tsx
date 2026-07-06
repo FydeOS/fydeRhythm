@@ -171,7 +171,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                 <div className="kb-emoji-tabs">
                     <button
                         className={`tab${category === 'recents' ? ' active' : ''}`}
-                        aria-label="recent emoji"
+                        aria-label="最近使用"
                         onClick={() => pick('recents')}
                     >
                         <ScheduleIcon />
@@ -180,7 +180,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                         <button
                             key={c.id}
                             className={`tab${category === c.id ? ' active' : ''}`}
-                            aria-label={c.id}
+                            aria-label={c.name}
                             onClick={() => pick(c.id)}
                         >
                             {c.icon}

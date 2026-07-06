@@ -56,7 +56,7 @@ export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
             onPointerLeave={clear}
             onContextMenu={(e) => e.preventDefault()}
         >
-            {candidate.text}
+            <span className="glyph">{candidate.text}</span>
         </button>
     );
 }
@@ -86,7 +86,8 @@ export function CandidateBar(props: CandidateBarProps) {
     const page = (dir: 1 | -1) => {
         const el = scrollRef.current;
         if (!el) return;
-        el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: reduced ? 'auto' : 'smooth' });
         if (dir === 1) maybeLoadMore();
     };
 

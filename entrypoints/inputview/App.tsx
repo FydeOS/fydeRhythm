@@ -213,6 +213,10 @@ export default function App() {
 
     return (
         <div className="kb-root">
+            {/* Announce candidate updates for screen readers (ChromeVox). */}
+            <div aria-live="polite" className="sr-only">
+                {candidates.length > 0 ? `${candidates.length} 个候选` : ''}
+            </div>
             <CandidateBar
                 candidates={candidates}
                 onSelect={selectCandidate}

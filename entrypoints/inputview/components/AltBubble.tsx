@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AltDef, KeyAction } from '../layouts/types';
 
 export interface AltBubbleProps {
@@ -11,10 +11,15 @@ export interface AltBubbleProps {
     onClose: () => void;
 }
 
-const kItemWidth = 46; // .alt min-width + gap, used for slide selection math
+const kItemWidth = 46; // nominal item pitch, used only for initial placement
 
 export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBubbleProps) {
     const [selected, setSelected] = useState(0);
+    const listRef = useRef<HTMLDivElement>(null);
+    // Right edge of each rendered item, measured once per open: slide
+    // selection must follow the REAL widths (multi-char alts are wider than
+    // the nominal pitch), and pointermove must not re-read layout.
+    const edgesRef = useRef<number[]>([]);
 
     // Keep the bubble on screen: start above the key, centred, clamped.
     const style = useMemo(() => {
@@ -24,20 +29,26 @@ export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBub
         return { left, top, minWidth: width };
     }, [alts.length, anchor]);
 
+    useLayoutEffect(() => {
+        const kids = Array.from(listRef.current?.children ?? []) as HTMLElement[];
+        edgesRef.current = kids.map((k) => k.getBoundingClientRect().right);
+    }, [alts]);
+
     useEffect(() => {
+        const indexAt = (x: number) => {
+            const edges = edgesRef.current;
+            for (let i = 0; i < edges.length; i++) {
+                if (x < edges[i]) return i;
+            }
+            return edges.length - 1;
+        };
         const move = (e: PointerEvent) => {
             if (pointerId !== -1 && e.pointerId !== pointerId) return;
-            const idx = Math.floor((e.clientX - style.left - 6) / kItemWidth);
-            setSelected(Math.max(0, Math.min(alts.length - 1, idx)));
+            setSelected(Math.max(0, indexAt(e.clientX)));
         };
         const up = (e: PointerEvent) => {
             if (pointerId !== -1 && e.pointerId !== pointerId) return;
-            const idx = Math.floor((e.clientX - style.left - 6) / kItemWidth);
-            if (idx >= 0 && idx < alts.length) {
-                onSelect(alts[Math.max(0, idx)].action);
-            } else {
-                onSelect(alts[selected].action);
-            }
+            onSelect(alts[Math.max(0, indexAt(e.clientX))].action);
             onClose();
         };
         window.addEventListener('pointermove', move);
@@ -48,14 +59,26 @@ export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBub
             window.removeEventListener('pointerup', up);
             window.removeEventListener('pointercancel', onClose);
         };
-    }, [alts, onClose, onSelect, pointerId, selected, style.left]);
+    }, [alts, onClose, onSelect, pointerId]);
 
     return (
-        <div className="kb-bubble" style={style}>
+        <div className="kb-bubble" role="listbox" aria-label="alternate characters" style={style} ref={listRef}>
             {alts.map((alt, i) => (
-                <div key={alt.label} className={`alt${i === selected ? ' selected' : ''}`}>
+                <button
+                    key={alt.label}
+                    type="button"
+                    role="option"
+                    aria-selected={i === selected}
+                    className={`alt${i === selected ? ' selected' : ''}`}
+                    onClick={() => {
+                        // Click-driven path (skin-tone bubble opened without a
+                        // tracked pointer).
+                        onSelect(alt.action);
+                        onClose();
+                    }}
+                >
                     {alt.label}
-                </div>
+                </button>
             ))}
         </div>
     );
