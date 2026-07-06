@@ -1,0 +1,544 @@
+/* InputView theme — FlorisBoard's day/night palettes (Apache-2.0) with a
+ * fully FLAT treatment: filled key surfaces but zero elevation — no shadows,
+ * no gradients, press feedback is a plain darker fill. (The ChromeOS-native
+ * flat look rather than FlorisBoard's skeuomorphic 2dp key shadows or its
+ * fully borderless variant, which reads empty on a laptop-wide dock.)
+ * theme-init.js stamps .light/.dark before first paint.
+ */
+
+:root.light {
+  /* Cool neutral background (Google Grey 200 family) with white keys; the
+   * accent is a dignified rose derived from the FydeOS brand seed #E40046
+   * (never the raw brand red — see docs/adr/0001). */
+  --kb-background: #e8eaed;
+  --kb-background-variant: #dadce0;
+  --kb-surface: #ffffff;          /* keys */
+  --kb-surface-variant: #dfe1e5;  /* pressed keys */
+  --kb-popup: #f1f3f4;            /* bubbles, menus, previews */
+  --kb-popup-focused: #c6cacf;
+  --kb-on-background: #121212;    /* candidates, bar icons */
+  --kb-on-surface: #1a1a24;       /* key glyphs */
+  --kb-on-surface-variant: #5f6368;
+  --kb-primary: #c2185b;          /* enter, accents */
+  --kb-primary-variant: #a01450;  /* enter pressed */
+  --kb-on-primary: #ffffff;
+  --kb-secondary: #ff9800;        /* caps-lock indicator */
+  --kb-popup-shadow: rgba(0, 0, 0, 0.25);
+  --kb-scrim: rgba(0, 0, 0, 0.25);
+}
+
+:root.dark {
+  /* Matches the options page's dark surfaces (#202124 family). */
+  --kb-background: #202124;
+  --kb-background-variant: #2e3134;
+  --kb-surface: #3c4043;
+  --kb-surface-variant: #5f6368;
+  --kb-popup: #4a4d51;
+  --kb-popup-focused: #80868b;
+  --kb-on-background: #dcdcdc;
+  --kb-on-surface: #e8eaed;
+  --kb-on-surface-variant: #9aa0a6;
+  --kb-primary: #d81b60;
+  --kb-primary-variant: #ad1457;
+  --kb-on-primary: #ffffff;
+  --kb-secondary: #f57c00;
+  --kb-popup-shadow: rgba(0, 0, 0, 0.40);
+  --kb-scrim: rgba(0, 0, 0, 0.40);
+}
+
+:root {
+  /* FlorisBoard proportions, scaled to our key size: its gaps are ~12% of the
+   * key width and its glyphs ~half the key height — the earlier 3px/21px cut
+   * read as a wall of oversized slabs by comparison. */
+  --kb-key-radius: 12px;
+  --kb-panel-radius: 12px;
+  /* keys sit in fixed-fraction cells; the gap is the cell padding */
+  --kb-cell-pad: 3.5px;
+  --kb-edge: 5px;
+  /* Type scales WITH the keyboard: the page is its own window, so 1vh is 1%
+   * of the keyboard height. Baselines calibrated at the 372px-tall keyboard
+   * (28px letters ≈ 7.5vh), clamped so tiny/huge screens stay sane.
+   * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 60%. */
+  --kb-key-font: clamp(19px, 7.5vh, 34px);
+  --kb-key-font-fn: clamp(13px, 4.6vh, 21px);
+  --kb-hint-font: clamp(11px, 4vh, 18px);
+  --kb-candidate-font: clamp(16px, 5.9vh, 26px);
+  --kb-bar-height: 48px;
+
+  font-family: "Google Sans Text", Roboto, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--kb-background);
+  color: var(--kb-on-background);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root.light { color-scheme: light; }
+:root.dark { color-scheme: dark; }
+
+/* Web Interface Guidelines: keyboard-focus visibility + reduced motion */
+:focus-visible {
+  outline: 2px solid var(--kb-primary);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- overall frame ---- */
+
+.kb-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--kb-edge) var(--kb-edge);
+}
+
+.kb-keys {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.kb-row {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+
+.kb-cell {
+  display: flex;
+  padding: var(--kb-cell-pad);
+}
+
+.kb-cell .kb-key {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- keys ---- */
+
+/* Flat: filled surface, zero elevation; press = plain darker fill */
+.kb-key {
+  position: relative;
+  border: none;
+  border-radius: var(--kb-key-radius);
+  background: var(--kb-surface);
+  color: var(--kb-on-surface);
+  font-family: inherit;
+  font-size: var(--kb-key-font);
+  /* Hug the glyphs: device CJK fonts (Noto Sans CJK) carry a tall default
+     line box that pushes flex-centered text visibly off middle. */
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.kb-key.pressed {
+  background: var(--kb-surface-variant);
+}
+
+/* Frame filler: invisible, non-interactive */
+.kb-key.spacer {
+  background: transparent;
+  pointer-events: none;
+}
+
+.kb-key.fn {
+  font-size: var(--kb-key-font-fn);
+}
+
+.kb-key.enter {
+  background: var(--kb-primary);
+  color: var(--kb-on-primary);
+}
+
+.kb-key.enter.pressed {
+  background: var(--kb-primary-variant);
+}
+
+.kb-key.space {
+  font-size: clamp(11px, 3.6vh, 16px);
+  color: var(--kb-on-surface-variant);
+}
+
+/* Engaged 中/英 or shift: accent glyph on the normal surface */
+.kb-key.active {
+  color: var(--kb-primary);
+}
+
+/* Caps lock: FlorisBoard turns the shift glyph secondary/orange */
+.kb-key.caps {
+  color: var(--kb-secondary);
+}
+
+.kb-key .hint {
+  position: absolute;
+  top: 4px;
+  right: 7px;
+  font-family: ui-monospace, monospace;
+  font-size: var(--kb-hint-font);
+  color: var(--kb-on-surface-variant);
+  line-height: 1;
+}
+
+/* ---- press preview (magnified key) ---- */
+
+.kb-preview {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kb-key-radius);
+  background: var(--kb-popup);
+  color: var(--kb-on-surface);
+  font-size: clamp(22px, 8.6vh, 38px);
+  line-height: 1;
+  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  pointer-events: none;
+}
+
+/* ---- alt-character bubble ---- */
+
+.kb-bubble {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  padding: 4px;
+  gap: 2px;
+  border-radius: var(--kb-key-radius);
+  background: var(--kb-popup);
+  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+}
+
+.kb-bubble .alt {
+  min-width: 44px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kb-key-radius);
+  font-size: clamp(17px, 5.9vh, 26px);
+  line-height: 1;
+  color: var(--kb-on-surface);
+}
+
+.kb-bubble .alt.selected {
+  background: var(--kb-popup-focused);
+}
+
+/* ---- candidate bar / toolbar ---- */
+
+.kb-bar {
+  height: var(--kb-bar-height);
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  padding: 0 2px;
+}
+
+.icon-btn {
+  flex: none;
+  width: 46px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--kb-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon-btn:active {
+  background: var(--kb-surface);
+}
+
+.kb-bar .icon-btn {
+  margin: 4px 0;
+  width: 40px;
+}
+
+.kb-candidates {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.kb-candidates::-webkit-scrollbar {
+  display: none;
+}
+
+.kb-candidate {
+  flex: none;
+  border: none;
+  background: transparent;
+  border-radius: var(--kb-key-radius);
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: var(--kb-candidate-font);
+  color: var(--kb-on-background);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.kb-candidate:first-of-type {
+  color: var(--kb-primary);
+  font-weight: 500;
+}
+
+.kb-candidate:active,
+.kb-candidate.pressed {
+  background: var(--kb-surface);
+}
+
+.kb-toolbar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.kb-toolbar .spring {
+  flex: 1;
+}
+
+/* ---- expanded candidate panel ---- */
+
+.kb-expanded {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--kb-background);
+  border-radius: var(--kb-panel-radius) var(--kb-panel-radius) 0 0;
+}
+
+.kb-expanded .grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 4px;
+  padding: 6px;
+  align-content: start;
+}
+
+.kb-expanded .grid .kb-candidate {
+  justify-content: center;
+  height: 52px;
+  background: var(--kb-surface);
+}
+
+.kb-expanded .side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+}
+
+/* ---- emoji panel ---- */
+
+.kb-emoji {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--kb-background);
+}
+
+.kb-emoji-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  align-content: start;
+  padding: 4px var(--kb-cell-pad);
+  scrollbar-width: none;
+}
+
+.kb-emoji-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.kb-emoji-cell {
+  border: none;
+  background: transparent;
+  border-radius: var(--kb-key-radius);
+  height: 52px;
+  font-size: 28px;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.kb-emoji-cell:active {
+  background: var(--kb-surface);
+}
+
+/* Bottom strip mirrors the keyboard's bottom row: [ABC][tabs][⌫] */
+.kb-emoji-bottom {
+  flex: none;
+  height: 64px;
+  display: flex;
+  align-items: stretch;
+  padding: var(--kb-cell-pad);
+  gap: calc(var(--kb-cell-pad) * 2);
+}
+
+.kb-emoji-side {
+  flex: none;
+  width: 12%;
+  min-width: 72px;
+  font-size: var(--kb-key-font-fn);
+}
+
+.kb-emoji-tabs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.kb-emoji-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.kb-emoji-tabs .tab {
+  flex: none;
+  min-width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 20px;
+  color: var(--kb-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Category glyphs render as color emoji; dim inactive ones for hierarchy */
+  filter: grayscale(1) opacity(0.55);
+}
+
+.kb-emoji-tabs .tab.active {
+  background: var(--kb-surface);
+  filter: none;
+}
+
+/* ---- delete-word confirm chip ---- */
+
+.kb-confirm {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--kb-panel-radius);
+  background: var(--kb-popup);
+  color: var(--kb-on-surface);
+  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  font-size: 15px;
+}
+
+.kb-confirm button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--kb-primary);
+  color: var(--kb-on-primary);
+  cursor: pointer;
+}
+
+.kb-confirm button.plain {
+  background: transparent;
+  color: var(--kb-primary-variant);
+}
+
+/* ---- schema menu (long-press 中/英) ---- */
+
+.kb-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: var(--kb-panel-radius);
+  background: var(--kb-popup);
+  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.kb-menu .item {
+  border: none;
+  background: transparent;
+  border-radius: var(--kb-key-radius);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--kb-on-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-menu .item:active {
+  background: var(--kb-popup-focused);
+}
+
+.kb-menu .item.active {
+  background: var(--kb-popup-focused);
+  font-weight: 500;
+}
+
+/* ---- scrim shared by popovers ---- */
+
+.kb-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: transparent;
+}

@@ -1,3 +1,5 @@
+import { copyFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { defineConfig } from 'wxt';
 import { sharedManifest, sharedInputComponent, sharedVite, sharedHooks } from './wxt.config.base';
 
@@ -33,6 +35,12 @@ export default defineConfig({
         {
           ...sharedInputComponent,
           indicator: '真',
+          // Must stay at the legacy path: ChromeOS caches the input_view URL
+          // from the IME registration, so devices that ever ran an older build
+          // keep loading this exact URL after upgrades. The WXT entrypoint
+          // emits /inputview.html; the build:done hook below copies it here
+          // (all asset references in the page are absolute, so the copy works
+          // from any directory).
           input_view: 'inputview/inputview.html'
         }
       ],
@@ -42,5 +50,13 @@ export default defineConfig({
   },
 
   vite: sharedVite,
-  hooks: sharedHooks
+  hooks: {
+    ...sharedHooks,
+    'build:done': async (wxt) => {
+      // See input_view above: serve the new keyboard page at the legacy URL.
+      const outDir = wxt.config.outDir;
+      await mkdir(join(outDir, 'inputview'), { recursive: true });
+      await copyFile(join(outDir, 'inputview.html'), join(outDir, 'inputview', 'inputview.html'));
+    }
+  }
 });

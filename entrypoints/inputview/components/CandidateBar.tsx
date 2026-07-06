@@ -1,0 +1,117 @@
+import React, { useRef } from 'react';
+import type { InputViewCandidate } from '@/lib/shared-types';
+import { ChevronLeftIcon, ChevronRightIcon, ExpandMoreIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
+
+export interface CandidateBarProps {
+    candidates: InputViewCandidate[];
+    onSelect: (index: number) => void;
+    onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
+    onLoadMore: () => void;
+    onExpand: () => void;
+    onOpenSettings: () => void;
+    onEmoji: () => void;
+    onHide: () => void;
+    // Opens the schema menu anchored at the globe button.
+    onSchemaMenu: (anchor: DOMRect) => void;
+}
+
+const kLongPressMs = 500;
+
+// One candidate chip with tap-to-select and long-press-to-delete.
+export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
+    candidate: InputViewCandidate;
+    onSelect: (index: number) => void;
+    onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
+}) {
+    const ref = useRef<HTMLButtonElement>(null);
+    const timer = useRef<number | null>(null);
+    const longPressed = useRef(false);
+
+    const clear = () => {
+        if (timer.current !== null) {
+            window.clearTimeout(timer.current);
+            timer.current = null;
+        }
+    };
+
+    return (
+        <button
+            ref={ref}
+            className="kb-candidate"
+            onPointerDown={() => {
+                longPressed.current = false;
+                clear();
+                timer.current = window.setTimeout(() => {
+                    timer.current = null;
+                    longPressed.current = true;
+                    const anchor = ref.current?.getBoundingClientRect();
+                    if (anchor) onDeleteRequest(candidate, anchor);
+                }, kLongPressMs);
+            }}
+            onPointerUp={() => {
+                clear();
+                if (!longPressed.current) onSelect(candidate.index);
+            }}
+            onPointerCancel={clear}
+            onPointerLeave={clear}
+            onContextMenu={(e) => e.preventDefault()}
+        >
+            {candidate.text}
+        </button>
+    );
+}
+
+export function CandidateBar(props: CandidateBarProps) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    if (props.candidates.length === 0) {
+        return (
+            <div className="kb-bar">
+                <div className="kb-toolbar">
+                    <button className="icon-btn" aria-label="settings" onClick={props.onOpenSettings}><SettingsIcon /></button>
+                    <button className="icon-btn" aria-label="emoji" onClick={props.onEmoji}><MoodIcon /></button>
+                    <button
+                        className="icon-btn"
+                        aria-label="switch schema"
+                        onClick={(e) => props.onSchemaMenu(e.currentTarget.getBoundingClientRect())}
+                    >
+                        <LanguageIcon />
+                    </button>
+                    <div className="spring" />
+                </div>
+            </div>
+        );
+    }
+
+    const page = (dir: 1 | -1) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
+        if (dir === 1) maybeLoadMore();
+    };
+
+    const maybeLoadMore = () => {
+        const el = scrollRef.current;
+        if (el && el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) {
+            props.onLoadMore();
+        }
+    };
+
+    return (
+        <div className="kb-bar">
+            <div className="kb-candidates" ref={scrollRef} onScroll={maybeLoadMore}>
+                {props.candidates.map((c) => (
+                    <CandidateChip
+                        key={c.index}
+                        candidate={c}
+                        onSelect={props.onSelect}
+                        onDeleteRequest={props.onDeleteRequest}
+                    />
+                ))}
+            </div>
+            <button className="icon-btn" aria-label="previous page" onClick={() => page(-1)}><ChevronLeftIcon /></button>
+            <button className="icon-btn" aria-label="next page" onClick={() => page(1)}><ChevronRightIcon /></button>
+            <button className="icon-btn" aria-label="expand candidates" onClick={props.onExpand}><ExpandMoreIcon /></button>
+        </div>
+    );
+}
