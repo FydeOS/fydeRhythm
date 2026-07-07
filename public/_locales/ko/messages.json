@@ -238,6 +238,30 @@
     "dict_pack_compiling": {
         "message": "컴파일 중…"
     },
+    "dict_pack_duplicates_merged": {
+        "message": "가져온 파일에서 중복 항목 $COUNT$개를 병합했습니다.",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_import_warning_summary": {
+        "message": "가져오기가 완료되었지만 경고가 $COUNT$개 있습니다:",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_more_warnings": {
+        "message": "…외 $COUNT$개 (전체 목록은 브라우저 콘솔 참조)",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
     "layout_zhuyin": {
         "message": "주음"
     },

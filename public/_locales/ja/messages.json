@@ -238,6 +238,30 @@
     "dict_pack_compiling": {
         "message": "コンパイル中…"
     },
+    "dict_pack_duplicates_merged": {
+        "message": "インポートしたファイル内の重複エントリ $COUNT$ 件を統合しました。",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_import_warning_summary": {
+        "message": "インポートは完了しましたが、$COUNT$ 件の警告があります：",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_more_warnings": {
+        "message": "…ほか $COUNT$ 件（完全なリストはブラウザのコンソールを参照）",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
     "layout_zhuyin": {
         "message": "注音"
     },

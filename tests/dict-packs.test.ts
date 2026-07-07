@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildRawTableDb,
+    DICT_PACK_WARNINGS_SHOWN_LIMIT,
     injectDictPacksIntoSchema,
     parseDictPackSource,
     parseDictPackSourceBytes,
+    summarizeDictPackWarnings,
 } from '../lib/dict-packs';
 
 describe('parseDictPackSource', () => {
@@ -38,6 +40,196 @@ describe('parseDictPackSource', () => {
         );
 
         expect(source.dictYaml).toContain('你好\tnihao\t100');
+    });
+
+    it('accepts weight-less TSV rows with a default weight', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao', '世界\tshi jie\t900'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(2);
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 100 },
+            { text: '世界', code: 'shi jie', weight: 900 },
+        ]);
+        expect(source.dictYaml).toContain('你好\tni hao\t100');
+        expect(source.dictYaml).toContain('世界\tshi jie\t900');
+    });
+
+    it('reports zero duplicates for a TSV file without repeated entries', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t100', '世界\tshi jie\t900'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(2);
+        expect(source.duplicateCount).toBe(0);
+    });
+
+    it('merges duplicate TSV rows and keeps the highest weight', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t100', '你好\tni hao\t900'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(1);
+        expect(source.duplicateCount).toBe(1);
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 900 }]);
+        expect(source.dictYaml).toContain('你好\tni hao\t900');
+        expect(source.dictYaml).not.toContain('你好\tni hao\t100');
+    });
+
+    it('keeps the earlier weight when a later duplicate is lower', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t900', '你好\tni hao\t100'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 900 }]);
+        expect(source.duplicateCount).toBe(1);
+    });
+
+    it('counts an equal-weight duplicate as merged', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t100', '你好\tni hao\t100'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(1);
+        expect(source.duplicateCount).toBe(1);
+    });
+
+    it('counts every extra occurrence of a triplicated row', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t100', '你好\tni hao\t200', '你好\tni hao\t50'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(1);
+        expect(source.duplicateCount).toBe(2);
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 200 }]);
+    });
+
+    it('merges weight-less duplicates against weighted rows via the default weight', () => {
+        // Default weight is 100: it beats an explicit 50 but loses to 300.
+        const lowThenDefault = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t50', '你好\tni hao'].join('\n'),
+            new Set(),
+        );
+        const defaultThenHigh = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao', '你好\tni hao\t300'].join('\n'),
+            new Set(),
+        );
+
+        expect(lowThenDefault.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 100 }]);
+        expect(lowThenDefault.duplicateCount).toBe(1);
+        expect(defaultThenHigh.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 300 }]);
+    });
+
+    it('does not merge rows that differ in text or code', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            [
+                '你好\tni hao\t100',
+                '拟好\tni hao\t100',
+                '你好\tni hao ma\t100',
+            ].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(3);
+        expect(source.duplicateCount).toBe(0);
+    });
+
+    it('dedupes on the trimmed code so trailing whitespace does not split entries', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            ['你好\tni hao\t100', '你好\tni hao \t900'].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 900 }]);
+        expect(source.duplicateCount).toBe(1);
+    });
+
+    it('dedupes across CRLF and LF line endings', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            '你好\tni hao\t100\r\n你好\tni hao\t900\n',
+            new Set(),
+        );
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 900 }]);
+        expect(source.duplicateCount).toBe(1);
+    });
+
+    it('keeps first-seen entry order even when a later duplicate wins on weight', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            [
+                '你好\tni hao\t100',
+                '世界\tshi jie\t500',
+                '你好\tni hao\t900',
+            ].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 900 },
+            { text: '世界', code: 'shi jie', weight: 500 },
+        ]);
+        const bodyStart = source.dictYaml.indexOf('\n...');
+        const body = source.dictYaml.slice(bodyStart);
+        expect(body.indexOf('你好')).toBeLessThan(body.indexOf('世界'));
+    });
+
+    it('ignores comments and blank lines when counting duplicates', () => {
+        const source = parseDictPackSource(
+            'custom.tsv',
+            [
+                '# comment',
+                '',
+                '你好\tni hao\t100',
+                '# 你好\tni hao\t100',
+                '',
+                '你好\tni hao\t100',
+            ].join('\n'),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(1);
+        expect(source.duplicateCount).toBe(1);
+    });
+
+    it('leaves dict yaml sources untouched and reports no duplicate count', () => {
+        const source = parseDictPackSource(
+            'dup.dict.yaml',
+            [
+                '---',
+                'name: dup',
+                'version: "1"',
+                '...',
+                '你好\tni hao\t100',
+                '你好\tni hao\t900',
+            ].join('\n'),
+            new Set(),
+        );
+
+        // dict.yaml passes through verbatim — duplicates are left to the
+        // compiler, and no duplicate count is reported.
+        expect(source.duplicateCount).toBeUndefined();
+        expect(source.entryCount).toBe(2);
+        expect(source.dictYaml).toContain('你好\tni hao\t100');
+        expect(source.dictYaml).toContain('你好\tni hao\t900');
     });
 
     it('uses the full Unicode display name when generating filesystem ids', () => {
@@ -111,8 +303,23 @@ describe('parseDictPackSource', () => {
 
         expect(source.packName).toBe('dict_pack_sample');
         expect(source.entryCount).toBe(2);
+        expect(source.duplicateCount).toBe(0);
         expect(source.dictYaml).toContain('你好\tni hao\t500');
         expect(source.dictYaml).toContain('测试\tce shi\t300');
+    });
+
+    it('merges duplicate Sogou SCEL words and reports the merge count', () => {
+        const source = parseDictPackSourceBytes(
+            'dup.scel',
+            makeScelDuplicateFixture(),
+            new Set(),
+        );
+
+        expect(source.entryCount).toBe(2);
+        expect(source.duplicateCount).toBe(1);
+        // Duplicate 你好 appears with weights 500 and 800 — the higher wins.
+        expect(source.entries).toContainEqual({ text: '你好', code: 'ni hao', weight: 800 });
+        expect(source.dictYaml).not.toContain('你好\tni hao\t500');
     });
 
     it('ignores trailing non-entry data in Sogou SCEL files', () => {
@@ -179,6 +386,61 @@ describe('parseDictPackSource', () => {
     });
 });
 
+describe('summarizeDictPackWarnings', () => {
+    const makeWarnings = (count: number) =>
+        Array.from({ length: count }, (_, i) => `warning ${i + 1}`);
+
+    it('returns nothing to show for an empty warning list', () => {
+        expect(summarizeDictPackWarnings([])).toEqual({ shown: [], hiddenCount: 0 });
+    });
+
+    it('shows every warning when below the limit', () => {
+        const warnings = makeWarnings(3);
+        expect(summarizeDictPackWarnings(warnings)).toEqual({ shown: warnings, hiddenCount: 0 });
+    });
+
+    it('shows every warning when exactly at the limit', () => {
+        const warnings = makeWarnings(DICT_PACK_WARNINGS_SHOWN_LIMIT);
+        expect(summarizeDictPackWarnings(warnings)).toEqual({ shown: warnings, hiddenCount: 0 });
+    });
+
+    it('hides a single warning past the limit', () => {
+        const warnings = makeWarnings(DICT_PACK_WARNINGS_SHOWN_LIMIT + 1);
+        const { shown, hiddenCount } = summarizeDictPackWarnings(warnings);
+        expect(shown).toEqual(warnings.slice(0, DICT_PACK_WARNINGS_SHOWN_LIMIT));
+        expect(hiddenCount).toBe(1);
+    });
+
+    it('summarizes huge warning lists down to the limit', () => {
+        const warnings = makeWarnings(10_000);
+        const { shown, hiddenCount } = summarizeDictPackWarnings(warnings);
+        expect(shown).toHaveLength(DICT_PACK_WARNINGS_SHOWN_LIMIT);
+        expect(shown[0]).toBe('warning 1');
+        expect(hiddenCount).toBe(10_000 - DICT_PACK_WARNINGS_SHOWN_LIMIT);
+    });
+
+    it('honors a custom limit', () => {
+        const warnings = makeWarnings(4);
+        expect(summarizeDictPackWarnings(warnings, 2)).toEqual({
+            shown: ['warning 1', 'warning 2'],
+            hiddenCount: 2,
+        });
+    });
+
+    it('treats a zero or negative limit as hide-everything', () => {
+        const warnings = makeWarnings(3);
+        expect(summarizeDictPackWarnings(warnings, 0)).toEqual({ shown: [], hiddenCount: 3 });
+        expect(summarizeDictPackWarnings(warnings, -5)).toEqual({ shown: [], hiddenCount: 3 });
+    });
+
+    it('does not mutate the input array', () => {
+        const warnings = makeWarnings(10);
+        const before = [...warnings];
+        summarizeDictPackWarnings(warnings);
+        expect(warnings).toEqual(before);
+    });
+});
+
 function makeScelFixture(withTrailingData = false): Uint8Array {
     const bytes = new Uint8Array(0x2700);
     let pinyinOffset = 0x1544;
@@ -193,6 +455,23 @@ function makeScelFixture(withTrailingData = false): Uint8Array {
         writeUint16Le(bytes, wordOffset, 35);
         writeUint16Le(bytes, wordOffset + 2, 1281);
     }
+    return bytes;
+}
+
+function makeScelDuplicateFixture(): Uint8Array {
+    const bytes = new Uint8Array(0x2700);
+    let pinyinOffset = 0x1544;
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 1, 'ni');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 2, 'hao');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 3, 'ce');
+    let wordOffset = writePinyinEntry(bytes, pinyinOffset, 4, 'shi');
+
+    // 你好 appears twice under the same code with different weights.
+    wordOffset = writeWordGroup(bytes, wordOffset, [1, 2], [
+        { word: '你好', weight: 500 },
+        { word: '你好', weight: 800 },
+    ]);
+    writeWordGroup(bytes, wordOffset, [3, 4], [{ word: '测试', weight: 300 }]);
     return bytes;
 }
 

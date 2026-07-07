@@ -238,6 +238,30 @@
     "dict_pack_compiling": {
         "message": "編譯中…"
     },
+    "dict_pack_duplicates_merged": {
+        "message": "已合併匯入檔案中的 $COUNT$ 條重複詞條。",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_import_warning_summary": {
+        "message": "匯入完成，但有 $COUNT$ 條警告：",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_more_warnings": {
+        "message": "…及另外 $COUNT$ 條（完整清單見瀏覽器主控台）",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
     "layout_zhuyin": {
         "message": "注音"
     },

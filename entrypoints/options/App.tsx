@@ -54,6 +54,7 @@ import {
     dictPackRawTablePath,
     encodeDictPackManifest,
     parseDictPackSourceBytes,
+    summarizeDictPackWarnings,
     type DictPackEntry,
     type DictPackManifest,
     type DictPackMetadata,
@@ -199,7 +200,9 @@ function OptionsPage() {
 
     const [dictPacks, setDictPacks] = useState<DictPackMetadata[]>([]);
     const [dictPackImporting, setDictPackImporting] = useState(false);
-    const [dictPackError, setDictPackError] = useState<string | null>(null);
+    // severity 'error': the import failed; 'warning': it succeeded but some
+    // entries were merged or skipped — never render partial success as an error.
+    const [dictPackAlert, setDictPackAlert] = useState<{ severity: 'error' | 'warning'; text: string } | null>(null);
 
     const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
 
@@ -428,15 +431,46 @@ function OptionsPage() {
         try {
             const manifest = await readDictPackManifest(schemaId);
             setDictPacks(manifest.packs);
-            setDictPackError(null);
+            setDictPackAlert(null);
         } catch (ex) {
-            setDictPackError($$("dict_pack_import_error") + String(ex));
+            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
             setDictPacks([]);
         }
     }
 
+    function dictPackWarningLines(warnings: string[]): string[] {
+        const { shown, hiddenCount } = summarizeDictPackWarnings(warnings);
+        const lines = [...shown];
+        if (hiddenCount > 0) {
+            lines.push($$("dict_pack_more_warnings", String(hiddenCount)));
+        }
+        return lines;
+    }
+
+    function showDictPackFailure(prefix: string, warnings: string[]) {
+        if (warnings.length > 0) {
+            console.error("Dict pack import failed:", warnings);
+        }
+        setDictPackAlert({ severity: 'error', text: prefix + dictPackWarningLines(warnings).join('\n') });
+    }
+
+    // Shown after a *successful* install: merged duplicates and compiler
+    // warnings are informational, so they get warning styling, not error.
+    function showDictPackImportNotice(source: DictPackSource, warnings: string[]) {
+        const lines: string[] = [];
+        if ((source.duplicateCount ?? 0) > 0) {
+            lines.push($$("dict_pack_duplicates_merged", String(source.duplicateCount)));
+        }
+        if (warnings.length > 0) {
+            console.warn("Dict pack import warnings:", warnings);
+            lines.push($$("dict_pack_import_warning_summary", String(warnings.length)));
+            lines.push(...dictPackWarningLines(warnings));
+        }
+        setDictPackAlert(lines.length > 0 ? { severity: 'warning', text: lines.join('\n') } : null);
+    }
+
     async function importDictPack(file: File) {
-        setDictPackError(null);
+        setDictPackAlert(null);
         setDictPackImporting(true);
         try {
             const bytes = new Uint8Array(await file.arrayBuffer());
@@ -445,12 +479,12 @@ function OptionsPage() {
             const existingDisplayNames = new Map(manifest.packs.map(p => [p.name.trim().normalize('NFC'), p.packName]));
             const source = parseDictPackSourceBytes(file.name, bytes, existingPackNames, existingDisplayNames);
             if (source.entryCount === 0) {
-                setDictPackError($$("dict_pack_empty"));
+                setDictPackAlert({ severity: 'error', text: $$("dict_pack_empty") });
                 return;
             }
             await installDictPackSource(source);
         } catch (ex) {
-            setDictPackError($$("dict_pack_import_error") + String(ex));
+            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
         } finally {
             setDictPackImporting(false);
         }
@@ -465,8 +499,8 @@ function OptionsPage() {
 
     async function installDictPackSource(source: DictPackSource) {
         if (!source.entries || source.entries.length === 0) {
-            const compiled = await compileDictPackAndInstall(source.packName, source.dictYaml);
-            if (!compiled) return;
+            const compileWarnings = await compileDictPackAndInstall(source.packName, source.dictYaml);
+            if (compileWarnings === null) return;
             try {
                 await upsertDictPackManifestEntry({
                     packName: source.packName,
@@ -481,6 +515,7 @@ function OptionsPage() {
                 await cleanupSharedYaml(source.packName);
                 throw ex;
             }
+            showDictPackImportNotice(source, compileWarnings);
             return;
         }
 
@@ -490,7 +525,7 @@ function OptionsPage() {
             packDictYaml: source.dictYaml,
         });
         if (!classified.ok) {
-            setDictPackError($$("dict_pack_compile_error") + classified.warnings.join('\n'));
+            showDictPackFailure($$("dict_pack_compile_error"), classified.warnings);
             return;
         }
 
@@ -499,12 +534,14 @@ function OptionsPage() {
         const rawEntries = source.entries.filter(entry => !validKeys.has(dictEntryKey(entry.text, entry.code)));
         const rawTableName = rawEntries.length > 0 ? `${source.packName}_raw` : undefined;
 
+        let compileWarnings: string[] = [];
         if (compiledEntries.length > 0) {
-            const compiled = await compileDictPackAndInstall(
+            const warnings = await compileDictPackAndInstall(
                 source.packName,
                 buildDictPackYaml(source.packName, compiledEntries),
             );
-            if (!compiled) return;
+            if (warnings === null) return;
+            compileWarnings = warnings;
         } else {
             await cleanupSharedYaml(source.packName);
         }
@@ -531,16 +568,16 @@ function OptionsPage() {
             }
             throw ex;
         }
-        if (classified.warnings.length > 0) {
-            console.warn("Dict pack classification warnings:", classified.warnings);
-        }
         await sendMessage("ReloadRime");
+        showDictPackImportNotice(source, [...classified.warnings, ...compileWarnings]);
     }
 
+    // Returns the compiler warnings on success, or null when compilation
+    // failed (the failure alert has already been shown).
     async function compileDictPackAndInstall(
         packName: string,
         dictYaml: string,
-    ): Promise<boolean> {
+    ): Promise<string[] | null> {
         let result;
         try {
             result = await sendMessage("CompileDictPack", {
@@ -554,13 +591,10 @@ function OptionsPage() {
         }
         if (!result.ok) {
             await cleanupSharedYaml(packName);
-            setDictPackError($$("dict_pack_compile_error") + result.warnings.join('\n'));
-            return false;
+            showDictPackFailure($$("dict_pack_compile_error"), result.warnings);
+            return null;
         }
-        if (result.warnings.length > 0) {
-            console.warn("Dict pack compile warnings:", result.warnings);
-        }
-        return true;
+        return result.warnings;
     }
 
     async function installRawTable(tableName: string, entries: DictPackEntry[]) {
@@ -624,7 +658,7 @@ function OptionsPage() {
     }
 
     async function toggleDictPackEnabled(id: string, enabled: boolean) {
-        setDictPackError(null);
+        setDictPackAlert(null);
         try {
             const manifest = await readDictPackManifest(imeSettings.schema);
             const nextManifest: DictPackManifest = {
@@ -635,12 +669,12 @@ function OptionsPage() {
             setDictPacks(nextManifest.packs);
             await sendMessage("ReloadRime");
         } catch (ex) {
-            setDictPackError($$("dict_pack_import_error") + String(ex));
+            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
         }
     }
 
     async function removeDictPack(id: string) {
-        setDictPackError(null);
+        setDictPackAlert(null);
         try {
             const manifest = await readDictPackManifest(imeSettings.schema);
             const pack = manifest.packs.find(p => p.id === id);
@@ -659,7 +693,7 @@ function OptionsPage() {
             setDictPacks(nextManifest.packs);
             await sendMessage("ReloadRime");
         } catch (ex) {
-            setDictPackError($$("dict_pack_import_error") + String(ex));
+            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
         }
     }
 
@@ -1763,9 +1797,18 @@ function OptionsPage() {
                                 {dictPackImporting ? $$("dict_pack_compiling") : $$("dict_pack_import_button")}
                             </Button>
                         </Box>
-                        {dictPackError && (
-                            <Box role="alert" sx={{ color: 'error.main', fontSize: '0.85rem', mt: 1.5 }}>
-                                {dictPackError}
+                        {dictPackAlert && (
+                            <Box role="alert" sx={{
+                                color: dictPackAlert.severity === 'error' ? 'error.main' : 'warning.main',
+                                fontSize: '0.85rem',
+                                mt: 1.5,
+                                whiteSpace: 'pre-line',
+                                // Defensive cap: even a summarized message must
+                                // never grow the page — scroll inside the box.
+                                maxHeight: 180,
+                                overflowY: 'auto',
+                            }}>
+                                {dictPackAlert.text}
                             </Box>
                         )}
                     </FormControl>

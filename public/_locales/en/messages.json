@@ -238,6 +238,30 @@
     "dict_pack_compiling": {
         "message": "Compiling…"
     },
+    "dict_pack_duplicates_merged": {
+        "message": "Merged $COUNT$ duplicate entries from the imported file.",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_import_warning_summary": {
+        "message": "Imported with $COUNT$ warnings:",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_more_warnings": {
+        "message": "…and $COUNT$ more (see the browser console for the full list)",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
     "layout_zhuyin": {
         "message": "Zhuyin"
     },

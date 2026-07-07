@@ -3,6 +3,10 @@ import { parse } from 'yaml';
 export const DICT_PACKS_MANIFEST_FILENAME = 'dict-packs.json';
 export const DICT_PACK_ID_PREFIX = 'dict_pack_';
 
+// Fallback weight for entries that carry no usable frequency (weight-less TSV
+// rows, or Sogou SCEL words without a frequency field).
+const DEFAULT_DICT_ENTRY_WEIGHT = 100;
+
 export interface DictPackMetadata {
     id: string;
     name: string;
@@ -30,6 +34,10 @@ export interface DictPackSource {
     displayName: string;
     entryCount: number;
     entries?: DictPackEntry[];
+    // Rows merged away because they repeated an earlier (text, code) pair.
+    // Only set for formats we parse entry-by-entry (TSV, SCEL); dict.yaml
+    // sources pass through verbatim and never report duplicates.
+    duplicateCount?: number;
 }
 
 export interface DictPackEntry {
@@ -123,24 +131,44 @@ function parseTsvSource(
     const displayName = displayNameFromFileName(fileName);
     const packName = resolvePackName(displayName, existingPackNames, existingDisplayNames);
 
-    const entries: DictPackEntry[] = [];
-    let entryCount = 0;
+    // Merge duplicate (text, code) rows up front — the RIME compiler emits a
+    // warning per duplicate, which for big community dictionaries turns the
+    // import result into thousands of warning lines. Keep the highest weight,
+    // matching the SCEL path.
+    const entryMap = new Map<string, DictPackEntry>();
+    let rowCount = 0;
     for (let line of text.split('\n')) {
         line = line.replace(/\r$/, '');
         if (line === '' || line.startsWith('#')) continue;
         const parts = line.split('\t');
-        if (parts.length !== 3) continue;
+        // Rime dictionaries store entries as text<tab>code<tab>weight, but the
+        // weight column is optional — plain text<tab>code rows are valid and
+        // common, so accept them with a default weight instead of dropping them.
+        if (parts.length < 2 || parts.length > 3) continue;
         const [word, code, weightStr] = parts;
         const normalizedCode = code.trim();
-        const weight = parseInt(weightStr, 10);
-        if (!word || !normalizedCode || isNaN(weight)) continue;
-        entries.push({ text: word, code: normalizedCode, weight });
-        entryCount++;
+        const parsedWeight = weightStr === undefined ? DEFAULT_DICT_ENTRY_WEIGHT : parseInt(weightStr, 10);
+        const weight = isNaN(parsedWeight) ? DEFAULT_DICT_ENTRY_WEIGHT : parsedWeight;
+        if (!word || !normalizedCode) continue;
+        rowCount++;
+        const key = `${word}\t${normalizedCode}`;
+        const existing = entryMap.get(key);
+        if (!existing || existing.weight < weight) {
+            entryMap.set(key, { text: word, code: normalizedCode, weight });
+        }
     }
 
+    const entries = [...entryMap.values()];
     const dictYaml = buildDictPackYaml(packName, entries);
 
-    return { packName, dictYaml, displayName, entryCount, entries };
+    return {
+        packName,
+        dictYaml,
+        displayName,
+        entryCount: entries.length,
+        entries,
+        duplicateCount: rowCount - entries.length,
+    };
 }
 
 interface ScelEntry {
@@ -165,13 +193,13 @@ function parseScelSource(
     const displayName = displayNameFromFileName(fileName);
     const packName = resolvePackName(displayName, existingPackNames, existingDisplayNames);
     const { pinyinTable, wordOffset } = readScelPinyinTable(bytes);
-    const entries = readScelEntries(bytes, pinyinTable, wordOffset);
+    const { entries, duplicateCount } = readScelEntries(bytes, pinyinTable, wordOffset);
     const dictEntries: DictPackEntry[] = [...entries.values()]
         .map(({ word, code, weight }) => ({ text: word, code, weight }));
 
     const dictYaml = buildDictPackYaml(packName, dictEntries);
 
-    return { packName, dictYaml, displayName, entryCount: entries.size, entries: dictEntries };
+    return { packName, dictYaml, displayName, entryCount: entries.size, entries: dictEntries, duplicateCount };
 }
 
 function readScelPinyinTable(bytes: Uint8Array): { pinyinTable: Map<number, string>; wordOffset: number } {
@@ -201,8 +229,10 @@ function readScelEntries(
     bytes: Uint8Array,
     pinyinTable: Map<number, string>,
     wordOffset: number,
-): Map<string, ScelEntry> {
+): { entries: Map<string, ScelEntry>; duplicateCount: number } {
     const result = new Map<string, ScelEntry>();
+    let acceptedWords = 0;
+    const done = () => ({ entries: result, duplicateCount: acceptedWords - result.size });
     let offset = wordOffset;
 
     while (offset + 4 <= bytes.length) {
@@ -220,7 +250,7 @@ function readScelEntries(
             const id = readUint16Le(bytes, offset);
             const syllable = pinyinTable.get(id);
             if (!syllable) {
-                if (result.size > 0) return result;
+                if (result.size > 0) return done();
                 throw new Error(`Invalid Sogou SCEL file: unknown pinyin id ${id}`);
             }
             code.push(syllable);
@@ -228,13 +258,13 @@ function readScelEntries(
         }
         for (let i = 0; i < homophoneCount; i++) {
             if (offset + 4 > bytes.length) {
-                if (result.size > 0) return result;
+                if (result.size > 0) return done();
                 throw new Error('Invalid Sogou SCEL file: truncated word block');
             }
             const wordLength = readUint16Le(bytes, offset);
             offset += 2;
             if (wordLength === 0 || offset + wordLength + 2 > bytes.length) {
-                if (result.size > 0) return result;
+                if (result.size > 0) return done();
                 throw new Error('Invalid Sogou SCEL file: malformed word entry');
             }
 
@@ -244,16 +274,17 @@ function readScelEntries(
             const extraLength = readUint16Le(bytes, offset);
             offset += 2;
             if (offset + extraLength > bytes.length) {
-                if (result.size > 0) return result;
+                if (result.size > 0) return done();
                 throw new Error('Invalid Sogou SCEL file: malformed word metadata');
             }
 
-            const rawWeight = extraLength >= 2 ? readUint16Le(bytes, offset) : 100;
+            const rawWeight = extraLength >= 2 ? readUint16Le(bytes, offset) : DEFAULT_DICT_ENTRY_WEIGHT;
             const weight = Math.max(rawWeight, 1);
             offset += extraLength;
 
             const codeString = code.join(' ');
             if (!word || !codeString) continue;
+            acceptedWords++;
             const key = `${word}\t${codeString}`;
             const existing = result.get(key);
             if (!existing || existing.weight < weight) {
@@ -262,7 +293,7 @@ function readScelEntries(
         }
     }
 
-    return result;
+    return done();
 }
 
 function readUint16Le(bytes: Uint8Array, offset: number): number {
@@ -295,6 +326,19 @@ function countEntries(dictYaml: string): number {
     return count;
 }
 
+// The RIME compiler reports one warning per problematic entry, so a large
+// dictionary can produce thousands of lines. Callers display `shown` and a
+// "…and N more" hint instead of the full list.
+export const DICT_PACK_WARNINGS_SHOWN_LIMIT = 5;
+
+export function summarizeDictPackWarnings(
+    warnings: string[],
+    limit: number = DICT_PACK_WARNINGS_SHOWN_LIMIT,
+): { shown: string[]; hiddenCount: number } {
+    const shown = warnings.slice(0, Math.max(0, limit));
+    return { shown, hiddenCount: warnings.length - shown.length };
+}
+
 export function normalizeToDictId(name: string): string {
     const normalizedName = name.trim().normalize('NFC');
     const normalized = normalizedName
@@ -302,7 +346,7 @@ export function normalizeToDictId(name: string): string {
         .replace(/[^a-z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '')
         .replace(/_+/g, '_');
-    const hasNonAscii = /[^\x00-\x7f]/.test(normalizedName);
+    const hasNonAscii = /[\u0080-\uffff]/.test(normalizedName);
     if (normalized && !hasNonAscii) {
         return DICT_PACK_ID_PREFIX + normalized;
     }

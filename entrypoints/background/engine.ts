@@ -152,6 +152,20 @@ export class RimeEngine {
         });
     }
 
+    // Dictionary-pack import depends on RIME compilation entry points that are
+    // only present in a wasm binary rebuilt with the dict-pack support. Guard
+    // against an older engine binary so the failure is actionable rather than a
+    // cryptic "rimeBuildDictionaryPack is not a function".
+    private assertDictionaryPackSupport(): void {
+        if (typeof this.wasmObject?.rimeBuildDictionaryPack !== 'function'
+            || typeof this.wasmObject?.rimeCollectValidDictionaryEntries !== 'function') {
+            throw new Error(
+                'This build of the RIME engine does not support dictionary-pack import. '
+                + 'Please update the extension to a build that includes the dictionary compiler.',
+            );
+        }
+    }
+
     async compileDictionaryPack(req: {
         schemaId: string;
         schemaConfigYaml: string;
@@ -160,6 +174,7 @@ export class RimeEngine {
         packDictYaml: string;
     }): Promise<{ ok: boolean; warnings: string[] }> {
         return await this.mutex.runExclusive(async () => {
+            this.assertDictionaryPackSupport();
             const result = await this.wasmObject.rimeBuildDictionaryPack(
                 req.schemaId,
                 req.schemaConfigYaml,
@@ -177,6 +192,7 @@ export class RimeEngine {
         packDictYaml: string;
     }): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
         return await this.mutex.runExclusive(async () => {
+            this.assertDictionaryPackSupport();
             const result = await this.wasmObject.rimeCollectValidDictionaryEntries(
                 req.baseDictionary,
                 req.packName,
