@@ -16,6 +16,9 @@ const kItemWidth = 46; // nominal item pitch, used only for initial placement
 
 export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBubbleProps) {
     const [selected, setSelected] = useState(0);
+    // Fresh copy of `selected` for the pointerup handler, whose effect closure
+    // captures state (releasing without sliding should pick the default, 0).
+    const selectedRef = useRef(0);
     const listRef = useRef<HTMLDivElement>(null);
     // Right edge of each rendered item, measured once per open: slide
     // selection must follow the REAL widths (multi-char alts are wider than
@@ -45,20 +48,26 @@ export function AltBubble({ alts, anchor, pointerId, onSelect, onClose }: AltBub
         };
         const move = (e: PointerEvent) => {
             if (pointerId !== -1 && e.pointerId !== pointerId) return;
-            setSelected(Math.max(0, indexAt(e.clientX)));
+            const idx = Math.max(0, indexAt(e.clientX));
+            selectedRef.current = idx;
+            setSelected(idx);
         };
         const up = (e: PointerEvent) => {
             if (pointerId !== -1 && e.pointerId !== pointerId) return;
-            onSelect(alts[Math.max(0, indexAt(e.clientX))].action);
+            onSelect(alts[selectedRef.current].action);
+            onClose();
+        };
+        const cancel = (e: PointerEvent) => {
+            if (pointerId !== -1 && e.pointerId !== pointerId) return;
             onClose();
         };
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', onClose);
+        window.addEventListener('pointercancel', cancel);
         return () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
-            window.removeEventListener('pointercancel', onClose);
+            window.removeEventListener('pointercancel', cancel);
         };
     }, [alts, onClose, onSelect, pointerId]);
 

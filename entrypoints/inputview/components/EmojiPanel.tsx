@@ -7,7 +7,11 @@ import { t } from '../i18n';
 
 const kRecentsKey = 'emojiRecents';
 const kMaxRecents = 40;
-const kLongPressMs = 400;
+// Match the letter keys' long-press timing so the gesture feels the same.
+const kLongPressMs = 350;
+// Finger-jitter slop before a held press reads as a scroll (the keys use a
+// similar margin) — leaving the small cell alone must NOT cancel the press.
+const kPressSlopPx = 24;
 
 // Recents persist in chrome.storage.local on device; localStorage keeps the
 // mock/dev path working in a plain tab.
@@ -42,11 +46,19 @@ function saveRecents(recents: string[]): void {
 function EmojiCell({ def, onInsert, onOpenTones }: {
     def: EmojiDef;
     onInsert: (emoji: string) => void;
-    onOpenTones: (def: EmojiDef, anchor: DOMRect) => void;
+    onOpenTones: (def: EmojiDef, anchor: DOMRect, pointerId: number) => void;
 }) {
     const ref = useRef<HTMLButtonElement>(null);
     const timer = useRef<number | null>(null);
     const longPressed = useRef(false);
+    const pointerId = useRef(-1);
+    const downPos = useRef<{ x: number; y: number } | null>(null);
+    // While the tone bubble is up, block touchmove's default: the grid is
+    // scrollable, and the browser claiming the still-held touch for a pan would
+    // fire pointercancel and close the bubble — the reason slides used to kill
+    // it. Non-passive on purpose; removed on release/cancel/unmount.
+    const blockScroll = useRef((e: TouchEvent) => e.preventDefault()).current;
+    const unblockScroll = () => window.removeEventListener('touchmove', blockScroll);
 
     const clear = () => {
         if (timer.current !== null) {
@@ -55,28 +67,44 @@ function EmojiCell({ def, onInsert, onOpenTones }: {
         }
     };
 
+    useEffect(() => () => window.removeEventListener('touchmove', blockScroll), [blockScroll]);
+
     return (
         <button
             ref={ref}
             className="kb-emoji-cell"
             aria-label={def.char}
-            onPointerDown={() => {
+            onPointerDown={(e) => {
                 longPressed.current = false;
+                pointerId.current = e.pointerId;
+                downPos.current = { x: e.clientX, y: e.clientY };
                 if (!def.skin) return;
                 clear();
                 timer.current = window.setTimeout(() => {
                     timer.current = null;
                     longPressed.current = true;
+                    // Keep the gesture: capture the pointer and stop the pan
+                    // from starting, so the bubble can track slide-to-tone.
+                    try { ref.current?.setPointerCapture(pointerId.current); } catch { /* pointer gone */ }
+                    window.addEventListener('touchmove', blockScroll, { passive: false });
                     const anchor = ref.current?.getBoundingClientRect();
-                    if (anchor) onOpenTones(def, anchor);
+                    if (anchor) onOpenTones(def, anchor, pointerId.current);
                 }, kLongPressMs);
+            }}
+            onPointerMove={(e) => {
+                // Beyond the slop before the press fires = a scroll, not a hold.
+                const d = downPos.current;
+                if (timer.current !== null && d
+                    && (Math.abs(e.clientX - d.x) > kPressSlopPx || Math.abs(e.clientY - d.y) > kPressSlopPx)) {
+                    clear();
+                }
             }}
             onPointerUp={() => {
                 clear();
+                unblockScroll();
                 if (!longPressed.current) onInsert(def.char);
             }}
-            onPointerCancel={clear}
-            onPointerLeave={clear}
+            onPointerCancel={() => { clear(); unblockScroll(); }}
             onContextMenu={(e) => e.preventDefault()}
         >
             {def.char}
@@ -125,7 +153,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
 }) {
     const [category, setCategory] = useState<string>('recents');
     const [recents, setRecents] = useState<string[]>([]);
-    const [tones, setTones] = useState<{ def: EmojiDef; anchor: DOMRect } | null>(null);
+    const [tones, setTones] = useState<{ def: EmojiDef; anchor: DOMRect; pointerId: number } | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -161,7 +189,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                         key={def.char}
                         def={def}
                         onInsert={insert}
-                        onOpenTones={(d, anchor) => setTones({ def: d, anchor })}
+                        onOpenTones={(d, anchor, pid) => setTones({ def: d, anchor, pointerId: pid })}
                     />
                 ))}
             </div>
@@ -194,7 +222,7 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                 <AltBubble
                     alts={skinVariants(tones.def.char).map((v) => ({ label: v, action: commit(v) }))}
                     anchor={tones.anchor}
-                    pointerId={-1}
+                    pointerId={tones.pointerId}
                     onSelect={(action: KeyAction) => {
                         if (action.type === 'commit') insert(action.text);
                     }}

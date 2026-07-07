@@ -363,6 +363,7 @@ body {
   display: flex;
   padding: 4px;
   gap: 2px;
+  touch-action: none;
   border-radius: var(--kb-key-radius);
   background: var(--kb-preview);
   box-shadow: 0 1px 4px var(--kb-popup-shadow);
