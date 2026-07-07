@@ -282,6 +282,15 @@
     "vk_key_hide": {
         "message": "キーボードを隠す"
     },
+    "vk_kbmode_docked": {
+        "message": "キーボードを固定"
+    },
+    "vk_kbmode_floating": {
+        "message": "フローティングキーボード"
+    },
+    "vk_resize_keyboard": {
+        "message": "キーボードのサイズ変更"
+    },
     "vk_key_symbols": {
         "message": "記号"
     },

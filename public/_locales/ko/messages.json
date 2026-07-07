@@ -282,6 +282,15 @@
     "vk_key_hide": {
         "message": "키보드 숨기기"
     },
+    "vk_kbmode_docked": {
+        "message": "키보드 고정"
+    },
+    "vk_kbmode_floating": {
+        "message": "플로팅 키보드"
+    },
+    "vk_resize_keyboard": {
+        "message": "키보드 크기 조절"
+    },
     "vk_key_symbols": {
         "message": "기호"
     },

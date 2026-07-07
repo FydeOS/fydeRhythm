@@ -22,6 +22,8 @@ export type KeyAction =
     | { type: 'layer'; layer: LayerId }
     | { type: 'toggleAscii' }
     | { type: 'hide' }
+    // On a numeric field, swap between the numberpad and the letter keyboard.
+    | { type: 'numericLetters'; on: boolean }
     | { type: 'none' };
 
 export interface AltDef {

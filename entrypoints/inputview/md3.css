@@ -59,19 +59,19 @@
   /* keys sit in fixed-fraction cells; the gap is the cell padding */
   --kb-cell-pad: 3.5px;
   --kb-edge: 5px;
-  /* Type scales WITH the keyboard: the page is its own window, so 1vh is 1%
-   * of the keyboard height. Baselines calibrated at the 372px-tall keyboard
-   * (28px letters ≈ 7.5vh), clamped so tiny/huge screens stay sane.
-   * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 60%. */
-  /* Glyphs at ~42% of key height — the Gboard-tablet/ChromeOS-native tier
-   * (FlorisBoard's phone keys run ~50%, too loud on wide desktop keys).
-   * Icons hold ~88% of letter size, hints ~53%. */
-  --kb-key-font: clamp(21px, 8.2vh, 37px);
-  --kb-key-font-fn: clamp(15px, 5.4vh, 24px);
-  --kb-icon-font: clamp(21px, 7.2vh, 33px);
-  --kb-hint-font: clamp(12px, 4.3vh, 19px);
-  --kb-candidate-font: clamp(16px, 5.9vh, 26px);
-  --kb-bar-height: 48px;
+  /* Type scales WITH the keyboard: .kb-root is a size container, so 1cqh is 1%
+   * of the keyboard's own height (docked, floating, or zoomed alike).
+   * Baselines calibrated at the 372px-tall keyboard (28px letters ≈ 7.5cqh);
+   * the clamp floors are low enough that a shrunk floating keyboard scales its
+   * glyphs down instead of flooring — keys stay proportional at every size.
+   * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 60%. Glyphs at ~42% of
+   * key height; icons hold ~88% of letter size, hints ~53%. */
+  --kb-key-font: clamp(13px, 8.2cqh, 37px);
+  --kb-key-font-fn: clamp(10px, 5.4cqh, 24px);
+  --kb-icon-font: clamp(13px, 7.2cqh, 33px);
+  --kb-hint-font: clamp(8px, 4.3cqh, 19px);
+  --kb-candidate-font: clamp(11px, 5.9cqh, 26px);
+  --kb-bar-height: clamp(34px, 13cqh, 52px);
 
   font-family: "Google Sans Text", Roboto, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
 }
@@ -166,6 +166,61 @@ body {
   width: 100%;
   height: 100%;
   padding: 0 var(--kb-edge) var(--kb-edge);
+  /* Size container so the type scale (cqh below) tracks the keyboard's OWN
+     height — keys stay proportional at any docked/floating/zoom size, in both
+     the mock tab and the real (window-sized) keyboard. */
+  container-type: size;
+  container-name: kb;
+}
+
+/* Floating card fills the (opaque) OS window edge-to-edge — no rounding/shadow,
+   so nothing shows in the corners. App sets width/height inline; position:
+   relative anchors the resize grip. */
+.kb-root.floating {
+  position: relative;
+}
+
+/* Drag handle — visible twin of the OS draggable region. */
+.kb-handle {
+  height: 22px; /* keep in sync with kFloatingHandleHeight in chrome-shim.ts */
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.kb-grabber {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--kb-on-surface-variant);
+  opacity: 0.45;
+}
+
+/* Corner resize grip, lower-left. */
+.kb-resize-grip {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 5px;
+  border: none;
+  background: transparent;
+  color: var(--kb-on-surface-variant);
+  font-size: 15px;
+  opacity: 0.6;
+  cursor: nesw-resize;
+  touch-action: none;
+  z-index: 6;
+}
+
+.kb-resize-grip:active {
+  opacity: 0.95;
 }
 
 .kb-keys {
@@ -223,7 +278,7 @@ body {
 
 .icon-btn svg,
 .kb-emoji-tabs .tab svg {
-  font-size: 22px;
+  font-size: clamp(13px, 5.9cqh, 26px);
 }
 
 /* Frame filler: invisible, non-interactive */
@@ -246,7 +301,7 @@ body {
 }
 
 .kb-key.space {
-  font-size: clamp(12px, 3.9vh, 17px);
+  font-size: clamp(8px, 3.9cqh, 17px);
   color: var(--kb-on-surface-variant);
 }
 
@@ -324,7 +379,7 @@ body {
   font-family: inherit;
   cursor: pointer;
   border-radius: 8px;
-  font-size: clamp(18px, 6.4vh, 28px);
+  font-size: clamp(12px, 6.4cqh, 28px);
   line-height: 1;
   color: var(--kb-on-surface);
 }
@@ -363,7 +418,7 @@ body {
 
 .kb-bar .icon-btn {
   margin: 4px 0;
-  width: 40px;
+  width: clamp(28px, 11cqh, 44px);
 }
 
 .kb-candidates {

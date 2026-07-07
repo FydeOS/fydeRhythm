@@ -59,7 +59,18 @@ describe('buildFastInputViewState', () => {
             script: 'zh',
             schemaId: '',
             schemaName: '',
+            numericField: null,
         });
+    });
+
+    it('routes number/tel fields to the numberpad and leaves others alone', async () => {
+        const withField = (type: string | undefined) =>
+            buildFastInputViewState({ session: null, context: type ? { type } : null } as never);
+        expect((await withField('number')).numericField).toBe('number');
+        expect((await withField('tel')).numericField).toBe('tel');
+        expect((await withField('text')).numericField).toBeNull();
+        expect((await withField('password')).numericField).toBeNull();
+        expect((await withField(undefined)).numericField).toBeNull();
     });
 
     it('resolves the per-schema layout binding', async () => {

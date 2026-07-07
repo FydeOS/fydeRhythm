@@ -22,6 +22,45 @@ export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
     );
 }
 
+// Docked/floating picker opened by long-pressing the hide key (iPadOS-style).
+export function KeyboardModeMenu({ floating, anchor, onPick, onClose }: {
+    floating: boolean;
+    anchor: DOMRect;
+    onPick: (floating: boolean) => void;
+    onClose: () => void;
+}) {
+    const items: Array<{ floating: boolean; label: string }> = [
+        { floating: false, label: t('vk_kbmode_docked') },
+        { floating: true, label: t('vk_kbmode_floating') },
+    ];
+    const height = items.length * 44 + 12;
+    // The hide key sits at the bottom-right; open above it, and right-align so
+    // the menu doesn't spill past the window edge.
+    const top = anchor.top - height - 8 >= 4
+        ? anchor.top - height - 8
+        : Math.min(anchor.bottom + 8, window.innerHeight - height - 4);
+    const left = Math.max(4, Math.min(anchor.right - 180, window.innerWidth - 184));
+    return (
+        <>
+            <div className="kb-scrim" aria-hidden="true" onPointerDown={onClose} />
+            <div className="kb-menu" style={{ top, left, width: 180 }}>
+                {items.map((it) => (
+                    <button
+                        key={String(it.floating)}
+                        className={`item${it.floating === floating ? ' active' : ''}`}
+                        onClick={() => {
+                            onClose();
+                            if (it.floating !== floating) onPick(it.floating);
+                        }}
+                    >
+                        {it.label}
+                    </button>
+                ))}
+            </div>
+        </>
+    );
+}
+
 // Schema picker opened by long-pressing the 中/英 key.
 export function SchemaMenu({ schemas, activeSchema, anchor, onPick, onClose }: {
     schemas: Array<{ id: string; label: string }>;

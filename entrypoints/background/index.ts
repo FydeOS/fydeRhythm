@@ -1,6 +1,6 @@
 import { parse } from "yaml";
 import { getFs, guessScriptForSchema, kDefaultSettings, resolveEffectiveLatinLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
-import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground } from "@/lib/shared-types";
+import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground, type NumericFieldKind } from "@/lib/shared-types";
 import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
 import { onMessage } from "@/lib/messaging";
@@ -134,7 +134,15 @@ export async function buildFastInputViewState(controller: InputController | unde
     script: guessScriptForSchema(schemaId, undefined, layout),
     schemaId,
     schemaName: schemaId,
+    numericField: numericFieldFor(controller?.context?.type),
   };
+}
+
+// Map the focused field's InputContext.type to the numberpad variant. Only
+// number/tel route to a numberpad; every other field type (text, url, search,
+// email, password, …) uses the normal letter keyboard.
+function numericFieldFor(type: string | undefined): NumericFieldKind | null {
+  return type === "number" || type === "tel" ? type : null;
 }
 
 // Fill in the engine/fs-dependent fields (real asciiMode, catalog label),
@@ -199,6 +207,11 @@ async function postSchemaList(
 // options page) can push fresh state without the page asking.
 const inputViewPosters = new Set<(msg: BackgroundToInputView) => void>();
 
+// Last numberpad routing pushed to the InputView. Focus moves between ordinary
+// text fields must NOT re-push state (it would flash the schema label); we only
+// re-push when the numeric routing actually flips (text↔number/tel).
+let lastNumericField: NumericFieldKind | null = null;
+
 // Change the active schema and reload the engine. Shared by the IME tray menu
 // and the InputView's long-press schema menu.
 async function activateSchema(schemaId: string): Promise<void> {
@@ -237,6 +250,17 @@ export default defineBackground({
         // we should disable rime learning in such context
         console.log("Got focus event, context = ", context);
         self.controller.context = context;
+
+        // Swap the keyboard into (or out of) the numberpad when the focused
+        // field's numeric-ness changes. Refined state carries the correct
+        // schema label alongside the new routing.
+        const nf = numericFieldFor(context.type);
+        if (nf !== lastNumericField) {
+          lastNumericField = nf;
+          for (const poster of inputViewPosters) {
+            void postRefinedInputViewState(self.controller, poster);
+          }
+        }
       });
 
       chrome.input.ime.onBlur.addListener((ctxId) => {

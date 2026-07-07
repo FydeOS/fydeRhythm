@@ -282,6 +282,15 @@
     "vk_key_hide": {
         "message": "收起鍵盤"
     },
+    "vk_kbmode_docked": {
+        "message": "停靠鍵盤"
+    },
+    "vk_kbmode_floating": {
+        "message": "浮動鍵盤"
+    },
+    "vk_resize_keyboard": {
+        "message": "調整鍵盤大小"
+    },
     "vk_key_symbols": {
         "message": "符號鍵盤"
     },

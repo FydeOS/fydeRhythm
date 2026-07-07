@@ -9,6 +9,8 @@ import { kanaLayout } from './kana';
 import { hangulLayout } from './hangul';
 import { symLayout, sym2Layout } from './symbols';
 
+export { numpadLayout } from './numpad';
+
 const latinSpecs: Record<LatinLayoutId, LatinFrameSpec> = {
     qwerty: qwertySpec,
     colemak: colemakSpec,

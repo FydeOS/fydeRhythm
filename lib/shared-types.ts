@@ -81,6 +81,12 @@ export interface InputViewCandidate {
  *  their script is 'ja'. */
 export type ScriptId = "zh" | "ja" | "ko";
 
+/** Focused-field kind that routes the keyboard to a compact numberpad instead
+ *  of letters. Derived from chrome.input.ime InputContext.type; `null` (any
+ *  other field type) renders the normal letter keyboard. `number` gets a
+ *  decimal pad (.-,), `tel` a phone pad (*#+). */
+export type NumericFieldKind = "number" | "tel";
+
 /** Everything the InputView needs to render the right keyboard. Sent as one
  *  atomic snapshot so the page never sees layout and ASCII state out of sync. */
 export interface InputViewState {
@@ -92,6 +98,9 @@ export interface InputViewState {
     script: ScriptId;
     schemaId: string;
     schemaName: string;
+    /** Set when the focused field is numeric — the keyboard renders a
+     *  numberpad rather than letters. `null` for ordinary text fields. */
+    numericField: NumericFieldKind | null;
 }
 
 export type BackgroundToInputView =

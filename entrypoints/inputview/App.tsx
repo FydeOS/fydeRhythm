@@ -1,22 +1,39 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
 import { strokeForChar } from '@/lib/latin-remap';
-import { createHost } from './chrome-shim';
+import { createHost, kFloatingScaleMin, kFloatingScaleMax, type ContainerGeometry } from './chrome-shim';
 import { t } from './i18n';
-import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation } from './layouts';
+import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation, numpadLayout } from './layouts';
 import type { AltDef, KeyAction, KeyDef, LayerId } from './layouts/types';
 import { Key, type ShiftState } from './components/Key';
 import { AltBubble } from './components/AltBubble';
 import { CandidateBar } from './components/CandidateBar';
 import { ExpandedPanel } from './components/ExpandedPanel';
-import { DeleteConfirm, SchemaMenu } from './components/Popovers';
+import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
 import { EmojiPanel } from './components/EmojiPanel';
+import { ResizeGripIcon } from './components/icons';
 
 type Popover =
     | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
     | { type: 'confirm'; candidate: InputViewCandidate; anchor: DOMRect }
     | { type: 'menu'; anchor: DOMRect }
+    | { type: 'kbmode'; anchor: DOMRect }
     | null;
+
+type FloatingPos = { left: number; top: number };
+
+function readWindowPos(): FloatingPos {
+    return { left: window.screenX, top: window.screenY };
+}
+
+// Floating = docked keyboard scaled uniformly (aspect always matches docked);
+// `pos` places the window, null centres it.
+function geomFor(floating: boolean, scale: number, pos?: FloatingPos | null): ContainerGeometry {
+    const dockedH = keyboardHeight();
+    return floating
+        ? { floating: true, width: Math.round(window.screen.width * scale), height: Math.round(dockedH * scale), left: pos?.left, top: pos?.top }
+        : { floating: false, width: window.screen.width, height: dockedH };
+}
 
 // Docked keyboard height. The legacy keyboard was a fixed 372px and users are
 // calibrated to it, so that is the floor; larger screens scale up to 42% of
@@ -39,6 +56,7 @@ const kFallbackState: InputViewState = {
     script: 'zh',
     schemaId: '',
     schemaName: '',
+    numericField: null,
 };
 
 export default function App() {
@@ -49,10 +67,24 @@ export default function App() {
     const [candidates, setCandidates] = useState<InputViewCandidate[]>([]);
     const [schemas, setSchemas] = useState<Array<{ id: string; label: string }>>([]);
     const [layer, setLayer] = useState<LayerId>('main');
+    // On a numeric field, the user tapped ABC to see the letter keyboard.
+    const [numericLetters, setNumericLetters] = useState(false);
     const [shift, setShift] = useState<ShiftState>('off');
     const [expanded, setExpanded] = useState(false);
     const [popover, setPopover] = useState<Popover>(null);
     const [containerReady, setContainerReady] = useState(false);
+    const [floating, setFloating] = useState(false);
+    const [floatingScale, setFloatingScale] = useState(1);
+    // Mirrors for the once-on-mount handlers (visibility/orientation) and the
+    // resize gesture, which would otherwise capture stale state.
+    const floatingRef = useRef(false);
+    const floatingScaleRef = useRef(1);
+    // Last known floating window position (null = never placed → centre it).
+    const floatingPosRef = useRef<FloatingPos | null>(null);
+    // Active corner-grip drag: start pointer-x, scale, window position, and card
+    // width — the top-right corner is held fixed so it grows toward lower-left.
+    const resizeStart = useRef<{ x: number; scale: number; pos: FloatingPos; width: number } | null>(null);
+    const resizeRaf = useRef(false);
     const loadedSignaled = useRef(false);
     const lastShiftTap = useRef(0);
     // Candidate count when the last load-more was posted; avoids re-posting for
@@ -81,16 +113,44 @@ export default function App() {
         });
         post({ kind: 'visibility', visible: true });
 
+        // Re-assert geometry, keeping a floating keyboard where it sits.
+        const resetContainer = () => {
+            if (floatingRef.current) {
+                const pos = readWindowPos();
+                floatingPosRef.current = pos;
+                return host.setupContainer(geomFor(true, floatingScaleRef.current, pos));
+            }
+            return host.setupContainer(geomFor(false, floatingScaleRef.current));
+        };
+
         const onVisibility = () => {
             post({ kind: 'visibility', visible: !document.hidden });
-            // Re-assert our docked geometry when re-shown: another IME may have
-            // switched the shared VK container (e.g. to floating) in between.
-            if (!document.hidden) void host.setupContainer(keyboardHeight());
+            if (document.hidden) {
+                // Remember where a floating keyboard was before it hides.
+                if (floatingRef.current) {
+                    const pos = readWindowPos();
+                    floatingPosRef.current = pos;
+                    host.writeFloatingPrefs({ floating: true, scale: floatingScaleRef.current, left: pos.left, top: pos.top });
+                }
+            } else {
+                void resetContainer();
+            }
         };
         document.addEventListener('visibilitychange', onVisibility);
 
-        void host.setupContainer(keyboardHeight()).then(() => setContainerReady(true));
-        const onOrientation = () => void host.setupContainer(keyboardHeight());
+        // Restore saved placement before the first setup. Uses the saved
+        // position (null → centre), not the live pos, which isn't placed yet.
+        void host.readFloatingPrefs().then((prefs) => {
+            floatingRef.current = prefs.floating;
+            floatingScaleRef.current = prefs.scale;
+            floatingPosRef.current = prefs.left !== undefined && prefs.top !== undefined
+                ? { left: prefs.left, top: prefs.top }
+                : null;
+            setFloating(prefs.floating);
+            setFloatingScale(prefs.scale);
+            void host.setupContainer(geomFor(prefs.floating, prefs.scale, floatingPosRef.current)).then(() => setContainerReady(true));
+        });
+        const onOrientation = () => void resetContainer();
         window.screen.orientation?.addEventListener('change', onOrientation);
 
         // Never leave the keyboard blank: if no state arrives (background dead
@@ -115,6 +175,9 @@ export default function App() {
             host.keyboardLoaded();
         }
     }, [vk, containerReady, host]);
+
+    // A new field starts on the numberpad, not wherever the last one was left.
+    useEffect(() => { setNumericLetters(false); }, [vk?.numericField]);
 
     // The background remaps physical keys by POSITION (Colemak/Dvorak on
     // external keyboards). Our synthesized strokes travel the same path, so
@@ -169,6 +232,9 @@ export default function App() {
             case 'hide':
                 host.hideKeyboard();
                 break;
+            case 'numericLetters':
+                setNumericLetters(action.on);
+                break;
             case 'none':
                 break;
         }
@@ -196,24 +262,91 @@ export default function App() {
         setPopover({ type: 'menu', anchor });
     };
 
+    // iPadOS-style: a long-press on the hide key opens a dock/float menu (a
+    // plain tap still hides). Applies the chosen placement and persists it.
+    const setFloatingMode = (next: boolean) => {
+        floatingRef.current = next;
+        setFloating(next);
+        const pos = floatingPosRef.current;
+        host.writeFloatingPrefs({ floating: next, scale: floatingScaleRef.current, left: pos?.left, top: pos?.top });
+        void host.setupContainer(geomFor(next, floatingScaleRef.current, next ? pos : null));
+    };
+
+    // Corner-grip drag scales the window, anchored at the top-left captured on
+    // down; resizes coalesced per frame, size+pos persisted on up.
+    const onResizeDown = (e: React.PointerEvent) => {
+        e.preventDefault();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+        resizeStart.current = { x: e.clientX, scale: floatingScaleRef.current, pos: readWindowPos(), width: geomFor(true, floatingScaleRef.current).width };
+    };
+    const onResizeMove = (e: React.PointerEvent) => {
+        const start = resizeStart.current;
+        if (!start) return;
+        // Dragging left (clientX decreases) grows the keyboard.
+        const next = Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, start.scale + (start.x - e.clientX) / window.screen.width));
+        floatingScaleRef.current = next;
+        setFloatingScale(next);
+        // Hold the top-right corner: new left = right edge − new width.
+        const rightEdge = start.pos.left + start.width;
+        floatingPosRef.current = { left: rightEdge - geomFor(true, next).width, top: start.pos.top };
+        if (!resizeRaf.current) {
+            resizeRaf.current = true;
+            requestAnimationFrame(() => {
+                resizeRaf.current = false;
+                void host.setupContainer(geomFor(true, floatingScaleRef.current, floatingPosRef.current));
+            });
+        }
+    };
+    const onResizeUp = () => {
+        if (!resizeStart.current) return;
+        resizeStart.current = null;
+        const pos = floatingPosRef.current;
+        host.writeFloatingPrefs({ floating: true, scale: floatingScaleRef.current, left: pos?.left, top: pos?.top });
+    };
+
     if (!vk) {
         return <div className="kb-root" />;
     }
 
     const activeLayoutId = vk.asciiMode ? vk.latinLayout : vk.layout;
-    const layout = layer === 'main'
-        ? getLayout(activeLayoutId, vk.asciiMode)
-        : layer === 'emoji' ? null : getLayerLayout(layer, vk.asciiMode);
-    const bottom = bottomRow({
+    // Numeric field → numberpad, unless the user tapped ABC for letters.
+    const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
+    const layout = numpad || layer === 'emoji'
+        ? null
+        : layer === 'main'
+            ? getLayout(activeLayoutId, vk.asciiMode)
+            : getLayerLayout(layer, vk.asciiMode);
+    let bottom = bottomRow({
         layer,
         asciiMode: vk.asciiMode,
         spaceLabel: vk.schemaName,
         layoutHasPunctuation: layoutHostsPunctuation(activeLayoutId),
         script: vk.script,
     });
+    // On the letters view of a numeric field, the ?123 key returns to the pad.
+    if (vk.numericField && numericLetters && layer === 'main') {
+        bottom = bottom.map((k) => k.id === 'to-sym'
+            ? { id: 'to-numpad', label: '123', kind: 'function', action: { type: 'numericLetters', on: false }, width: k.width }
+            : k);
+    }
+    const renderRows: KeyDef[][] | null = numpad
+        ? numpad.rows
+        : layout
+            ? [...layout.rows, bottom]
+            : null;
+
+    const floatStyle = floating
+        ? { width: geomFor(true, floatingScale).width, height: geomFor(true, floatingScale).height }
+        : undefined;
 
     return (
-        <div className="kb-root">
+        <div className={`kb-root${floating ? ' floating' : ''}`} style={floatStyle}>
+            {floating && (
+                // Visible counterpart of the OS draggable region.
+                <div className="kb-handle" aria-hidden="true">
+                    <span className="kb-grabber" />
+                </div>
+            )}
             {/* Announce candidate updates for screen readers (ChromeVox). */}
             <div aria-live="polite" className="sr-only">
                 {candidates.length > 0 ? t('vk_candidates_announce', String(candidates.length)) : ''}
@@ -242,42 +375,38 @@ export default function App() {
                     // center with side margins — the Gboard alignment model. Rows
                     // must never stretch keys to fill the width.
                     (() => {
-                        const units = (row: typeof bottom) => row.reduce((s, k) => s + (k.width ?? 1), 0);
-                        const maxUnits = Math.max(...layout!.rows.map(units), units(bottom));
-                        const cell = (def: (typeof bottom)[number]) => ({
+                        const rows = renderRows!;
+                        const units = (row: KeyDef[]) => row.reduce((s, k) => s + (k.width ?? 1), 0);
+                        const maxUnits = Math.max(...rows.map(units));
+                        const cell = (def: KeyDef) => ({
                             width: `${((def.width ?? 1) / maxUnits) * 100}%`,
                         });
+                        const gridId = numpad ? numpad.id : layout!.id;
                         return (
                             <>
-                                {layout!.rows.map((row, i) => (
-                                    <div className="kb-row" key={`${layout!.id}-${i}`}>
+                                {rows.map((row, i) => (
+                                    <div className="kb-row" key={`${gridId}-${i}`}>
                                         {row.map((def) => (
                                             <div className="kb-cell" key={def.id} style={cell(def)}>
                                                 <Key
                                                     def={def}
                                                     shift={shift}
-                                                    active={def.id === 'Shift' && shift !== 'off'}
+                                                    active={
+                                                        (def.id === 'Shift' && shift !== 'off') ||
+                                                        (def.id === 'ascii-toggle' && !vk.asciiMode)
+                                                    }
                                                     onAction={performAction}
                                                     onOpenBubble={openBubble}
+                                                    onLongPressMenu={
+                                                        def.id === 'ascii-toggle' ? (_def, anchor) => openSchemaMenu(anchor)
+                                                            : def.id === 'hide' ? (_def, anchor) => setPopover({ type: 'kbmode', anchor })
+                                                                : undefined
+                                                    }
                                                 />
                                             </div>
                                         ))}
                                     </div>
                                 ))}
-                                <div className="kb-row">
-                                    {bottom.map((def) => (
-                                        <div className="kb-cell" key={def.id} style={cell(def)}>
-                                            <Key
-                                                def={def}
-                                                shift={shift}
-                                                active={def.id === 'ascii-toggle' && !vk.asciiMode}
-                                                onAction={performAction}
-                                                onOpenBubble={openBubble}
-                                                onLongPressMenu={def.id === 'ascii-toggle' ? (_def, anchor) => openSchemaMenu(anchor) : undefined}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
                             </>
                         );
                     })()
@@ -292,6 +421,19 @@ export default function App() {
                     />
                 )}
             </div>
+            {floating && (
+                <button
+                    className="kb-resize-grip"
+                    aria-label={t('vk_resize_keyboard')}
+                    onPointerDown={onResizeDown}
+                    onPointerMove={onResizeMove}
+                    onPointerUp={onResizeUp}
+                    onPointerCancel={onResizeUp}
+                    onContextMenu={(e) => e.preventDefault()}
+                >
+                    <ResizeGripIcon />
+                </button>
+            )}
             {popover?.type === 'bubble' && (
                 <AltBubble
                     alts={popover.alts}
@@ -318,6 +460,14 @@ export default function App() {
                     activeSchema={vk.schemaId}
                     anchor={popover.anchor}
                     onPick={(id) => post({ kind: 'switchSchema', schemaId: id })}
+                    onClose={() => setPopover(null)}
+                />
+            )}
+            {popover?.type === 'kbmode' && (
+                <KeyboardModeMenu
+                    floating={floating}
+                    anchor={popover.anchor}
+                    onPick={setFloatingMode}
                     onClose={() => setPopover(null)}
                 />
             )}
