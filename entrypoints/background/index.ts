@@ -22,17 +22,22 @@ async function buildSchemaMenuItems(activeSchema: string, enabledSchemas?: strin
 // storage.session to recover it on the next cold start (see restoreEngineId).
 const kEngineIdSessionKey = "imeEngineId";
 
+// Never throws: it is fired unawaited from several listeners (onActivate,
+// storage.onChanged, schemaSwitched), where a rejection would be uncaught.
 export async function refreshImeMenuItems() {
-  const engineID = self.controller?.engineId;
-  if (!engineID) return;
-  const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
-  const active = (obj.settings?.schema ? obj.settings : null) ?? self.controller?.activeSettings;
-  if (!active?.schema) return;
-  const items = await buildSchemaMenuItems(active.schema, active.enabledSchemas);
   try {
-    chrome.input.ime.setMenuItems({ engineID, items });
+    const engineID = self.controller?.engineId;
+    if (!engineID) return;
+    const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
+    const active = (obj.settings?.schema ? obj.settings : null) ?? self.controller?.activeSettings;
+    if (!active?.schema) return;
+    const items = await buildSchemaMenuItems(active.schema, active.enabledSchemas);
+    chrome.input.ime.setMenuItems({ engineID, items }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) console.warn("setMenuItems failed:", error.message);
+    });
   } catch (ex) {
-    console.error("setMenuItems failed:", ex);
+    console.error("refreshImeMenuItems failed:", ex);
   }
 }
 
@@ -340,16 +345,20 @@ export default defineBackground({
       chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) => {
         console.log(candidateId, button);
         if (button == 'left') {
-          void self.controller.selectCandidate(candidateId)
-            .catch((error: unknown) => self.controller.printErr(`selectCandidate: ${String(error)}`));
+          void self.controller.selectCandidate(candidateId).catch((error: unknown) => {
+            // A late click on a composition RIME already committed/cleared;
+            // benign, so log instead of surfacing an uncaught rejection.
+            console.log("Stale candidate click ignored:", error);
+          });
           self.controller.lastRightClickItem = -1;
         } else if (button == 'right') {
           self.controller.rightClick(candidateId);
         }
       });
 
-      chrome.input.ime.onMenuItemActivated.addListener(async (engineID, menuId) => {
-        await activateSchema(menuId);
+      chrome.input.ime.onMenuItemActivated.addListener((_engineID, menuId) => {
+        void activateSchema(menuId)
+          .catch((error: unknown) => self.controller.printErr(`activateSchema: ${String(error)}`));
       });
     }
 
@@ -499,25 +508,31 @@ export default defineBackground({
           const msg = raw as InputViewToBackground;
           switch (msg.kind) {
             case "visibility":
+              if (typeof msg.visible !== "boolean") break;
               setInputViewConnectionVisible(connection, msg.visible);
               break;
             case "setAsciiMode":
+              if (typeof msg.asciiMode !== "boolean") break;
               void self.controller.setAsciiMode(msg.asciiMode)
                 .catch((error: unknown) => reportInputViewError("setAsciiMode", error));
               break;
             case "selectCandidate":
+              if (typeof msg.index !== "number") break;
               void self.controller.selectCandidate(msg.index, false)
                 .catch((error: unknown) => reportInputViewError("selectCandidate", error));
               break;
             case "deleteCandidate":
+              if (typeof msg.index !== "number") break;
               void self.controller.deleteCandidate(msg.index, false)
                 .catch((error: unknown) => reportInputViewError("deleteCandidate", error));
               break;
             case "loadMoreCandidates":
+              if (typeof msg.count !== "number") break;
               void self.controller.fetchMoreCandidates(msg.count)
                 .catch((error: unknown) => reportInputViewError("loadMoreCandidates", error));
               break;
             case "switchSchema":
+              if (typeof msg.schemaId !== "string") break;
               void activateSchema(msg.schemaId)
                 .catch((error: unknown) => reportInputViewError("switchSchema", error));
               break;

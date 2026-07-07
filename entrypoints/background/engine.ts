@@ -8,6 +8,12 @@ import EventEmitter from "events";
 export class RimeCandidateIterator {
     wasmIterator: any;
     engine: RimeEngine;
+    // destroy() can run while an advance()/current() is queued on the engine
+    // mutex; calling into a deleted embind handle aborts, so both methods
+    // re-check this flag inside the exclusive section (JS is single-threaded,
+    // so destroy() cannot interleave between that check and the wasm call).
+    private destroyed = false;
+    private destroyPromise: Promise<void> | null = null;
 
     constructor(it: any, eng: RimeEngine) {
         this.wasmIterator = it;
@@ -15,19 +21,24 @@ export class RimeCandidateIterator {
     }
 
     async destroy(): Promise<void> {
-        await this.engine.mutex.runExclusive(async () => {
-            this.wasmIterator.delete();
+        if (this.destroyPromise) return this.destroyPromise;
+        this.destroyed = true;
+        this.destroyPromise = this.engine.mutex.runExclusive(async () => {
+            this.wasmIterator?.delete();
         });
+        return this.destroyPromise;
     }
 
     async advance() {
         await this.engine.mutex.runExclusive(async () => {
+            if (this.destroyed) return;
             await this.wasmIterator.advance();
         });
     }
 
     async current() : Promise<RimeCandidate | null> {
         return await this.engine.mutex.runExclusive(async () => {
+            if (this.destroyed) return null;
             return await this.wasmIterator.current();
         });
     }

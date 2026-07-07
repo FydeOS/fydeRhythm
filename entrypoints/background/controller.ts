@@ -440,7 +440,8 @@ export class InputController extends EventEmitter {
             });
         }
         if (this.engineId != null) {
-            void this.setCandidateWindowProperties(this.engineId, { visible: false });
+            void this.setCandidateWindowProperties(this.engineId, { visible: false })
+                .catch((err) => console.warn("resetUI: hiding candidate window failed:", err));
         }
         void this.invalidateCandidateCache();
     }
@@ -458,7 +459,13 @@ export class InputController extends EventEmitter {
         await this.sessionMutex.runExclusive(async () => {
             if (this.session === session && this.sessionEpoch === sessionEpoch &&
                 this.contextEpoch === contextEpoch && this.engineId === null) {
-                await session?.clearComposition();
+                try {
+                    await session?.clearComposition();
+                } catch (error) {
+                    if (!this.isInactiveImeError(error)) {
+                        this.printErr(`deactivate composition: ${String(error)}`);
+                    }
+                }
             }
         });
     }
@@ -481,7 +488,13 @@ export class InputController extends EventEmitter {
             // never clear it after waiting for the operation queue.
             if (this.session === session && this.sessionEpoch === sessionEpoch &&
                 this.contextEpoch === contextEpoch && this.context === null) {
-                await session?.clearComposition();
+                try {
+                    await session?.clearComposition();
+                } catch (error) {
+                    if (!this.isInactiveImeError(error)) {
+                        this.printErr(`clearContext composition: ${String(error)}`);
+                    }
+                }
             }
         });
     }
@@ -518,6 +531,22 @@ export class InputController extends EventEmitter {
                 }
             }
         });
+    }
+
+    // Completion callback for callback-style chrome.input.ime calls: reads
+    // runtime.lastError (Chrome logs an unread value as "Unchecked
+    // runtime.lastError") and rejects with a real Error instead of undefined.
+    private imeCallDone(what: string, res: () => void, rej: (e: Error) => void): (ok: boolean) => void {
+        return (ok) => {
+            const error = chrome.runtime.lastError;
+            if (error) {
+                rej(new Error(`${what}: ${error.message}`));
+            } else if (ok) {
+                res();
+            } else {
+                rej(new Error(`${what} failed`));
+            }
+        };
     }
 
     isInactiveImeError(error: unknown): boolean {
@@ -650,13 +679,13 @@ export class InputController extends EventEmitter {
                                         id: idx,
                                         label: rimeContext.selectLabels[idx] || (idx + 1).toString()
                                     })),
-                                }, (ok) => ok ? res() : rej());
+                                }, this.imeCallDone("setCandidates", res, rej));
                             }));
                             promises.push(new Promise<void>((res, rej) => {
                                 chrome.input.ime.setCursorPosition({
                                     contextID: contextId,
                                     candidateID: rimeContext.menu.highlightedCandidateIndex
-                                }, (ok) => ok ? res() : rej());
+                                }, this.imeCallDone("setCursorPosition", res, rej));
                             }));
                         }
                     } else {
@@ -728,7 +757,7 @@ export class InputController extends EventEmitter {
                             chrome.input.ime.setCandidates({
                                 contextID: contextId,
                                 candidates: []
-                            }, (ok) => ok ? res() : rej());
+                            }, this.imeCallDone("setCandidates", res, rej));
                         }));
                     }
                 } else {
@@ -764,7 +793,7 @@ export class InputController extends EventEmitter {
                 chrome.input.ime.commitText({
                     contextID: contextId,
                     text: commit.text
-                }, (ok) => ok ? res() : rej());
+                }, this.imeCallDone("commitText", res, rej));
             });
             await this.invalidateCandidateCache();
             return true;
@@ -954,6 +983,9 @@ export class InputController extends EventEmitter {
                             chrome.input.ime.commitText({
                                 contextID: this.context.contextID,
                                 text: bufferedInput
+                            }, () => {
+                                const error = chrome.runtime.lastError;
+                                if (error) console.warn("commitText (input cache) failed:", error.message);
                             });
                             this.inputCache = [];
                         }
@@ -1022,14 +1054,19 @@ export class InputController extends EventEmitter {
     lastRightClickTime = 0;
 
     rightClick(index: number) {
+        // A late click can reference a composition that RIME already committed
+        // or cleared; the engine rejects it, which is benign here.
+        const deleteQuietly = (ix: number) => this.deleteCandidate(ix).catch((err) => {
+            console.log("Candidate delete ignored (composition already gone):", err);
+        });
         const curTime = (new Date()).getTime();
         if (this.lastRightClickItem == index && curTime - this.lastRightClickTime < 3000) {
             console.log("Del candidate");
-            void this.deleteCandidate(index).catch((error) => this.printErr(`deleteCandidate: ${String(error)}`));
+            deleteQuietly(index);
             this.lastRightClickItem = -1;
         } else {
             console.log("Ready Del candidate");
-            void this.deleteCandidate(index).catch((error) => this.printErr(`deleteCandidate: ${String(error)}`));
+            deleteQuietly(index);
             this.lastRightClickItem = index;
             this.lastRightClickTime = curTime;
         }
@@ -1068,7 +1105,13 @@ export class InputController extends EventEmitter {
         await this.sessionMutex.runExclusive(async () => {
             if (visibilityEpoch !== this.visibilityEpoch || this.inputViewVisible !== visible) return;
             if (!visible) {
-                await this.session?.clearComposition();
+                try {
+                    await this.session?.clearComposition();
+                } catch (error) {
+                    if (!this.isInactiveImeError(error)) {
+                        this.printErr(`visibility composition: ${String(error)}`);
+                    }
+                }
             }
             if (visibilityEpoch !== this.visibilityEpoch || this.inputViewVisible !== visible) return;
             await this.refreshContextInSessionOperation();
