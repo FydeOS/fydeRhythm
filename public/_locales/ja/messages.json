@@ -189,6 +189,55 @@
     "theme_dark": {
         "message": "ダーク"
     },
+    "dict_pack_section_title": {
+        "message": "辞書パック"
+    },
+    "dict_pack_hint": {
+        "message": ".txt、.tsv または .dict.yaml ファイルをインポートして辞書パックをコンパイルします。単語帳と異なり、前方一致と重み順の候補表示をサポートします。"
+    },
+    "dict_pack_import_button": {
+        "message": "辞書パックをインポート"
+    },
+    "dict_pack_empty": {
+        "message": "ファイルに有効なエントリがありません。"
+    },
+    "dict_pack_import_error": {
+        "message": "辞書パックのインポートエラー："
+    },
+    "dict_pack_compile_error": {
+        "message": "コンパイル失敗："
+    },
+    "dict_pack_entry_count": {
+        "message": "$COUNT$ 件",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_enabled": {
+        "message": "有効"
+    },
+    "dict_pack_disabled": {
+        "message": "無効"
+    },
+    "dict_pack_remove_button": {
+        "message": "削除"
+    },
+    "dict_pack_empty_list": {
+        "message": "辞書パックがまだインストールされていません。ファイルをインポートするかカタログからインストールしてください。"
+    },
+    "dict_pack_active_entry_count": {
+        "message": "$COUNT$ 件が有効",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_compiling": {
+        "message": "コンパイル中…"
+    },
     "layout_zhuyin": {
         "message": "注音"
     },

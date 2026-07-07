@@ -189,6 +189,55 @@
     "theme_dark": {
         "message": "Dark"
     },
+    "dict_pack_section_title": {
+        "message": "Dictionary Packs"
+    },
+    "dict_pack_hint": {
+        "message": "Import a .txt, .tsv or .dict.yaml file to compile a dictionary pack. Unlike word packs, compiled packs support prefix matching and proper weight-based ranking."
+    },
+    "dict_pack_import_button": {
+        "message": "Import Dict Pack"
+    },
+    "dict_pack_empty": {
+        "message": "The file contains no valid entries."
+    },
+    "dict_pack_import_error": {
+        "message": "Error importing dict pack: "
+    },
+    "dict_pack_compile_error": {
+        "message": "Compilation failed: "
+    },
+    "dict_pack_entry_count": {
+        "message": "$COUNT$ entries",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_enabled": {
+        "message": "Enabled"
+    },
+    "dict_pack_disabled": {
+        "message": "Disabled"
+    },
+    "dict_pack_remove_button": {
+        "message": "Remove"
+    },
+    "dict_pack_empty_list": {
+        "message": "No dictionary packs installed yet. Import a file or install from catalog."
+    },
+    "dict_pack_active_entry_count": {
+        "message": "$COUNT$ entries active",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_compiling": {
+        "message": "Compiling…"
+    },
     "layout_zhuyin": {
         "message": "Zhuyin"
     },

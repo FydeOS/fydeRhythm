@@ -452,6 +452,14 @@ export default defineBackground({
       return { handled: false };
     });
 
+    onMessage('CompileDictPack', async ({ data }) => {
+      return await self.controller.compileDictPack(data.schemaId, data.packName, data.packDictYaml);
+    });
+
+    onMessage('ClassifyDictPackEntries', async ({ data }) => {
+      return await self.controller.classifyDictPackEntries(data.schemaId, data.packName, data.packDictYaml);
+    });
+
     // Port listener for the InputView (protocol types in lib/shared-types.ts)
     chrome.runtime.onConnect.addListener((port) => {
       if (port.name == kInputViewPortName) {

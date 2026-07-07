@@ -44,3 +44,7 @@ build-*/
 /entrypoints/background/rime_emscripten.wasm
 /entrypoints/background/rime_emscripten.js
 /entrypoints/background/rime_emscripten.d.ts
+
+tmp/
+.vscode/
+/entrypoints/background/rime_emscripten.wasm

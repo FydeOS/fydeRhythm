@@ -21,6 +21,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
+import Tooltip from "@mui/material/Tooltip";
 
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -29,6 +30,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
@@ -43,6 +45,20 @@ import Divider from "@mui/material/Divider";
 import { detectSchemaInZip, importSchemaFromZip } from "@/lib/import-schema";
 import { getInstalledSchemaIds } from "@/lib/schema-install";
 import { sendMessage } from "@/lib/messaging";
+import {
+    decodeDictPackManifest,
+    buildDictPackYaml,
+    buildRawTableDb,
+    dictPackArtifactPath,
+    dictPacksManifestPath,
+    dictPackRawTablePath,
+    encodeDictPackManifest,
+    parseDictPackSourceBytes,
+    type DictPackEntry,
+    type DictPackManifest,
+    type DictPackMetadata,
+    type DictPackSource,
+} from "@/lib/dict-packs";
 import Link from "@mui/material/Link";
 
 const kFuzzyMap = [
@@ -181,6 +197,10 @@ function OptionsPage() {
     const [removeCandidate, setRemoveCandidate] = useState<SchemaDescription | null>(null);
     const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
+    const [dictPacks, setDictPacks] = useState<DictPackMetadata[]>([]);
+    const [dictPackImporting, setDictPackImporting] = useState(false);
+    const [dictPackError, setDictPackError] = useState<string | null>(null);
+
     const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
 
     // chrome.storage.local.get
@@ -262,6 +282,7 @@ function OptionsPage() {
         loadSettings();
         loadSchemaList();
         loadLocalSchemaList();
+        loadDictPacks(kDefaultSettings.schema);
 
         const listener = (m: { rimeStatusChanged?: boolean }) => {
             if (m.rimeStatusChanged) {
@@ -291,6 +312,11 @@ function OptionsPage() {
         return () => window.removeEventListener("beforeunload", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settingsDirty]);
+
+    useEffect(() => {
+        loadDictPacks(imeSettings.schema);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [imeSettings.schema]);
 
     async function loadRime() {
         await chrome.storage.sync.set({ settings: imeSettings });
@@ -377,6 +403,263 @@ function OptionsPage() {
             changeSettings({ algebraList: _.uniq([...imeSettings.algebraList, val]) });
         } else {
             changeSettings({ algebraList: imeSettings.algebraList.filter(a => a != val) });
+        }
+    }
+
+    async function readDictPackManifest(schemaId: string): Promise<DictPackManifest> {
+        const fs = await getFs();
+        const manifestPath = dictPacksManifestPath(schemaId);
+        if (await fs.readEntryRaw(manifestPath)) {
+            try {
+                return decodeDictPackManifest(await fs.readWholeFile(manifestPath));
+            } catch {
+                // fall through to empty
+            }
+        }
+        return { version: 1, packs: [] };
+    }
+
+    async function writeDictPackManifest(schemaId: string, manifest: DictPackManifest) {
+        const fs = await getFs();
+        await fs.writeWholeFile(dictPacksManifestPath(schemaId), encodeDictPackManifest(manifest));
+    }
+
+    async function loadDictPacks(schemaId: string) {
+        try {
+            const manifest = await readDictPackManifest(schemaId);
+            setDictPacks(manifest.packs);
+            setDictPackError(null);
+        } catch (ex) {
+            setDictPackError($$("dict_pack_import_error") + String(ex));
+            setDictPacks([]);
+        }
+    }
+
+    async function importDictPack(file: File) {
+        setDictPackError(null);
+        setDictPackImporting(true);
+        try {
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            const manifest = await readDictPackManifest(imeSettings.schema);
+            const existingPackNames = new Set(manifest.packs.map(p => p.packName));
+            const existingDisplayNames = new Map(manifest.packs.map(p => [p.name.trim().normalize('NFC'), p.packName]));
+            const source = parseDictPackSourceBytes(file.name, bytes, existingPackNames, existingDisplayNames);
+            if (source.entryCount === 0) {
+                setDictPackError($$("dict_pack_empty"));
+                return;
+            }
+            await installDictPackSource(source);
+        } catch (ex) {
+            setDictPackError($$("dict_pack_import_error") + String(ex));
+        } finally {
+            setDictPackImporting(false);
+        }
+    }
+
+    async function cleanupSharedYaml(packName: string) {
+        try {
+            const fs = await getFs();
+            await fs.delPath(`/root/${imeSettings.schema}/shared/${packName}.dict.yaml`);
+        } catch { /* file may not have been written */ }
+    }
+
+    async function installDictPackSource(source: DictPackSource) {
+        if (!source.entries || source.entries.length === 0) {
+            const compiled = await compileDictPackAndInstall(source.packName, source.dictYaml);
+            if (!compiled) return;
+            try {
+                await upsertDictPackManifestEntry({
+                    packName: source.packName,
+                    displayName: source.displayName,
+                    entryCount: source.entryCount,
+                    compiledEntryCount: source.entryCount,
+                    rawEntryCount: 0,
+                });
+                await sendMessage("ReloadRime");
+            } catch (ex) {
+                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, source.packName));
+                await cleanupSharedYaml(source.packName);
+                throw ex;
+            }
+            return;
+        }
+
+        const classified = await sendMessage("ClassifyDictPackEntries", {
+            schemaId: imeSettings.schema,
+            packName: source.packName,
+            packDictYaml: source.dictYaml,
+        });
+        if (!classified.ok) {
+            setDictPackError($$("dict_pack_compile_error") + classified.warnings.join('\n'));
+            return;
+        }
+
+        const validKeys = new Set(classified.entries.map(entry => dictEntryKey(entry.text, entry.code)));
+        const compiledEntries = source.entries.filter(entry => validKeys.has(dictEntryKey(entry.text, entry.code)));
+        const rawEntries = source.entries.filter(entry => !validKeys.has(dictEntryKey(entry.text, entry.code)));
+        const rawTableName = rawEntries.length > 0 ? `${source.packName}_raw` : undefined;
+
+        if (compiledEntries.length > 0) {
+            const compiled = await compileDictPackAndInstall(
+                source.packName,
+                buildDictPackYaml(source.packName, compiledEntries),
+            );
+            if (!compiled) return;
+        } else {
+            await cleanupSharedYaml(source.packName);
+        }
+
+        try {
+            if (rawEntries.length > 0 && rawTableName) {
+                await installRawTable(rawTableName, rawEntries);
+            }
+            await upsertDictPackManifestEntry({
+                packName: source.packName,
+                displayName: source.displayName,
+                entryCount: compiledEntries.length + rawEntries.length,
+                compiledEntryCount: compiledEntries.length,
+                rawEntryCount: rawEntries.length,
+                rawTableName,
+            });
+        } catch (ex) {
+            if (compiledEntries.length > 0) {
+                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, source.packName));
+                await cleanupSharedYaml(source.packName);
+            }
+            if (rawTableName) {
+                await deleteIfExists(dictPackRawTablePath(imeSettings.schema, rawTableName));
+            }
+            throw ex;
+        }
+        if (classified.warnings.length > 0) {
+            console.warn("Dict pack classification warnings:", classified.warnings);
+        }
+        await sendMessage("ReloadRime");
+    }
+
+    async function compileDictPackAndInstall(
+        packName: string,
+        dictYaml: string,
+    ): Promise<boolean> {
+        let result;
+        try {
+            result = await sendMessage("CompileDictPack", {
+                schemaId: imeSettings.schema,
+                packName,
+                packDictYaml: dictYaml,
+            });
+        } catch (ex) {
+            await cleanupSharedYaml(packName);
+            throw ex;
+        }
+        if (!result.ok) {
+            await cleanupSharedYaml(packName);
+            setDictPackError($$("dict_pack_compile_error") + result.warnings.join('\n'));
+            return false;
+        }
+        if (result.warnings.length > 0) {
+            console.warn("Dict pack compile warnings:", result.warnings);
+        }
+        return true;
+    }
+
+    async function installRawTable(tableName: string, entries: DictPackEntry[]) {
+        const fs = await getFs();
+        await fs.writeWholeFile(
+            dictPackRawTablePath(imeSettings.schema, tableName),
+            buildRawTableDb(tableName, entries),
+        );
+    }
+
+    async function upsertDictPackManifestEntry(req: {
+        packName: string;
+        displayName: string;
+        entryCount: number;
+        compiledEntryCount: number;
+        rawEntryCount: number;
+        rawTableName?: string;
+    }) {
+        const manifest = await readDictPackManifest(imeSettings.schema);
+        const now = Date.now();
+        const existingIndex = manifest.packs.findIndex(p => p.packName === req.packName);
+        const existing = existingIndex >= 0 ? manifest.packs[existingIndex] : undefined;
+        if (existing?.rawTableName && existing.rawTableName !== req.rawTableName) {
+            await deleteIfExists(dictPackRawTablePath(imeSettings.schema, existing.rawTableName));
+        }
+        if (existing && req.compiledEntryCount === 0 && (existing.compiledEntryCount ?? existing.entryCount) > 0) {
+            await deleteIfExists(dictPackArtifactPath(imeSettings.schema, existing.packName));
+            await cleanupSharedYaml(existing.packName);
+        }
+        const entry: DictPackMetadata = {
+            id: req.packName,
+            name: req.displayName,
+            packName: req.packName,
+            baseDictionary: imeSettings.schema,
+            entryCount: req.entryCount,
+            compiledEntryCount: req.compiledEntryCount,
+            rawEntryCount: req.rawEntryCount,
+            rawTableName: req.rawTableName,
+            enabled: true,
+            installedAt: existingIndex >= 0 ? manifest.packs[existingIndex].installedAt : now,
+            updatedAt: now,
+            source: 'user',
+        };
+        const packs = existingIndex >= 0
+            ? manifest.packs.map((p, i) => i === existingIndex ? entry : p)
+            : [...manifest.packs, entry];
+        const nextManifest: DictPackManifest = { version: 1, packs };
+        await writeDictPackManifest(imeSettings.schema, nextManifest);
+        setDictPacks(nextManifest.packs);
+    }
+
+    async function deleteIfExists(path: string) {
+        try {
+            const fs = await getFs();
+            await fs.delPath(path);
+        } catch { /* file may not exist */ }
+    }
+
+    function dictEntryKey(text: string, code: string): string {
+        return `${text}\t${code.trim()}`;
+    }
+
+    async function toggleDictPackEnabled(id: string, enabled: boolean) {
+        setDictPackError(null);
+        try {
+            const manifest = await readDictPackManifest(imeSettings.schema);
+            const nextManifest: DictPackManifest = {
+                version: 1,
+                packs: manifest.packs.map(p => p.id === id ? { ...p, enabled, updatedAt: Date.now() } : p),
+            };
+            await writeDictPackManifest(imeSettings.schema, nextManifest);
+            setDictPacks(nextManifest.packs);
+            await sendMessage("ReloadRime");
+        } catch (ex) {
+            setDictPackError($$("dict_pack_import_error") + String(ex));
+        }
+    }
+
+    async function removeDictPack(id: string) {
+        setDictPackError(null);
+        try {
+            const manifest = await readDictPackManifest(imeSettings.schema);
+            const pack = manifest.packs.find(p => p.id === id);
+            const nextManifest: DictPackManifest = {
+                version: 1,
+                packs: manifest.packs.filter(p => p.id !== id),
+            };
+            if (pack) {
+                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, pack.packName));
+                await deleteIfExists(`/root/${imeSettings.schema}/shared/${pack.packName}.dict.yaml`);
+                if (pack.rawTableName) {
+                    await deleteIfExists(dictPackRawTablePath(imeSettings.schema, pack.rawTableName));
+                }
+            }
+            await writeDictPackManifest(imeSettings.schema, nextManifest);
+            setDictPacks(nextManifest.packs);
+            await sendMessage("ReloadRime");
+        } catch (ex) {
+            setDictPackError($$("dict_pack_import_error") + String(ex));
         }
     }
 
@@ -910,6 +1193,9 @@ function OptionsPage() {
         </div>
     );
 
+    const activeDictPackEntryCount = dictPacks
+        .filter(pack => pack.enabled)
+        .reduce((sum, pack) => sum + pack.entryCount, 0);
     const manifest = chrome.runtime.getManifest();
 
     return <ThemeProvider theme={theme} defaultMode="system">
@@ -1370,6 +1656,121 @@ function OptionsPage() {
                     </Box>
                 </div>
             </div>}
+
+            <div className={styles.formGroup}>
+                <div className={styles.formBox}>
+                    <FormControl className={styles.formControl}>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
+                            <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("dict_pack_section_title")}</h2>
+                            {dictPacks.length > 0 && (
+                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                                    {$$("dict_pack_active_entry_count", String(activeDictPackEntryCount))}
+                                </Box>
+                            )}
+                        </Box>
+                        <Box sx={{ fontSize: '0.875rem', color: 'text.secondary', lineHeight: 1.45, mb: 2 }}>
+                            {$$("dict_pack_hint")}
+                        </Box>
+                        {dictPacks.length > 0 ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                                {dictPacks.map((pack) => (
+                                    <Box
+                                        key={pack.id}
+                                        sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1.5,
+                                            px: 2,
+                                            py: 1.5,
+                                            borderRadius: '12px',
+                                            border: '1px solid',
+                                            borderColor: pack.enabled ? 'rgba(228, 0, 70, 0.18)' : 'divider',
+                                            bgcolor: pack.enabled ? 'rgba(228, 0, 70, 0.02)' : 'transparent',
+                                            transition: 'background-color 0.15s, border-color 0.15s',
+                                        }}
+                                    >
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Box sx={{ fontSize: '0.9375rem', fontWeight: pack.enabled ? 500 : 400, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {pack.name}
+                                            </Box>
+                                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary', mt: 0.25 }}>
+                                                {$$("dict_pack_entry_count", String(pack.entryCount))}
+                                            </Box>
+                                        </Box>
+                                        <Switch
+                                            size="small"
+                                            checked={pack.enabled}
+                                            onChange={(_, checked) => toggleDictPackEnabled(pack.id, checked)}
+                                            disabled={dictPackImporting}
+                                            inputProps={{ 'aria-label': pack.enabled ? $$("dict_pack_enabled") : $$("dict_pack_disabled") }}
+                                        />
+                                        <Tooltip title={$$("dict_pack_remove_button")}>
+                                            <span>
+                                                <IconButton
+                                                    aria-label={$$("dict_pack_remove_button")}
+                                                    onClick={() => removeDictPack(pack.id)}
+                                                    disabled={dictPackImporting}
+                                                    color="error"
+                                                    size="small"
+                                                >
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                </IconButton>
+                                            </span>
+                                        </Tooltip>
+                                    </Box>
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box
+                                sx={{
+                                    mb: 2,
+                                    px: 2,
+                                    py: 2,
+                                    borderRadius: '12px',
+                                    border: '1px dashed',
+                                    borderColor: 'divider',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.5,
+                                    fontSize: '0.875rem',
+                                    color: 'text.secondary',
+                                }}
+                            >
+                                <CloudUploadIcon fontSize="small" />
+                                {$$("dict_pack_empty_list")}
+                            </Box>
+                        )}
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <input
+                                type="file"
+                                accept=".txt,.tsv,.yaml,.dict.yaml,.scel"
+                                id="dict-pack-import-input"
+                                style={{ display: 'none' }}
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        await importDictPack(e.target.files[0]);
+                                        e.target.value = '';
+                                    }
+                                }}
+                            />
+                            <Button
+                                variant={dictPacks.length > 0 ? "outlined" : "contained"}
+                                startIcon={dictPackImporting ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                                onClick={() => document.getElementById('dict-pack-import-input')?.click()}
+                                disabled={dictPackImporting}
+                                size="small"
+                            >
+                                {dictPackImporting ? $$("dict_pack_compiling") : $$("dict_pack_import_button")}
+                            </Button>
+                        </Box>
+                        {dictPackError && (
+                            <Box role="alert" sx={{ color: 'error.main', fontSize: '0.85rem', mt: 1.5 }}>
+                                {dictPackError}
+                            </Box>
+                        )}
+                    </FormControl>
+                </div>
+            </div>
 
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>

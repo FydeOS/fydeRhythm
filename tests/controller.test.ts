@@ -4,9 +4,9 @@ import type { ImeSettings } from '../lib/utils';
 const mocks = vi.hoisted(() => ({
     listEnabledInstalledSchemas: vi.fn(),
     fs: {
-        readEntryRaw: vi.fn(async () => true),
+        readEntryRaw: vi.fn(async (_path: string) => true),
         createDirectory: vi.fn(async () => { }),
-        readWholeFile: vi.fn(async () => new Uint8Array()),
+        readWholeFile: vi.fn(async (_path: string) => new Uint8Array()),
         writeWholeFile: vi.fn(async () => { }),
     },
     getFs: vi.fn(),
@@ -1331,3 +1331,4 @@ describe('physical-key Latin layout remap', () => {
         expect(commits).toEqual([]);
     });
 });
+

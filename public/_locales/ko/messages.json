@@ -189,6 +189,55 @@
     "theme_dark": {
         "message": "다크"
     },
+    "dict_pack_section_title": {
+        "message": "사전 팩"
+    },
+    "dict_pack_hint": {
+        "message": ".txt, .tsv 또는 .dict.yaml 파일을 가져와 사전 팩을 컴파일합니다. 단어 팩과 달리 전방 일치와 가중치 기반 순위를 지원합니다."
+    },
+    "dict_pack_import_button": {
+        "message": "사전 팩 가져오기"
+    },
+    "dict_pack_empty": {
+        "message": "파일에 유효한 항목이 없습니다."
+    },
+    "dict_pack_import_error": {
+        "message": "사전 팩 가져오기 오류: "
+    },
+    "dict_pack_compile_error": {
+        "message": "컴파일 실패: "
+    },
+    "dict_pack_entry_count": {
+        "message": "$COUNT$ 개 항목",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_enabled": {
+        "message": "활성화"
+    },
+    "dict_pack_disabled": {
+        "message": "비활성화"
+    },
+    "dict_pack_remove_button": {
+        "message": "제거"
+    },
+    "dict_pack_empty_list": {
+        "message": "아직 설치된 사전 팩이 없습니다. 파일을 가져오거나 카탈로그에서 설치하세요."
+    },
+    "dict_pack_active_entry_count": {
+        "message": "$COUNT$ 개 항목 활성",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_compiling": {
+        "message": "컴파일 중…"
+    },
     "layout_zhuyin": {
         "message": "주음"
     },

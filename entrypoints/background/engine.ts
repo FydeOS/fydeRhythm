@@ -152,6 +152,44 @@ export class RimeEngine {
         });
     }
 
+    async compileDictionaryPack(req: {
+        schemaId: string;
+        schemaConfigYaml: string;
+        baseDictionary: string;
+        packName: string;
+        packDictYaml: string;
+    }): Promise<{ ok: boolean; warnings: string[] }> {
+        return await this.mutex.runExclusive(async () => {
+            const result = await this.wasmObject.rimeBuildDictionaryPack(
+                req.schemaId,
+                req.schemaConfigYaml,
+                req.baseDictionary,
+                req.packName,
+                req.packDictYaml,
+            );
+            return { ok: result.ok as boolean, warnings: (result.warnings as string[]) ?? [] };
+        });
+    }
+
+    async collectValidDictionaryEntries(req: {
+        baseDictionary: string;
+        packName: string;
+        packDictYaml: string;
+    }): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
+        return await this.mutex.runExclusive(async () => {
+            const result = await this.wasmObject.rimeCollectValidDictionaryEntries(
+                req.baseDictionary,
+                req.packName,
+                req.packDictYaml,
+            );
+            return {
+                ok: result.ok as boolean,
+                warnings: (result.warnings as string[]) ?? [],
+                entries: (result.entries as Array<{ text: string; code: string; weight: number }>) ?? [],
+            };
+        });
+    }
+
     async createSession(schemaId: string, schemaConfig: string): Promise<RimeSession> {
         return await this.mutex.runExclusive(async () => {
             console.log("Creating session")

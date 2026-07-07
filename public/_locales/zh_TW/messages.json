@@ -189,6 +189,55 @@
     "theme_dark": {
         "message": "深色"
     },
+    "dict_pack_section_title": {
+        "message": "字典包"
+    },
+    "dict_pack_hint": {
+        "message": "匯入 .txt、.tsv 或 .dict.yaml 檔案以編譯字典包。與詞庫不同，編譯式字典包支援前綴比對與基於權重的排名。"
+    },
+    "dict_pack_import_button": {
+        "message": "匯入字典包"
+    },
+    "dict_pack_empty": {
+        "message": "檔案中沒有有效詞條。"
+    },
+    "dict_pack_import_error": {
+        "message": "匯入字典包時出錯："
+    },
+    "dict_pack_compile_error": {
+        "message": "編譯失敗："
+    },
+    "dict_pack_entry_count": {
+        "message": "$COUNT$ 個詞條",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_enabled": {
+        "message": "已啟用"
+    },
+    "dict_pack_disabled": {
+        "message": "已停用"
+    },
+    "dict_pack_remove_button": {
+        "message": "刪除"
+    },
+    "dict_pack_empty_list": {
+        "message": "尚未安裝任何字典包。匯入檔案或從目錄安裝。"
+    },
+    "dict_pack_active_entry_count": {
+        "message": "已啟用 $COUNT$ 個詞條",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_compiling": {
+        "message": "編譯中…"
+    },
     "layout_zhuyin": {
         "message": "注音"
     },

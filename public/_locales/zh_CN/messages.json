@@ -189,6 +189,55 @@
     "theme_dark": {
         "message": "深色"
     },
+    "dict_pack_section_title": {
+        "message": "字典包"
+    },
+    "dict_pack_hint": {
+        "message": "导入 .txt、.tsv 或 .dict.yaml 文件以编译字典包。与词库不同，编译式字典包支持前缀匹配与基于权重的排名。"
+    },
+    "dict_pack_import_button": {
+        "message": "导入字典包"
+    },
+    "dict_pack_empty": {
+        "message": "文件中没有有效词条。"
+    },
+    "dict_pack_import_error": {
+        "message": "导入字典包时出错："
+    },
+    "dict_pack_compile_error": {
+        "message": "编译失败："
+    },
+    "dict_pack_entry_count": {
+        "message": "$COUNT$ 个词条",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_enabled": {
+        "message": "已启用"
+    },
+    "dict_pack_disabled": {
+        "message": "已停用"
+    },
+    "dict_pack_remove_button": {
+        "message": "删除"
+    },
+    "dict_pack_empty_list": {
+        "message": "尚未安装任何字典包。导入文件或从目录安装。"
+    },
+    "dict_pack_active_entry_count": {
+        "message": "已启用 $COUNT$ 个词条",
+        "placeholders": {
+            "count": {
+                "content": "$1"
+            }
+        }
+    },
+    "dict_pack_compiling": {
+        "message": "编译中…"
+    },
     "layout_zhuyin": {
         "message": "注音"
     },

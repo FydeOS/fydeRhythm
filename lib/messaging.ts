@@ -19,6 +19,15 @@ interface ProtocolMap {
   SimulateKey: (keyData: any) => {
     handled: boolean;
   };
+  CompileDictPack: (data: { schemaId: string; packName: string; packDictYaml: string }) => {
+    ok: boolean;
+    warnings: string[];
+  };
+  ClassifyDictPackEntries: (data: { schemaId: string; packName: string; packDictYaml: string }) => {
+    ok: boolean;
+    warnings: string[];
+    entries: Array<{ text: string; code: string; weight: number }>;
+  };
 }
 
 // Create type-safe messaging functions

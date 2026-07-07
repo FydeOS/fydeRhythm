@@ -6,6 +6,11 @@ import type { LatinLayoutId, RimeCandidate } from "@/lib/shared-types";
 import { remapPhysicalKey } from "@/lib/latin-remap";
 import EventEmitter from "events";
 import { listEnabledInstalledSchemas } from "./schemas";
+import {
+    decodeDictPackManifest,
+    dictPacksManifestPath,
+    injectDictPacksIntoSchema,
+} from '@/lib/dict-packs';
 
 const kShiftMask = 1 << 0;
 const kControlMask = 1 << 2;
@@ -167,6 +172,66 @@ export class InputController extends EventEmitter {
         }
     }
 
+    async listEnabledDictPacks(
+        fs: Awaited<ReturnType<typeof getFs>>,
+        schemaId: string
+    ): Promise<ReturnType<typeof decodeDictPackManifest>['packs']> {
+        const manifestPath = dictPacksManifestPath(schemaId);
+        if (!await fs.readEntryRaw(manifestPath)) return [];
+        try {
+            const manifest = decodeDictPackManifest(await fs.readWholeFile(manifestPath));
+            return manifest.packs
+                .filter(pack => pack.enabled);
+        } catch (ex) {
+            console.warn(`Could not read dict pack manifest for schema ${schemaId}:`, ex);
+            return [];
+        }
+    }
+
+    async compileDictPack(
+        schemaId: string,
+        packName: string,
+        packDictYaml: string
+    ): Promise<{ ok: boolean; warnings: string[] }> {
+        if (!this.engine) throw new Error("Engine not loaded");
+        const fs = await getFs();
+        const schemaYamlBuffer = await fs.readWholeFile(
+            `/root/${schemaId}/build/${schemaId}.schema.yaml`
+        );
+        const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
+        const schemaConfig = parse(schemaYaml);
+        const baseDictionary: string =
+            (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
+        return await this.engine.compileDictionaryPack({
+            schemaId,
+            schemaConfigYaml: schemaYaml,
+            baseDictionary,
+            packName,
+            packDictYaml,
+        });
+    }
+
+    async classifyDictPackEntries(
+        schemaId: string,
+        packName: string,
+        packDictYaml: string
+    ): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
+        if (!this.engine) throw new Error("Engine not loaded");
+        const fs = await getFs();
+        const schemaYamlBuffer = await fs.readWholeFile(
+            `/root/${schemaId}/build/${schemaId}.schema.yaml`
+        );
+        const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
+        const schemaConfig = parse(schemaYaml);
+        const baseDictionary: string =
+            (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
+        return await this.engine.collectValidDictionaryEntries({
+            baseDictionary,
+            packName,
+            packDictYaml,
+        });
+    }
+
     async loadRimeConfig(settings: ImeSettings): Promise<string> {
         const fs = await getFs();
         const schemaBasePath = `/root/${settings.schema}`;
@@ -188,6 +253,8 @@ export class InputController extends EventEmitter {
                 schemaConfig.speller.algebra.push(a);
             }
         }
+        const enabledDictPacks = await this.listEnabledDictPacks(fs, settings.schema);
+        injectDictPacksIntoSchema(schemaConfig, enabledDictPacks);
         return stringify(schemaConfig);
     }
 
