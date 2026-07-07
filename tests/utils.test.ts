@@ -49,6 +49,9 @@ describe('InputView layout resolution', () => {
         expect(guessLayoutForSchema('bopomofo_tw')).toBe('zhuyin');
         expect(guessLayoutForSchema('custom', '注音方案')).toBe('zhuyin');
         expect(guessLayoutForSchema('japanese_kana')).toBe('kana');
+        // Store catalog ids that lack the full keyword.
+        expect(guessLayoutForSchema('jap_poly', 'Poly 日文输入法')).toBe('kana');
+        expect(guessLayoutForSchema('hangeul2set')).toBe('hangul');
         expect(guessLayoutForSchema('hangul_2set')).toBe('hangul');
         expect(guessLayoutForSchema('aurora_pinyin', '极光拼音')).toBeUndefined();
         expect(guessLayoutForSchema('wubi98')).toBeUndefined();

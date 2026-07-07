@@ -26,6 +26,12 @@ function checkAction(action: KeyAction, keyId: string) {
                 `${keyId}: '${action.stroke.key}' must ${needsShift ? '' : 'NOT '}carry shiftKey`,
             ).toBe(needsShift);
         }
+    } else if (action.type === 'strokes') {
+        expect(action.strokes.length, `${keyId}: strokes must be non-empty`).toBeGreaterThan(0);
+        for (const s of action.strokes) {
+            expect(s.key, `${keyId}: stroke.key must be set`).not.toBe('');
+            expect(s.code, `${keyId}: stroke '${s.key}' needs a code`).not.toBe('');
+        }
     } else if (action.type === 'commit') {
         expect(action.text.length, `${keyId}: commit text must be non-empty`).toBeGreaterThan(0);
     }
@@ -132,6 +138,35 @@ describe('layout data', () => {
         expect(getLayout('dvorak', false).rows.flat().find((k) => k.id === 'Comma')).toBeUndefined();
         const dvorakBottom = bottomRow({ layer: 'main', asciiMode: false, spaceLabel: 's', layoutHasPunctuation: false, script: 'zh' });
         expect(dvorakBottom.find((k) => k.id === 'Comma')?.label).toBe('，');
+    });
+});
+
+describe('kana layout', () => {
+    it('keys type romaji stroke sequences the jap_poly schema understands', async () => {
+        const { kanaLayout } = await import('../entrypoints/inputview/layouts/kana');
+        const romajiOf = (action: KeyAction) =>
+            action.type === 'strokes' ? action.strokes.map((s) => s.key).join('') : null;
+        const byLabel = new Map<string, KeyAction>();
+        for (const row of kanaLayout.rows) {
+            for (const key of row) {
+                byLabel.set(key.label, key.action);
+                for (const alt of key.alts ?? []) byLabel.set(alt.label, alt.action);
+            }
+        }
+        // jap_poly base spellings (kunrei): し=si, つ=tu, ふ=hu; っ/small use x.
+        for (const [kana, romaji] of [
+            ['あ', 'a'], ['し', 'si'], ['つ', 'tu'], ['ふ', 'hu'], ['ん', 'n'],
+            ['を', 'wo'], ['ー', '-'], ['っ', 'xtu'], ['ゃ', 'xya'], ['が', 'ga'], ['ぱ', 'pa'],
+        ] as const) {
+            expect(romajiOf(byLabel.get(kana)!), `${kana} must type "${romaji}"`).toBe(romaji);
+        }
+        // Every kana stroke must stay inside jap_poly's alphabet (a–z and -).
+        for (const [label, action] of byLabel) {
+            const romaji = romajiOf(action);
+            if (romaji !== null) {
+                expect(/^[a-z-]+$/.test(romaji), `${label}: '${romaji}' outside a–z/-`).toBe(true);
+            }
+        }
     });
 });
 

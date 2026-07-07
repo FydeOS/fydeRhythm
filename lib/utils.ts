@@ -101,8 +101,9 @@ export function resolveEffectiveLatinLayout(
 export function guessLayoutForSchema(schemaId: string, schemaName?: string): LayoutId | undefined {
     const haystack = `${schemaId} ${schemaName ?? ""}`.toLowerCase();
     if (/zhuyin|bopomofo|注音/.test(haystack)) return "zhuyin";
-    if (/kana|japanese|japan|日本|假名|かな/.test(haystack)) return "kana";
-    if (/hangul|korean|谚文|한글/.test(haystack)) return "hangul";
+    // "jap" catches the store's jap_poly, whose id lacks the full word.
+    if (/kana|japan|jap|nihon|日本|日文|假名|かな/.test(haystack)) return "kana";
+    if (/hangul|hangeul|korean|谚文|한글/.test(haystack)) return "hangul";
     return undefined;
 }
 

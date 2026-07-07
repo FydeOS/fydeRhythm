@@ -202,6 +202,10 @@ export default function App() {
                 host.typeStroke(layoutStroke(action.stroke));
                 if (shift === 'shift') setShift('off');
                 break;
+            case 'strokes':
+                for (const s of action.strokes) host.typeStroke(layoutStroke(s));
+                if (shift === 'shift') setShift('off');
+                break;
             case 'commit':
                 host.insertText(action.text);
                 if (shift === 'shift') setShift('off');

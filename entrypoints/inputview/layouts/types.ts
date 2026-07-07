@@ -16,6 +16,8 @@ export type LayerId = 'main' | 'sym' | 'sym2' | 'emoji';
 export type KeyAction =
     // Inject a keystroke (letters, digits, punctuation, Backspace, Enter, …)
     | { type: 'stroke'; stroke: KeyStroke }
+    // Inject a keystroke sequence (kana keys type their romaji spelling)
+    | { type: 'strokes'; strokes: KeyStroke[] }
     // Commit text directly, bypassing the engine (emoji, glyphs with no key mapping)
     | { type: 'commit'; text: string }
     | { type: 'shift' }
