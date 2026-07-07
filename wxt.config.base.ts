@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import type { UserConfig, WxtHooks } from 'wxt';
+import Icons from 'unplugin-icons/vite';
 
 const licensePath = fileURLToPath(new URL('./LICENSE', import.meta.url));
 
@@ -39,6 +40,10 @@ export const sharedInputComponent = {
 };
 
 export const sharedVite: UserConfig['vite'] = () => ({
+  // `~icons/<set>/<name>` imports compile to inline SVG React components at
+  // build time — no runtime dependency or network fetch, so they stay within
+  // the extension's strict CSP. Only imported icons are bundled.
+  plugins: [Icons({ compiler: 'jsx', jsx: 'react' })],
   build: {
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 1500,
