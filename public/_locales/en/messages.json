@@ -288,8 +288,14 @@
     "vk_kbmode_floating": {
         "message": "Floating keyboard"
     },
+    "vk_kbmode_onehand": {
+        "message": "One-handed keyboard"
+    },
     "vk_resize_keyboard": {
         "message": "Resize keyboard"
+    },
+    "vk_swap_side": {
+        "message": "Move to other side"
     },
     "vk_key_symbols": {
         "message": "Symbols"

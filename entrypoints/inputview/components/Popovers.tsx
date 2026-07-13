@@ -1,4 +1,5 @@
 import React from 'react';
+import type { KeyboardMode } from '../chrome-shim';
 import { t } from '../i18n';
 
 // Confirm chip for deleting a user-learned word (long-press on a candidate).
@@ -22,16 +23,17 @@ export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
     );
 }
 
-// Docked/floating picker opened by long-pressing the hide key (iPadOS-style).
-export function KeyboardModeMenu({ floating, anchor, onPick, onClose }: {
-    floating: boolean;
+// Placement picker opened by long-pressing the hide key (iPadOS-style).
+export function KeyboardModeMenu({ mode, anchor, onPick, onClose }: {
+    mode: KeyboardMode;
     anchor: DOMRect;
-    onPick: (floating: boolean) => void;
+    onPick: (mode: KeyboardMode) => void;
     onClose: () => void;
 }) {
-    const items: Array<{ floating: boolean; label: string }> = [
-        { floating: false, label: t('vk_kbmode_docked') },
-        { floating: true, label: t('vk_kbmode_floating') },
+    const items: Array<{ mode: KeyboardMode; label: string }> = [
+        { mode: 'docked', label: t('vk_kbmode_docked') },
+        { mode: 'floating', label: t('vk_kbmode_floating') },
+        { mode: 'onehand', label: t('vk_kbmode_onehand') },
     ];
     const height = items.length * 44 + 12;
     // The hide key sits at the bottom-right; open above it, and right-align so
@@ -46,11 +48,11 @@ export function KeyboardModeMenu({ floating, anchor, onPick, onClose }: {
             <div className="kb-menu" style={{ top, left, width: 180 }}>
                 {items.map((it) => (
                     <button
-                        key={String(it.floating)}
-                        className={`item${it.floating === floating ? ' active' : ''}`}
+                        key={it.mode}
+                        className={`item${it.mode === mode ? ' active' : ''}`}
                         onClick={() => {
                             onClose();
-                            if (it.floating !== floating) onPick(it.floating);
+                            if (it.mode !== mode) onPick(it.mode);
                         }}
                     >
                         {it.label}

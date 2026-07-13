@@ -10,35 +10,141 @@ import {
     type InputViewToBackground,
     type LayoutId,
 } from '@/lib/shared-types';
+import { kFrameUnits } from './layouts/frame';
 import type { KeyStroke } from './layouts/types';
 
+// Where the keyboard sits:
+//   docked   — full-width, bottom of the screen.
+//   floating — the docked keyboard scaled uniformly, dragged anywhere.
+//   onehand  — phone-shaped keyboard pinned to a bottom corner (see below).
+export type KeyboardMode = 'docked' | 'floating' | 'onehand';
+export type OneHandSide = 'left' | 'right';
+
 // Floating window = docked keyboard scaled uniformly; `scale` is the fraction
-// of docked size. kFloatingHandleHeight matches `.kb-handle` in md3.css.
-export const kFloatingHandleHeight = 22;
+// of docked size. Both constants match `.kb-handle` / `.kb-resize-grip` in
+// md3.css: the handle is the card's top strip, and the resize button sits at
+// its right end. The OS drag region stops short of the button — a draggable
+// region swallows the pointer, so anything under it can never be tapped.
+export const kFloatingHandleHeight = 28;
+export const kFloatingResizeWidth = 56;
 const kFloatingMargin = 8;
-export const kFloatingScaleMin = 0.4;
+export const kFloatingScaleMin = 0.55;
 export const kFloatingScaleMax = 0.85;
 export const kFloatingDefaultScale = 0.6;
 
+// Smallest key a finger can reliably hit. Material asks for 48dp; this is the
+// hard floor the geometry refuses to go below.
+const kMinKeyHeight = 32;
+const kKeyGap = 2 * 3.5; // --kb-cell-pad, both sides
+
+// "Scaled uniformly" is a half-truth: the handle and the candidate bar have
+// floors (they hold real controls), so they DON'T shrink with the card — at
+// scale 0.55 they take 30% of it against 13% docked, and the rows get what is
+// left. Shrunk far enough that crushed the keys: a 5-row layout (zhuyin, kana)
+// came out at 21px per key. So the card has a floor of its own, computed from
+// the rows it must hold. Below it the keyboard stops getting shorter; shrinking
+// past this is what one-hand mode is for, and it reflows instead of scaling.
+function minFloatingHeight(rows: number): number {
+    return rows * (kMinKeyHeight + kKeyGap) + kFloatingHandleHeight + kMinBarHeight + kEdge;
+}
+const kMinBarHeight = 40; // --kb-bar-height floor in md3.css
+const kEdge = 5; // --kb-edge
+
+// One-hand keyboard. NOT a smaller floating keyboard: scaling the docked
+// keyboard preserves its aspect, and the docked keyboard is a wide, squat
+// ribbon (a full screen width over ~372px), so no scale factor yields keys a
+// thumb can work — narrow enough to reach across and the rows collapse to
+// ~30px. This mode reflows to phone proportions instead: the frame is
+// kFrameUnits key columns across, so the pitch is width/11.5, and rows are
+// 1.4x the pitch tall — keys taller than wide, the shape thumbs actually type
+// on. At the 420px cap that lands on a ~36px pitch and ~45px keys, i.e. the
+// metrics of a phone keyboard.
+//
+// It is corner-anchored on purpose and cannot be dragged: the thumb sweeps an
+// arc pivoted at the hand gripping the edge, so a keyboard adrift in the
+// middle of the screen is worse one-handed than one glued to the corner.
+const kOneHandWidthFraction = 0.36;
+const kOneHandWidthMin = 320;
+const kOneHandWidthMax = 420;
+// Latin/hangul layouts are 4 rows; zhuyin and kana are 5. The card grows a row
+// rather than dividing a fixed height by more rows — squeezing 5 rows into the
+// 4-row card drops the keys to 35px tall, which defeats the whole mode.
+export const kOneHandRows = 4;
+const kOneHandRowAspect = 1.4;
+// These three mirror `.kb-root.onehand` / `.kb-onehand-bar` in md3.css: the
+// card height is computed from them, so CSS and TS must agree.
+const kOneHandEdge = 4;
+export const kOneHandBarHeight = 34;
+const kOneHandCandidateHeight = 40;
+
+export interface ScreenSize {
+    width: number;
+    height: number;
+}
+
 // `width`/`height` are the card size (docked ignores them, spans the screen);
-// `left`/`top` place a floating window (omitted → centre).
+// `left`/`top` place a floating window (omitted → centre). `draggable` arms the
+// OS drag region under the handle — off for the corner-anchored one-hand card.
 export interface ContainerGeometry {
     floating: boolean;
     width: number;
     height: number;
+    draggable: boolean;
     left?: number;
     top?: number;
 }
 
-// Persisted placement: floating size (scale) and dragged position.
-export interface FloatingPrefs {
-    floating: boolean;
+// Persisted placement: the mode, the floating size (scale) and dragged
+// position, and the corner the one-hand keyboard is pinned to.
+export interface Placement {
+    mode: KeyboardMode;
     scale: number;
+    side: OneHandSide;
     left?: number;
     top?: number;
 }
 
-export const kDefaultFloatingPrefs: FloatingPrefs = { floating: false, scale: kFloatingDefaultScale };
+export const kDefaultPlacement: Placement = { mode: 'docked', scale: kFloatingDefaultScale, side: 'right' };
+
+// Docked keyboard height. The legacy keyboard was a fixed 372px and users are
+// calibrated to it, so that is the floor; larger screens scale up to 42% of
+// screen height, capped. (Earlier cuts at 260/300px read visibly too short.)
+export function dockedHeight(screen: ScreenSize): number {
+    return Math.max(372, Math.min(Math.round(screen.height * 0.42), 440));
+}
+
+// The card size and placement for a given mode. Pure: the caller passes the
+// screen (window.screen on device, a fixture in tests) and, for one-hand, the
+// row count of the layout on screen — docked and floating divide a fixed height
+// among however many rows there are, but the one-hand card is sized FROM the
+// key, so it must know how many rows it is sizing for.
+export function geometryFor(p: Placement, screen: ScreenSize, rows: number = kOneHandRows): ContainerGeometry {
+    if (p.mode === 'docked') {
+        return { floating: false, draggable: false, width: screen.width, height: dockedHeight(screen) };
+    }
+    if (p.mode === 'floating') {
+        return {
+            floating: true,
+            draggable: true,
+            width: Math.round(screen.width * p.scale),
+            height: Math.max(Math.round(dockedHeight(screen) * p.scale), minFloatingHeight(rows)),
+            left: p.left,
+            top: p.top,
+        };
+    }
+    const width = Math.round(
+        Math.min(kOneHandWidthMax, Math.max(kOneHandWidthMin, screen.width * kOneHandWidthFraction)));
+    const rowHeight = Math.round(((width - 2 * kOneHandEdge) / kFrameUnits) * kOneHandRowAspect);
+    const height = rowHeight * rows + kOneHandCandidateHeight + kOneHandBarHeight + kOneHandEdge;
+    return {
+        floating: true,
+        draggable: false,
+        width,
+        height,
+        left: p.side === 'left' ? kFloatingMargin : Math.max(0, screen.width - width - kFloatingMargin),
+        top: Math.max(0, screen.height - height - kFloatingMargin),
+    };
+}
 
 export interface VkHost {
     readonly mock: boolean;
@@ -50,8 +156,8 @@ export interface VkHost {
     // the mode is confirmed — signal keyboardLoaded only after, or Chrome may
     // show the window with another IME's geometry.
     setupContainer(geom: ContainerGeometry): Promise<void>;
-    readFloatingPrefs(): Promise<FloatingPrefs>;
-    writeFloatingPrefs(prefs: FloatingPrefs): void;
+    readPlacement(): Promise<Placement>;
+    writePlacement(placement: Placement): void;
     openSettings(): void;
     // Connect the background port; returns the poster for VK→background messages.
     connect(onMessage: (msg: BackgroundToInputView) => void): (msg: InputViewToBackground) => void;
@@ -116,19 +222,29 @@ interface VirtualKeyboardPrivate {
     openSettings(): void;
 }
 
-const kFloatingPrefKey = "inputViewFloating";
+// Kept under the original key so a stored placement survives the upgrade.
+const kPlacementPrefKey = "inputViewFloating";
 
-// Clamp the persisted scale and tolerate a missing/legacy value (an older
-// build stored a bare boolean under this key).
-export function normalizeFloatingPrefs(raw: unknown): FloatingPrefs {
-    if (raw === true) return { floating: true, scale: kFloatingDefaultScale };
-    if (!raw || typeof raw !== "object") return kDefaultFloatingPrefs;
-    const o = raw as Partial<FloatingPrefs>;
+// Clamp the persisted scale and migrate the two older shapes stored under this
+// key: a bare boolean, and { floating: boolean, ... } from before one-hand mode.
+export function normalizePlacement(raw: unknown): Placement {
+    if (raw === true) return { ...kDefaultPlacement, mode: 'floating' };
+    if (!raw || typeof raw !== "object") return kDefaultPlacement;
+    const o = raw as Record<string, unknown>;
+    const mode: KeyboardMode = o.mode === 'floating' || o.mode === 'onehand' || o.mode === 'docked'
+        ? o.mode
+        : o.floating === true ? 'floating' : 'docked';
     const scale = typeof o.scale === "number" && isFinite(o.scale)
         ? Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, o.scale))
         : kFloatingDefaultScale;
     const coord = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : undefined);
-    return { floating: o.floating === true, scale, left: coord(o.left), top: coord(o.top) };
+    return {
+        mode,
+        scale,
+        side: o.side === 'left' ? 'left' : 'right',
+        left: coord(o.left),
+        top: coord(o.top),
+    };
 }
 
 function getVkPrivate(): VirtualKeyboardPrivate | undefined {
@@ -185,7 +301,7 @@ class RealHost implements VkHost {
 
     setupContainer(geom: ContainerGeometry): Promise<void> {
         return geom.floating
-            ? this.setupFloating(geom.width, geom.height, geom.left, geom.top)
+            ? this.setupFloating(geom)
             : this.setupDocked(geom.height);
     }
 
@@ -203,6 +319,14 @@ class RealHost implements VkHost {
                 }
                 window.resizeTo(window.screen.width, height);
                 window.moveTo(0, window.screen.height - height);
+                // Retire any drag region left by a floating session. A docked
+                // keyboard has no handle, so a surviving region would sit over
+                // the candidate bar and swallow taps on the first candidates.
+                try {
+                    this.vk.setDraggableArea({ left: 0, top: 0, width: window.screen.width, height: 0 });
+                } catch (e) {
+                    console.warn('setDraggableArea failed', e);
+                }
                 this.updateHitTest();
                 resolve();
             });
@@ -210,8 +334,8 @@ class RealHost implements VkHost {
     }
 
     // The window IS the card (opaque). left/top omitted centres near the bottom;
-    // passing them keeps a dragged keyboard put.
-    private setupFloating(width: number, height: number, left?: number, top?: number): Promise<void> {
+    // passing them keeps a dragged (or corner-pinned) keyboard put.
+    private setupFloating({ width, height, left, top, draggable }: ContainerGeometry): Promise<void> {
         const clamp = (v: number, max: number) => Math.max(0, Math.min(v, max));
         const winLeft = left !== undefined
             ? clamp(left, window.screen.width - width)
@@ -230,7 +354,17 @@ class RealHost implements VkHost {
                 window.resizeTo(width, height);
                 window.moveTo(winLeft, winTop);
                 try {
-                    this.vk.setDraggableArea({ left: 0, top: 0, width, height: kFloatingHandleHeight });
+                    // Stops short of the resize button at the strip's right end,
+                    // which would otherwise never receive a pointer. Zero height
+                    // retires the region entirely: one-hand is corner-anchored, and
+                    // a stale drag area from a previous floating session would still
+                    // swallow taps on the swap bar.
+                    this.vk.setDraggableArea({
+                        left: 0,
+                        top: 0,
+                        width: draggable ? Math.max(0, width - kFloatingResizeWidth) : width,
+                        height: draggable ? kFloatingHandleHeight : 0,
+                    });
                 } catch (e) {
                     console.warn('setDraggableArea failed', e);
                 }
@@ -240,17 +374,17 @@ class RealHost implements VkHost {
         });
     }
 
-    async readFloatingPrefs(): Promise<FloatingPrefs> {
+    async readPlacement(): Promise<Placement> {
         try {
-            const got = await chrome.storage.local.get(kFloatingPrefKey);
-            return normalizeFloatingPrefs(got[kFloatingPrefKey]);
+            const got = await chrome.storage.local.get(kPlacementPrefKey);
+            return normalizePlacement(got[kPlacementPrefKey]);
         } catch {
-            return kDefaultFloatingPrefs;
+            return kDefaultPlacement;
         }
     }
 
-    writeFloatingPrefs(prefs: FloatingPrefs): void {
-        void chrome.storage.local.set({ [kFloatingPrefKey]: prefs });
+    writePlacement(placement: Placement): void {
+        void chrome.storage.local.set({ [kPlacementPrefKey]: placement });
     }
 
     openSettings(): void {
@@ -376,16 +510,16 @@ class MockHost implements VkHost {
         return Promise.resolve();
     }
 
-    async readFloatingPrefs(): Promise<FloatingPrefs> {
+    async readPlacement(): Promise<Placement> {
         try {
-            return normalizeFloatingPrefs(JSON.parse(localStorage.getItem(kFloatingPrefKey) ?? 'null'));
+            return normalizePlacement(JSON.parse(localStorage.getItem(kPlacementPrefKey) ?? 'null'));
         } catch {
-            return kDefaultFloatingPrefs;
+            return kDefaultPlacement;
         }
     }
 
-    writeFloatingPrefs(prefs: FloatingPrefs): void {
-        localStorage.setItem(kFloatingPrefKey, JSON.stringify(prefs));
+    writePlacement(placement: Placement): void {
+        localStorage.setItem(kPlacementPrefKey, JSON.stringify(placement));
     }
 
     openSettings(): void {

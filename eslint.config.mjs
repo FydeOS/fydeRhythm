@@ -9,6 +9,10 @@ const sourceFiles = [
   "entrypoints/**/*.{ts,tsx}",
   "lib/**/*.{ts,tsx}",
   "tests/**/*.ts",
+  // The audit's check functions are serialized into the browser, so these run
+  // half in node and half in the page — they need both sets of globals. (The
+  // other scripts/ files declare their own globals and are left alone.)
+  "scripts/inputview-audit/*.mjs",
   "vitest.config.ts",
   "wxt.config*.ts",
 ];

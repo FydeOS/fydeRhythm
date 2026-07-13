@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
 import { strokeForChar } from '@/lib/latin-remap';
-import { createHost, kFloatingScaleMin, kFloatingScaleMax, type ContainerGeometry } from './chrome-shim';
+import {
+    createHost,
+    geometryFor,
+    kFloatingScaleMin,
+    kFloatingScaleMax,
+    kOneHandRows,
+    type KeyboardMode,
+    type OneHandSide,
+    type Placement,
+} from './chrome-shim';
 import { t } from './i18n';
 import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation, numpadLayout } from './layouts';
 import type { AltDef, KeyAction, KeyDef, LayerId } from './layouts/types';
@@ -11,7 +20,7 @@ import { CandidateBar } from './components/CandidateBar';
 import { ExpandedPanel } from './components/ExpandedPanel';
 import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
 import { EmojiPanel } from './components/EmojiPanel';
-import { ResizeGripIcon } from './components/icons';
+import { ChevronLeftIcon, ChevronRightIcon, ResizeGripIcon } from './components/icons';
 
 type Popover =
     | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -24,22 +33,6 @@ type FloatingPos = { left: number; top: number };
 
 function readWindowPos(): FloatingPos {
     return { left: window.screenX, top: window.screenY };
-}
-
-// Floating = docked keyboard scaled uniformly (aspect always matches docked);
-// `pos` places the window, null centres it.
-function geomFor(floating: boolean, scale: number, pos?: FloatingPos | null): ContainerGeometry {
-    const dockedH = keyboardHeight();
-    return floating
-        ? { floating: true, width: Math.round(window.screen.width * scale), height: Math.round(dockedH * scale), left: pos?.left, top: pos?.top }
-        : { floating: false, width: window.screen.width, height: dockedH };
-}
-
-// Docked keyboard height. The legacy keyboard was a fixed 372px and users are
-// calibrated to it, so that is the floor; larger screens scale up to 42% of
-// screen height, capped. (Earlier cuts at 260/300px read visibly too short.)
-function keyboardHeight(): number {
-    return Math.max(372, Math.min(Math.round(window.screen.height * 0.42), 440));
 }
 
 const kCandidatePageSize = 10;
@@ -73,17 +66,33 @@ export default function App() {
     const [expanded, setExpanded] = useState(false);
     const [popover, setPopover] = useState<Popover>(null);
     const [containerReady, setContainerReady] = useState(false);
-    const [floating, setFloating] = useState(false);
+    const [placementLoaded, setPlacementLoaded] = useState(false);
+    const [mode, setMode] = useState<KeyboardMode>('docked');
+    const [side, setSide] = useState<OneHandSide>('right');
     const [floatingScale, setFloatingScale] = useState(1);
     // Mirrors for the once-on-mount handlers (visibility/orientation) and the
     // resize gesture, which would otherwise capture stale state.
-    const floatingRef = useRef(false);
+    const modeRef = useRef<KeyboardMode>('docked');
+    const sideRef = useRef<OneHandSide>('right');
     const floatingScaleRef = useRef(1);
+    // Rows in the layout on screen (0 = no layout yet). The card is sized from
+    // the key up, so its height depends on this; 0 holds a one-hand card back
+    // until the first layout arrives rather than placing it at the wrong height
+    // and resizing under the user. It is STATE, not just a ref: the card's own
+    // inline size is computed from it during render, and a ref written in an
+    // effect would leave the card a render behind the window it sits in.
+    const [rows, setRows] = useState(0);
+    const rowsRef = useRef(0);
+    const placementLoadedRef = useRef(false);
+    // Geometry last handed to the OS, so a re-render that changes nothing about
+    // the card doesn't re-place the window.
+    const appliedRef = useRef('');
     // Last known floating window position (null = never placed → centre it).
+    // One-hand ignores it: geometryFor pins that card to a corner.
     const floatingPosRef = useRef<FloatingPos | null>(null);
     // Active corner-grip drag: start pointer-x, scale, window position, and card
     // width — the top-right corner is held fixed so it grows toward lower-left.
-    const resizeStart = useRef<{ x: number; scale: number; pos: FloatingPos; width: number } | null>(null);
+    const resizeStart = useRef<{ x: number; scale: number; pos: FloatingPos } | null>(null);
     const resizeRaf = useRef(false);
     const loadedSignaled = useRef(false);
     const lastShiftTap = useRef(0);
@@ -92,6 +101,20 @@ export default function App() {
     const loadMoreMark = useRef(-1);
 
     const post = (msg: InputViewToBackground) => postRef.current?.(msg);
+
+    // Placement read off the mirrors, so the mount-only handlers and the resize
+    // gesture always see the live values. `over` applies a not-yet-committed
+    // change (the mode being picked, the side being swapped).
+    const placement = (over: Partial<Placement> = {}): Placement => ({
+        mode: modeRef.current,
+        scale: floatingScaleRef.current,
+        side: sideRef.current,
+        left: floatingPosRef.current?.left,
+        top: floatingPosRef.current?.top,
+        ...over,
+    });
+    const geom = (over: Partial<Placement> = {}) =>
+        geometryFor(placement(over), window.screen, rowsRef.current || kOneHandRows);
 
     useEffect(() => {
         postRef.current = host.connect((msg) => {
@@ -113,24 +136,24 @@ export default function App() {
         });
         post({ kind: 'visibility', visible: true });
 
-        // Re-assert geometry, keeping a floating keyboard where it sits.
+        // Re-assert geometry, keeping a floating keyboard where it sits. (A
+        // one-hand card is re-pinned to its corner, which is what we want after
+        // a rotation.)
         const resetContainer = () => {
-            if (floatingRef.current) {
-                const pos = readWindowPos();
-                floatingPosRef.current = pos;
-                return host.setupContainer(geomFor(true, floatingScaleRef.current, pos));
-            }
-            return host.setupContainer(geomFor(false, floatingScaleRef.current));
+            if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
+            return host.setupContainer(geom());
         };
 
         const onVisibility = () => {
             post({ kind: 'visibility', visible: !document.hidden });
+            // Before the stored placement lands, the refs still say "docked" —
+            // re-asserting that would place the wrong container.
+            if (!placementLoadedRef.current) return;
             if (document.hidden) {
                 // Remember where a floating keyboard was before it hides.
-                if (floatingRef.current) {
-                    const pos = readWindowPos();
-                    floatingPosRef.current = pos;
-                    host.writeFloatingPrefs({ floating: true, scale: floatingScaleRef.current, left: pos.left, top: pos.top });
+                if (modeRef.current === 'floating') {
+                    floatingPosRef.current = readWindowPos();
+                    host.writePlacement(placement());
                 }
             } else {
                 void resetContainer();
@@ -138,17 +161,20 @@ export default function App() {
         };
         document.addEventListener('visibilitychange', onVisibility);
 
-        // Restore saved placement before the first setup. Uses the saved
-        // position (null → centre), not the live pos, which isn't placed yet.
-        void host.readFloatingPrefs().then((prefs) => {
-            floatingRef.current = prefs.floating;
+        // Restore saved placement; the effect below performs the setup, once it
+        // knows enough to size the card.
+        void host.readPlacement().then((prefs) => {
+            modeRef.current = prefs.mode;
+            sideRef.current = prefs.side;
             floatingScaleRef.current = prefs.scale;
             floatingPosRef.current = prefs.left !== undefined && prefs.top !== undefined
                 ? { left: prefs.left, top: prefs.top }
                 : null;
-            setFloating(prefs.floating);
+            setMode(prefs.mode);
+            setSide(prefs.side);
             setFloatingScale(prefs.scale);
-            void host.setupContainer(geomFor(prefs.floating, prefs.scale, floatingPosRef.current)).then(() => setContainerReady(true));
+            placementLoadedRef.current = true;
+            setPlacementLoaded(true);
         });
         const onOrientation = () => void resetContainer();
         window.screen.orientation?.addEventListener('change', onOrientation);
@@ -164,6 +190,76 @@ export default function App() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // The keys on screen. Derived above the early return because the container
+    // effect below sizes the one-hand card from the row count (zhuyin and kana
+    // are 5 rows, the Latin layouts 4).
+    const view = useMemo(() => {
+        if (!vk) return null;
+        const activeLayoutId = vk.asciiMode ? vk.latinLayout : vk.layout;
+        // Numeric field → numberpad, unless the user tapped ABC for letters.
+        const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
+        const layout = numpad || layer === 'emoji'
+            ? null
+            : layer === 'main'
+                ? getLayout(activeLayoutId, vk.asciiMode)
+                : getLayerLayout(layer, vk.asciiMode);
+        let bottom = bottomRow({
+            layer,
+            asciiMode: vk.asciiMode,
+            spaceLabel: vk.schemaName,
+            layoutHasPunctuation: layoutHostsPunctuation(activeLayoutId),
+            script: vk.script,
+        });
+        // On the letters view of a numeric field, the ?123 key returns to the pad.
+        if (vk.numericField && numericLetters && layer === 'main') {
+            bottom = bottom.map((k) => k.id === 'to-sym'
+                ? { id: 'to-numpad', label: '123', kind: 'function', action: { type: 'numericLetters', on: false }, width: k.width } as KeyDef
+                : k);
+        }
+        const rows: KeyDef[][] | null = numpad
+            ? numpad.rows
+            : layout
+                ? [...layout.rows, bottom]
+                : null;
+        return { gridId: numpad ? numpad.id : layout?.id ?? 'emoji', rows };
+    }, [vk, layer, numericLetters]);
+
+    // Rows on screen; null on the emoji panel, which keeps the card as it is.
+    const rowCount = view?.rows?.length ?? null;
+
+    // Publish the row count for the render below and the effect after it. Both
+    // must agree: the window is sized from this, and so is the card drawn inside
+    // it. (zhuyin is 5 rows, the Latin layouts 4.)
+    useEffect(() => {
+        if (rowCount && rowCount !== rowsRef.current) {
+            rowsRef.current = rowCount;
+            setRows(rowCount);
+        }
+    }, [rowCount]);
+
+    // Size and place the window. A one-hand card waits for the first layout,
+    // because its height is derived from the row count — placing it early would
+    // mean resizing it out from under the user a frame later.
+    useEffect(() => {
+        if (!placementLoaded) return;
+        if (mode === 'onehand' && !rows) return;
+        // The OS moves a floating window when the user drags the handle, and
+        // tells us nothing. Re-read where it actually is before re-asserting
+        // geometry, or we would teleport it back to wherever we last put it.
+        if (mode === 'floating' && appliedRef.current) floatingPosRef.current = readWindowPos();
+        const next = geom();
+        const key = JSON.stringify(next);
+        // Rows change on every layer switch, but only a one-hand card resizes
+        // for them — don't re-place a window whose geometry hasn't moved.
+        if (key === appliedRef.current) {
+            setContainerReady(true);
+            return;
+        }
+        appliedRef.current = key;
+        void host.setupContainer(next).then(() => setContainerReady(true));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [placementLoaded, mode, side, rows, host]);
 
     // Tell Chrome to show the window only after the container mode is confirmed
     // AND the first keyboard has rendered — signaling earlier can flash a
@@ -266,89 +362,117 @@ export default function App() {
         setPopover({ type: 'menu', anchor });
     };
 
-    // iPadOS-style: a long-press on the hide key opens a dock/float menu (a
-    // plain tap still hides). Applies the chosen placement and persists it.
-    const setFloatingMode = (next: boolean) => {
-        floatingRef.current = next;
-        setFloating(next);
-        const pos = floatingPosRef.current;
-        host.writeFloatingPrefs({ floating: next, scale: floatingScaleRef.current, left: pos?.left, top: pos?.top });
-        void host.setupContainer(geomFor(next, floatingScaleRef.current, next ? pos : null));
+    // iPadOS-style: a long-press on the hide key opens the placement menu (a
+    // plain tap still hides). Applies the chosen mode and persists it.
+    const setKeyboardMode = (next: KeyboardMode) => {
+        // Capture where the OS actually left the card before leaving floating —
+        // a drag of the handle fires no event, so this is the only chance to
+        // learn about it, and persisting without it would throw the drag away.
+        if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
+        modeRef.current = next;
+        setMode(next);
+        // A keyboard returning to float lands where it was left (the position is
+        // kept across modes); docked and one-hand place themselves. The container
+        // effect applies the new geometry.
+        host.writePlacement(placement());
     };
 
-    // Corner-grip drag scales the window, anchored at the top-left captured on
-    // down; resizes coalesced per frame, size+pos persisted on up.
+    // Swap the one-hand keyboard to the other bottom corner — the frequent
+    // gesture (you switch hands far more often than you switch modes), so it
+    // gets a permanent button rather than a trip through the menu.
+    const swapSide = () => {
+        const next: OneHandSide = sideRef.current === 'left' ? 'right' : 'left';
+        sideRef.current = next;
+        setSide(next);
+        host.writePlacement(placement());
+    };
+
+    // The resize button sits at the right end of the drag handle, so dragging it
+    // right grows the keyboard and the top-left corner stays put — the card grows
+    // the way the pointer is going. Resizes are coalesced per frame; size and
+    // position are persisted on release.
     const onResizeDown = (e: React.PointerEvent) => {
         e.preventDefault();
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
-        resizeStart.current = { x: e.clientX, scale: floatingScaleRef.current, pos: readWindowPos(), width: geomFor(true, floatingScaleRef.current).width };
+        resizeStart.current = { x: e.screenX, scale: floatingScaleRef.current, pos: readWindowPos() };
     };
     const onResizeMove = (e: React.PointerEvent) => {
         const start = resizeStart.current;
         if (!start) return;
-        // Dragging left (clientX decreases) grows the keyboard.
-        const next = Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, start.scale + (start.x - e.clientX) / window.screen.width));
+        // A missed pointerup (the OS can steal the pointer while it moves the
+        // window) would otherwise leave the card resizing on plain hover.
+        if (e.buttons === 0) { onResizeUp(); return; }
+        // screenX, NOT clientX: growing the card can push it against the screen
+        // edge, and the OS then slides the whole window left. A viewport-relative
+        // x would read that as the finger moving, grow the card again, and run
+        // the scale to its limit in a few frames.
+        const next = Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, start.scale + (e.screenX - start.x) / window.screen.width));
         floatingScaleRef.current = next;
         setFloatingScale(next);
-        // Hold the top-right corner: new left = right edge − new width.
-        const rightEdge = start.pos.left + start.width;
-        floatingPosRef.current = { left: rightEdge - geomFor(true, next).width, top: start.pos.top };
+        floatingPosRef.current = start.pos;
         if (!resizeRaf.current) {
             resizeRaf.current = true;
             requestAnimationFrame(() => {
                 resizeRaf.current = false;
-                void host.setupContainer(geomFor(true, floatingScaleRef.current, floatingPosRef.current));
+                const g = geom();
+                appliedRef.current = JSON.stringify(g);
+                void host.setupContainer(g);
             });
         }
     };
     const onResizeUp = () => {
         if (!resizeStart.current) return;
         resizeStart.current = null;
-        const pos = floatingPosRef.current;
-        host.writeFloatingPrefs({ floating: true, scale: floatingScaleRef.current, left: pos?.left, top: pos?.top });
+        host.writePlacement(placement());
     };
 
-    if (!vk) {
+    if (!vk || !view) {
         return <div className="kb-root" />;
     }
 
-    const activeLayoutId = vk.asciiMode ? vk.latinLayout : vk.layout;
-    // Numeric field → numberpad, unless the user tapped ABC for letters.
-    const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
-    const layout = numpad || layer === 'emoji'
-        ? null
-        : layer === 'main'
-            ? getLayout(activeLayoutId, vk.asciiMode)
-            : getLayerLayout(layer, vk.asciiMode);
-    let bottom = bottomRow({
-        layer,
-        asciiMode: vk.asciiMode,
-        spaceLabel: vk.schemaName,
-        layoutHasPunctuation: layoutHostsPunctuation(activeLayoutId),
-        script: vk.script,
-    });
-    // On the letters view of a numeric field, the ?123 key returns to the pad.
-    if (vk.numericField && numericLetters && layer === 'main') {
-        bottom = bottom.map((k) => k.id === 'to-sym'
-            ? { id: 'to-numpad', label: '123', kind: 'function', action: { type: 'numericLetters', on: false }, width: k.width }
-            : k);
-    }
-    const renderRows: KeyDef[][] | null = numpad
-        ? numpad.rows
-        : layout
-            ? [...layout.rows, bottom]
-            : null;
-
-    const floatStyle = floating
-        ? { width: geomFor(true, floatingScale).width, height: geomFor(true, floatingScale).height }
-        : undefined;
+    // The card is the window on device; in the mock tab the inline size is what
+    // makes a floating/one-hand keyboard render at its true size.
+    const card = mode === 'docked'
+        ? undefined
+        : geometryFor({ mode, scale: floatingScale, side }, window.screen, rows || kOneHandRows);
+    const cardStyle = card ? { width: card.width, height: card.height } : undefined;
 
     return (
-        <div className={`kb-root${floating ? ' floating' : ''}`} style={floatStyle}>
-            {floating && (
-                // Visible counterpart of the OS draggable region.
-                <div className="kb-handle" aria-hidden="true">
-                    <span className="kb-grabber" />
+        <div className={`kb-root${mode === 'docked' ? '' : ` ${mode}`}`} style={cardStyle}>
+            {mode === 'floating' && (
+                // The card's top strip: the visible counterpart of the OS drag
+                // region, with the resize button parked at its right end. The
+                // grip used to float over the bottom-left KEY, where it could
+                // never line up with anything and covered ?123; here it sits in
+                // chrome that is already reserved.
+                <div className="kb-handle">
+                    <span className="kb-grabber" aria-hidden="true" />
+                    <button
+                        className="kb-resize-grip"
+                        aria-label={t('vk_resize_keyboard')}
+                        onPointerDown={onResizeDown}
+                        onPointerMove={onResizeMove}
+                        onPointerUp={onResizeUp}
+                        onPointerCancel={onResizeUp}
+                        onContextMenu={(e) => e.preventDefault()}
+                    >
+                        <ResizeGripIcon />
+                    </button>
+                </div>
+            )}
+            {mode === 'onehand' && (
+                // The one-hand card can't be dragged, so its top bar carries the
+                // side swap instead of a grabber. The button sits on the pinned
+                // side (under the thumb already holding that edge) and its arrow
+                // points across, to the corner the keyboard will jump to.
+                <div className={`kb-onehand-bar ${side}`}>
+                    <button
+                        className="icon-btn"
+                        aria-label={t('vk_swap_side')}
+                        onClick={swapSide}
+                    >
+                        {side === 'left' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+                    </button>
                 </div>
             )}
             {/* Announce candidate updates for screen readers (ChromeVox). */}
@@ -379,13 +503,13 @@ export default function App() {
                     // center with side margins — the Gboard alignment model. Rows
                     // must never stretch keys to fill the width.
                     (() => {
-                        const rows = renderRows!;
+                        const rows = view.rows!;
                         const units = (row: KeyDef[]) => row.reduce((s, k) => s + (k.width ?? 1), 0);
                         const maxUnits = Math.max(...rows.map(units));
                         const cell = (def: KeyDef) => ({
                             width: `${((def.width ?? 1) / maxUnits) * 100}%`,
                         });
-                        const gridId = numpad ? numpad.id : layout!.id;
+                        const gridId = view.gridId;
                         return (
                             <>
                                 {rows.map((row, i) => (
@@ -425,19 +549,6 @@ export default function App() {
                     />
                 )}
             </div>
-            {floating && (
-                <button
-                    className="kb-resize-grip"
-                    aria-label={t('vk_resize_keyboard')}
-                    onPointerDown={onResizeDown}
-                    onPointerMove={onResizeMove}
-                    onPointerUp={onResizeUp}
-                    onPointerCancel={onResizeUp}
-                    onContextMenu={(e) => e.preventDefault()}
-                >
-                    <ResizeGripIcon />
-                </button>
-            )}
             {popover?.type === 'bubble' && (
                 <AltBubble
                     alts={popover.alts}
@@ -469,9 +580,9 @@ export default function App() {
             )}
             {popover?.type === 'kbmode' && (
                 <KeyboardModeMenu
-                    floating={floating}
+                    mode={mode}
                     anchor={popover.anchor}
-                    onPick={setFloatingMode}
+                    onPick={setKeyboardMode}
                     onClose={() => setPopover(null)}
                 />
             )}

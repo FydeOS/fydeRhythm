@@ -27,15 +27,33 @@ function hasPreview(def: KeyDef): boolean {
 // Preview box above the key, clamped INSIDE the window: the keyboard is its
 // own ChromeOS window, so anything positioned past its edges is simply cut
 // off — top-row previews must slide down over the key instead.
-function previewStyle(anchor: DOMRect): React.CSSProperties {
-    // Key-sized, not magnified — an oversized preview reads as a heavy box.
-    const width = anchor.width;
-    const height = anchor.height;
+const kPreviewScale = 1.3;
+const kPreviewMinWidth = 48;
+
+// The preview is portalled to <body>, OUTSIDE the keyboard's CSS container, so
+// it can see neither the row-relative type scale nor a per-placement token
+// override — a cqh font would silently resolve against the viewport, and
+// --kb-key-radius would come from :root (12px) even over an 8px one-hand key.
+// Everything it needs is measured off the key it magnifies instead.
+function previewStyle(anchor: DOMRect, key: HTMLElement): React.CSSProperties {
+    // Bigger than the key, and centred over it. A key-sized preview is the trap:
+    // it looks exactly like the key it is covering, so it reads as the keyboard
+    // twitching rather than as "this is the letter you are about to type".
+    const width = Math.max(anchor.width * kPreviewScale, kPreviewMinWidth);
+    const height = anchor.height * kPreviewScale;
+    const centred = anchor.left + (anchor.width - width) / 2;
+    const cs = window.getComputedStyle(key);
     return {
-        left: Math.max(4, Math.min(anchor.left, window.innerWidth - width - 4)),
-        top: Math.max(4, anchor.top - height - 6),
+        left: Math.max(4, Math.min(centred, window.innerWidth - width - 4)),
+        top: Math.max(4, anchor.top - height - 8),
         width,
         height,
+        // Magnify the KEY's own glyph. Deriving this from the key's height
+        // instead would drift wherever the type scale and the key's proportions
+        // disagree — floating at minimum scale showed the letter SMALLER in the
+        // preview than on the key.
+        fontSize: `${parseFloat(cs.fontSize) * kPreviewScale}px`,
+        borderRadius: `${parseFloat(cs.borderRadius) + 2}px`,
     };
 }
 
@@ -196,7 +214,7 @@ export function Key({ def, shift, onAction, onOpenBubble, onLongPressMenu, activ
             {anchor && createPortal(
                 <div
                     className="kb-preview"
-                    style={previewStyle(anchor)}
+                    style={previewStyle(anchor, ref.current!)}
                 >
                     {label}
                 </div>,

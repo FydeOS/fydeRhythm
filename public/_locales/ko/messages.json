@@ -288,8 +288,14 @@
     "vk_kbmode_floating": {
         "message": "플로팅 키보드"
     },
+    "vk_kbmode_onehand": {
+        "message": "한 손 키보드"
+    },
     "vk_resize_keyboard": {
         "message": "키보드 크기 조절"
+    },
+    "vk_swap_side": {
+        "message": "반대쪽으로 이동"
     },
     "vk_key_symbols": {
         "message": "기호"

@@ -288,8 +288,14 @@
     "vk_kbmode_floating": {
         "message": "フローティングキーボード"
     },
+    "vk_kbmode_onehand": {
+        "message": "片手キーボード"
+    },
     "vk_resize_keyboard": {
         "message": "キーボードのサイズ変更"
+    },
+    "vk_swap_side": {
+        "message": "反対側へ移動"
     },
     "vk_key_symbols": {
         "message": "記号"

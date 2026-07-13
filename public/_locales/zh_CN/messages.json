@@ -288,8 +288,14 @@
     "vk_kbmode_floating": {
         "message": "浮动键盘"
     },
+    "vk_kbmode_onehand": {
+        "message": "单手键盘"
+    },
     "vk_resize_keyboard": {
         "message": "调整键盘大小"
+    },
+    "vk_swap_side": {
+        "message": "移到另一侧"
     },
     "vk_key_symbols": {
         "message": "符号键盘"

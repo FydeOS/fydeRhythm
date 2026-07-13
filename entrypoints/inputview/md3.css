@@ -59,19 +59,24 @@
   /* keys sit in fixed-fraction cells; the gap is the cell padding */
   --kb-cell-pad: 3.5px;
   --kb-edge: 5px;
-  /* Type scales WITH the keyboard: .kb-root is a size container, so 1cqh is 1%
-   * of the keyboard's own height (docked, floating, or zoomed alike).
-   * Baselines calibrated at the 372px-tall keyboard (28px letters ≈ 7.5cqh);
-   * the clamp floors are low enough that a shrunk floating keyboard scales its
-   * glyphs down instead of flooring — keys stay proportional at every size.
-   * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 60%. Glyphs at ~42% of
-   * key height; icons hold ~88% of letter size, hints ~53%. */
-  --kb-key-font: clamp(13px, 8.2cqh, 37px);
-  --kb-key-font-fn: clamp(10px, 5.4cqh, 24px);
-  --kb-icon-font: clamp(13px, 7.2cqh, 33px);
-  --kb-hint-font: clamp(8px, 4.3cqh, 19px);
+  /* Type scales with the ROW a key sits in (.kb-row is a size container), not
+   * with the card. Sizing off the card assumes a fixed share of it goes to
+   * chrome — true when the candidate bar is 13% of a docked keyboard, false the
+   * moment the card shrinks around a fixed-height bar and handle. A floating
+   * keyboard at 0.55 gives 30% of itself to chrome, and card-relative glyphs
+   * came out at 80% of a zhuyin key. Row-relative, every placement gets the
+   * docked proportions for free and nothing needs a per-mode override.
+   * Baseline (docked, 79.6px rows): letters ≈ 38% of the row.
+   * FlorisBoard ratios: hints ≈ 55% of letters, fn ≈ 66%, icons ≈ 88%. */
+  --kb-key-font: clamp(13px, 38cqh, 37px);
+  --kb-key-font-fn: clamp(10px, 25cqh, 24px);
+  --kb-icon-font: clamp(13px, 33cqh, 33px);
+  --kb-hint-font: clamp(8px, 20cqh, 19px);
+  /* The bar is outside the rows, so these stay card-relative. The floor keeps
+   * the bar's icon buttons at a hittable size (they are bar-height minus 8). */
   --kb-candidate-font: clamp(11px, 5.9cqh, 26px);
-  --kb-bar-height: clamp(34px, 13cqh, 52px);
+  --kb-bar-height: clamp(40px, 13cqh, 52px);
+  --kb-emoji-cell: clamp(36px, 14cqh, 56px);
 
   font-family: "Google Sans Text", Roboto, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
 }
@@ -135,6 +140,11 @@ body {
     background: var(--kb-popup-focused);
   }
 
+  /* Floating is the mouse-driven placement; its one control needs an affordance. */
+  .kb-resize-grip:hover {
+    background: var(--kb-surface);
+  }
+
   .kb-emoji-tabs .tab:hover {
     filter: grayscale(1) opacity(0.85);
   }
@@ -166,23 +176,67 @@ body {
   width: 100%;
   height: 100%;
   padding: 0 var(--kb-edge) var(--kb-edge);
-  /* Size container so the type scale (cqh below) tracks the keyboard's OWN
-     height — keys stay proportional at any docked/floating/zoom size, in both
-     the mock tab and the real (window-sized) keyboard. */
+  /* Size container for the things measured against the CARD (the candidate bar
+     and its type scale). The keys are measured against their row instead — see
+     .kb-row — so they stay proportional at any placement or scale. */
   container-type: size;
   container-name: kb;
 }
 
-/* Floating card fills the (opaque) OS window edge-to-edge — no rounding/shadow,
-   so nothing shows in the corners. App sets width/height inline; position:
-   relative anchors the resize grip. */
-.kb-root.floating {
-  position: relative;
+/* One-hand card: phone-shaped, pinned to a bottom corner. Tighter gaps and a fixed candidate bar keep the keys near phone metrics at
+   this size. geometryFor() in chrome-shim.ts derives the card height from these
+   three, so CSS and TS must agree. The type scale needs no override: it is
+   row-relative, so it already fits these keys. */
+.kb-root.onehand {
+  --kb-edge: 4px;
+  --kb-bar-height: 40px;
+  --kb-cell-pad: 2.5px;
+  --kb-key-radius: 8px;
 }
 
-/* Drag handle — visible twin of the OS draggable region. */
+/* A hint can't hold the docked 15%-of-key-width ratio on a key this narrow and
+   stay legible, so it tucks fully into the corner (the 4px/7px inset used by
+   the docked key is a lot of room on a 31px one). */
+.kb-root.onehand .kb-key .hint {
+  top: 2px;
+  right: 3px;
+}
+
+/* Top bar of the one-hand card: the swap button sits on the pinned side, i.e.
+   under the thumb already holding that edge — the far corner would be the one
+   place a one-handed user can't reach. Its arrow points across, to where the
+   keyboard will go (App picks the direction). */
+.kb-onehand-bar {
+  height: 34px; /* keep in sync with kOneHandBarHeight in chrome-shim.ts */
+  flex: none;
+  display: flex;
+  align-items: stretch;
+}
+
+.kb-onehand-bar.left {
+  justify-content: flex-start;
+}
+
+.kb-onehand-bar.right {
+  justify-content: flex-end;
+}
+
+/* Wider than tall on purpose — a pill, not a circle, so the radius has to be
+   set explicitly or the 50% above would draw an ellipse. */
+.kb-onehand-bar .icon-btn {
+  width: 56px;
+  aspect-ratio: auto;
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* Drag handle — visible twin of the OS draggable region, and the strip the
+   resize button lives in. The grabber stays optically centred on the CARD (it
+   is centred by the flex row, and the button is taken out of flow), which is
+   what makes the strip read as aligned with the keyboard below it. */
 .kb-handle {
-  height: 22px; /* keep in sync with kFloatingHandleHeight in chrome-shim.ts */
+  position: relative;
+  height: 28px; /* keep in sync with kFloatingHandleHeight in chrome-shim.ts */
   flex: none;
   display: flex;
   align-items: center;
@@ -198,29 +252,36 @@ body {
   opacity: 0.45;
 }
 
-/* Corner resize grip, lower-left. */
+/* Resize button, right end of the handle. Its width is kFloatingResizeWidth in
+   chrome-shim.ts, which is carved out of the OS drag region so this button can
+   actually receive the pointer — so it has to sit flush against the WINDOW's
+   right edge, not inside .kb-root's side padding. Offset by --kb-edge, it and
+   the drag region tile the strip exactly: any gap is a dead strip, and any
+   overlap is a button that drags the window instead of resizing it.
+   Drag it right to grow the keyboard. */
 .kb-resize-grip {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 30px;
-  height: 30px;
+  top: 0;
+  right: calc(-1 * var(--kb-edge));
+  width: 56px;
+  height: 100%;
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding: 5px;
+  align-items: center;
+  justify-content: center;
   border: none;
+  border-radius: var(--kb-key-radius);
   background: transparent;
   color: var(--kb-on-surface-variant);
-  font-size: 15px;
-  opacity: 0.6;
-  cursor: nesw-resize;
+  font-size: 16px;
+  opacity: 0.9;
+  cursor: ew-resize;
   touch-action: none;
   z-index: 6;
 }
 
 .kb-resize-grip:active {
-  opacity: 0.95;
+  opacity: 1;
+  background: var(--kb-surface);
 }
 
 .kb-keys {
@@ -230,10 +291,14 @@ body {
   flex: 1;
 }
 
+/* Size container for the type scale above: 1cqh here is 1% of the row's own
+   height, so a glyph is always the same fraction of the key it sits in — in
+   every placement, at every scale, for 4-row and 5-row layouts alike. */
 .kb-row {
   display: flex;
   flex: 1;
   justify-content: center;
+  container-type: size;
 }
 
 .kb-cell {
@@ -300,8 +365,13 @@ body {
   background: var(--kb-primary-variant);
 }
 
+/* The schema name. Row-relative like every other key label — as a share of the
+   CARD (3.9cqh) it collapsed onto its floor the moment the type scale moved to
+   the row, and read at 8px in every placement. Sits just under the fn labels:
+   secondary information, but it names the engine you are typing with, so it has
+   to be legible at a glance. */
 .kb-key.space {
-  font-size: clamp(8px, 3.9cqh, 17px);
+  font-size: clamp(11px, 22cqh, 20px);
   color: var(--kb-on-surface-variant);
 }
 
@@ -321,9 +391,28 @@ body {
 .kb-candidate .glyph {
   min-width: 0;
   max-width: 100%;
+  white-space: nowrap;
+}
+
+/* Only the labels that can actually outgrow their box get clipped. The key sets
+   line-height: 1, so the line box is exactly the font size and a descender (the
+   tail of g/j/p/q/y) paints outside it — `overflow: hidden` would shear it off.
+   Ellipsis is only ever needed on the space key (it carries the schema name) and
+   on candidates, and neither is a single letter.
+
+   The space key still needs the clip-margin: its label is Latin as often as not
+   (the engine reports a raw schema id — "aurora_pinyin" — until the real name
+   loads), so it has descenders and an underscore riding the bottom of the clip
+   box. overflow: clip lets ink past the edge without letting the BOX grow. */
+.kb-key.space .glyph {
+  overflow: clip;
+  overflow-clip-margin: 0.3em;
+  text-overflow: ellipsis;
+}
+
+.kb-candidate .glyph {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .kb-key .hint {
@@ -338,18 +427,22 @@ body {
 
 /* ---- press preview (magnified key) ---- */
 
+/* Size, position AND font-size come from previewStyle() in Key.tsx: this box is
+   portalled outside .kb-root, so the cqh type scale above does not apply to it —
+   it is measured from the key it magnifies instead. Padding keeps the glyph off
+   the rounded corners; line-height leaves a descender (g/j/p/q/y) somewhere to
+   go instead of riding the bottom edge. */
 .kb-preview {
   position: fixed;
   z-index: 30;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--kb-key-radius);
+  padding: 2px 8px;
   background: var(--kb-preview);
   color: var(--kb-on-surface);
-  font-size: var(--kb-key-font);
-  line-height: 1;
-  box-shadow: 0 1px 4px var(--kb-popup-shadow);
+  line-height: 1.2;
+  box-shadow: 0 2px 8px var(--kb-popup-shadow);
   pointer-events: none;
 }
 
@@ -357,10 +450,16 @@ body {
 
 /* Alt/tone picker: light panel (never darker than the keys — a dark slab
    over the keyboard reads as a black box) with an accent-filled selection. */
+/* Wraps rather than overflowing: the keyboard is its own OS window, so a bubble
+   wider than the window gets cut off by it (the 9 alts on "a" want 426px, and
+   the one-hand window is 420px). AltBubble caps the width and re-seats the
+   bubble against its real height. */
 .kb-bubble {
   position: fixed;
   z-index: 40;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   padding: 4px;
   gap: 2px;
   touch-action: none;
@@ -400,9 +499,13 @@ body {
   padding: 0 2px;
 }
 
+/* border-radius: 50% only reads as a circle on a SQUARE box — aspect-ratio
+   pins that, so the hover/press fill can't stretch into an ellipse when the
+   button lands in a flex row that sizes it by its content or stretches it. */
 .icon-btn {
   flex: none;
   width: 46px;
+  aspect-ratio: 1;
   border: none;
   background: transparent;
   border-radius: 50%;
@@ -417,9 +520,12 @@ body {
   background: var(--kb-surface);
 }
 
+/* In the bar the circle is sized off the bar itself (the toolbar centers its
+   children and the candidate row stretches them — align-self keeps both square),
+   so it scales with the keyboard instead of being a fixed 46px. */
 .kb-bar .icon-btn {
-  margin: 4px 0;
-  width: clamp(28px, 11cqh, 44px);
+  align-self: center;
+  width: calc(var(--kb-bar-height) - 8px);
 }
 
 .kb-candidates {
@@ -457,10 +563,6 @@ body {
 }
 
 .kb-candidate:active,
-.kb-candidate.pressed {
-  background: var(--kb-surface);
-}
-
 .kb-toolbar {
   flex: 1;
   display: flex;
@@ -499,7 +601,7 @@ body {
   background: var(--kb-surface);
   max-width: none;
   content-visibility: auto;
-  contain-intrinsic-size: 52px;
+  contain-intrinsic-size: var(--kb-emoji-cell);
 }
 
 .kb-expanded .side {
@@ -525,7 +627,7 @@ body {
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--kb-emoji-cell), 1fr));
   align-content: start;
   padding: 4px var(--kb-cell-pad);
   scrollbar-width: none;
@@ -535,12 +637,15 @@ body {
   display: none;
 }
 
+/* The panel shares the keys' vertical budget, so its cells have to scale with
+   the card like the keys do — at fixed 52px a floating keyboard at minimum
+   scale showed 1.4 rows of emoji under a bottom strip half the panel's height. */
 .kb-emoji-cell {
   border: none;
   background: transparent;
   border-radius: var(--kb-key-radius);
-  height: 52px;
-  font-size: 28px;
+  height: var(--kb-emoji-cell);
+  font-size: calc(var(--kb-emoji-cell) * 0.54);
   font-family: inherit;
   display: flex;
   align-items: center;
@@ -551,7 +656,7 @@ body {
 .kb-emoji-cell {
   /* Big categories render ~200 cells; skip offscreen rows */
   content-visibility: auto;
-  contain-intrinsic-size: 52px;
+  contain-intrinsic-size: var(--kb-emoji-cell);
 }
 
 .kb-emoji-cell:active {
@@ -561,11 +666,19 @@ body {
 /* Bottom strip mirrors the keyboard's bottom row: [ABC][tabs][⌫] */
 .kb-emoji-bottom {
   flex: none;
-  height: 64px;
+  height: clamp(44px, 17cqh, 64px);
   display: flex;
   align-items: stretch;
   padding: var(--kb-cell-pad);
   gap: calc(var(--kb-cell-pad) * 2);
+}
+
+/* The panel's back/backspace keys are .kb-key, but they sit in the emoji strip
+   rather than in a .kb-row — so the row-relative icon scale has no row to
+   measure and falls back to the card, which blew a 40px icon into a 37px key.
+   These two get a card-relative size of their own. */
+.kb-emoji-side svg {
+  font-size: clamp(16px, 8cqh, 28px);
 }
 
 .kb-emoji-side {
