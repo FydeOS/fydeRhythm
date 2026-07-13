@@ -1,64 +1,79 @@
-/* InputView theme — FlorisBoard's day/night palettes (Apache-2.0) with a
- * fully FLAT treatment: filled key surfaces but zero elevation — no shadows,
- * no gradients, press feedback is a plain darker fill. (The ChromeOS-native
- * flat look rather than FlorisBoard's skeuomorphic 2dp key shadows or its
- * fully borderless variant, which reads empty on a laptop-wide dock.)
+/* InputView theme — "Keyline". The system is ONE hairline shadow: every key
+ * rests on it and loses it on press, dropping into the board with a scale(.98).
+ * Nothing else in the board is elevated except popups and the floating shells,
+ * so the shadow reads as depth rather than decoration. Never add a key border
+ * or a second shadow — the single hairline IS the system.
+ *
+ * (This replaces the earlier fully-flat treatment, where press feedback was a
+ * darker fill alone. Palette and elevation per the Keyline spec; the FlorisBoard
+ * day/night palette it started from is Apache-2.0.)
  * theme-init.js stamps .light/.dark before first paint.
  */
 
 :root.light {
-  /* Cool neutral background (Google Grey 200 family) with white keys; the
-   * accent is a dignified rose derived from the FydeOS brand seed #E40046
-   * (never the raw brand red — see docs/adr/0001). */
-  --kb-background: #e8eaed;
-  --kb-background-variant: #dadce0;
-  --kb-surface: #ffffff;          /* keys */
-  --kb-surface-variant: #dfe1e5;  /* pressed keys */
-  --kb-popup: #f1f3f4;            /* bubbles, menus, previews */
-  --kb-popup-focused: #c6cacf;
-  --kb-on-background: #121212;    /* candidates, bar icons */
-  --kb-on-surface: #1a1a24;       /* key glyphs */
-  --kb-on-surface-variant: #5f6368;
-  --kb-primary: #c2185b;          /* enter, accents */
-  --kb-primary-variant: #a01450;  /* enter pressed */
+  --kb-background: #eff1f3;          /* keyboard ground */
+  --kb-background-variant: #e1e4e8;  /* function / modifier keys */
+  --kb-surface: #ffffff;             /* letter keys */
+  --kb-surface-variant: #d5d9de;     /* pressed-key fill */
+  --kb-popup: #ffffff;               /* bubbles, menus */
+  --kb-popup-focused: #e8f0fe;       /* selected item */
+  --kb-preview: #ffffff;             /* magnified key preview */
+  --kb-on-background: #202124;       /* candidates, bar icons */
+  --kb-on-surface: #202124;          /* key glyphs */
+  --kb-on-surface-variant: #5f6368;  /* hints, secondary icons, space label */
+  --kb-primary: #c2185b;             /* enter, first candidate, active glyph */
+  --kb-primary-variant: #a01049;     /* pressed accent / hover */
   --kb-on-primary: #ffffff;
-  --kb-secondary: #ff9800;        /* caps-lock indicator */
-  --kb-popup-shadow: rgba(0, 0, 0, 0.25);
-  --kb-scrim: rgba(0, 0, 0, 0.25);
-  --kb-preview: #f1f3f4;
+  --kb-secondary: #e8710a;           /* caps-lock glyph only */
+  --kb-scrim: rgba(32, 33, 36, 0.40);
+
+  /* The elevation ladder. A key rests on the hairline; only popups go higher.
+     The spec's floating/one-hand SHELL shadows are not here: the ChromeOS
+     keyboard window is opaque, so a lifted shell would paint its shadow inside
+     its own window. Nothing to define until that window can be transparent. */
+  --kb-elev-key: 0 1px 2px rgba(60, 64, 67, 0.16);
+  --kb-elev-popup: 0 3px 8px rgba(60, 64, 67, 0.20);
 }
 
 :root.dark {
-  /* Matches the options page's dark surfaces (#202124 family). */
   --kb-background: #202124;
-  --kb-background-variant: #2e3134;
+  --kb-background-variant: #292a2d;
   --kb-surface: #3c4043;
-  --kb-surface-variant: #5f6368;
-  --kb-popup: #4a4d51;
-  --kb-popup-focused: #80868b;
-  --kb-on-background: #dcdcdc;
+  --kb-surface-variant: #4c5155;
+  --kb-popup: #3c4043;
+  --kb-popup-focused: #394457;
+  --kb-preview: #3c4043;
+  --kb-on-background: #e8eaed;
   --kb-on-surface: #e8eaed;
   --kb-on-surface-variant: #9aa0a6;
-  --kb-primary: #d81b60;
-  --kb-primary-variant: #ad1457;
-  --kb-on-primary: #ffffff;
-  --kb-secondary: #f57c00;
-  --kb-popup-shadow: rgba(0, 0, 0, 0.40);
-  --kb-scrim: rgba(0, 0, 0, 0.40);
-  /* Lighter than the popup tone: a near-black preview over dark keys reads
-     as a heavy black box. */
-  --kb-preview: #5f6368;
+  --kb-primary: #f06292;
+  --kb-primary-variant: #ec407a;
+  --kb-on-primary: #1a0410;
+  --kb-secondary: #fbbc04;
+  --kb-scrim: rgba(0, 0, 0, 0.60);
+
+  /* A blue-tinted shadow disappears on a dark ground; these go black instead. */
+  --kb-elev-key: 0 1px 3px rgba(0, 0, 0, 0.40);
+  --kb-elev-popup: 0 3px 10px rgba(0, 0, 0, 0.50);
 }
 
 :root {
   /* FlorisBoard proportions, scaled to our key size: its gaps are ~12% of the
    * key width and its glyphs ~half the key height — the earlier 3px/21px cut
    * read as a wall of oversized slabs by comparison. */
-  --kb-key-radius: 12px;
-  --kb-panel-radius: 12px;
-  /* keys sit in fixed-fraction cells; the gap is the cell padding */
-  --kb-cell-pad: 3.5px;
-  --kb-edge: 5px;
+  /* Rounds with the KEY, not with a fixed number. The spec's token says 8px, but
+   * the spec's own mock draws a 10-column Gboard row (keys at a 2.25 aspect);
+   * the production frame is 11.5 units, so our keys are 40% narrower and taller
+   * and the same 8px reads square on them. Row-relative, a docked key lands on
+   * the ~12px the mock actually looks like, while the small boards keep the 8px
+   * that stops a 32px key turning into a pill. */
+  --kb-key-radius: clamp(8px, 15cqh, 14px);
+  --kb-panel-radius: 8px;
+  /* --kb-edge, --kb-cell-pad, --kb-bar-min/max, --kb-handle-height,
+   * --kb-resize-width and the --kb-onehand-* set are NOT declared here: they are
+   * published from metrics.ts before first paint, because geometryFor() sizes the
+   * OS window from the same numbers. Restating them here is what let the card and
+   * the window it lives in drift apart. This file says only where they apply. */
   /* Type scales with the ROW a key sits in (.kb-row is a size container), not
    * with the card. Sizing off the card assumes a fixed share of it goes to
    * chrome — true when the candidate bar is 13% of a docked keyboard, false the
@@ -72,10 +87,10 @@
   --kb-key-font-fn: clamp(10px, 25cqh, 24px);
   --kb-icon-font: clamp(13px, 33cqh, 33px);
   --kb-hint-font: clamp(8px, 20cqh, 19px);
-  /* The bar is outside the rows, so these stay card-relative. The floor keeps
-   * the bar's icon buttons at a hittable size (they are bar-height minus 8). */
+  /* The bar is outside the rows, so these stay card-relative. Resolves to 48px
+   * on the docked 372px board, per the spec's redline. */
   --kb-candidate-font: clamp(11px, 5.9cqh, 26px);
-  --kb-bar-height: clamp(40px, 13cqh, 52px);
+  --kb-bar-height: clamp(var(--kb-bar-min), 13cqh, var(--kb-bar-max));
   --kb-emoji-cell: clamp(36px, 14cqh, 56px);
 
   font-family: "Google Sans Text", Roboto, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
@@ -183,23 +198,22 @@ body {
   container-name: kb;
 }
 
-/* One-hand card: phone-shaped, pinned to a bottom corner. Tighter gaps and a fixed candidate bar keep the keys near phone metrics at
-   this size. geometryFor() in chrome-shim.ts derives the card height from these
-   three, so CSS and TS must agree. The type scale needs no override: it is
-   row-relative, so it already fits these keys. */
+/* One-hand card: phone-shaped, pinned to a bottom corner. Tighter gaps and a
+   fixed candidate bar keep the keys near phone metrics at this size — and
+   geometryFor() sizes the window from the very same numbers (metrics.ts), so
+   the card cannot end up a different size than the window holding it. The type
+   scale needs no override: it is row-relative, so it already fits these keys. */
 .kb-root.onehand {
-  --kb-edge: 4px;
-  --kb-bar-height: 40px;
-  --kb-cell-pad: 2.5px;
-  --kb-key-radius: 8px;
+  --kb-edge: var(--kb-onehand-edge);
+  --kb-cell-pad: var(--kb-onehand-cell-pad);
+  --kb-bar-height: var(--kb-onehand-bar);
 }
 
-/* A hint can't hold the docked 15%-of-key-width ratio on a key this narrow and
-   stay legible, so it tucks fully into the corner (the 4px/7px inset used by
-   the docked key is a lot of room on a 31px one). */
+/* No hints on this board. They can't hold their proportions on a 31px key, and
+   the alternates are still one long-press away — which is how a phone keyboard
+   has always worked. */
 .kb-root.onehand .kb-key .hint {
-  top: 2px;
-  right: 3px;
+  display: none;
 }
 
 /* Top bar of the one-hand card: the swap button sits on the pinned side, i.e.
@@ -207,7 +221,7 @@ body {
    place a one-handed user can't reach. Its arrow points across, to where the
    keyboard will go (App picks the direction). */
 .kb-onehand-bar {
-  height: 34px; /* keep in sync with kOneHandBarHeight in chrome-shim.ts */
+  height: var(--kb-onehand-control-bar);
   flex: none;
   display: flex;
   align-items: stretch;
@@ -236,7 +250,7 @@ body {
    what makes the strip read as aligned with the keyboard below it. */
 .kb-handle {
   position: relative;
-  height: 28px; /* keep in sync with kFloatingHandleHeight in chrome-shim.ts */
+  height: var(--kb-handle-height);
   flex: none;
   display: flex;
   align-items: center;
@@ -252,24 +266,24 @@ body {
   opacity: 0.45;
 }
 
-/* Resize button, right end of the handle. Its width is kFloatingResizeWidth in
-   chrome-shim.ts, which is carved out of the OS drag region so this button can
-   actually receive the pointer — so it has to sit flush against the WINDOW's
-   right edge, not inside .kb-root's side padding. Offset by --kb-edge, it and
-   the drag region tile the strip exactly: any gap is a dead strip, and any
-   overlap is a button that drags the window instead of resizing it.
+/* Resize button, right end of the handle. Its width is carved out of the OS drag
+   region (chrome-shim reads the same --kb-resize-width from metrics.ts) so this
+   button can actually receive the pointer — so it has to sit flush against the
+   WINDOW's right edge, not inside .kb-root's side padding. Offset by --kb-edge,
+   it and the drag region tile the strip exactly: any gap is a dead strip, and
+   any overlap is a button that drags the window instead of resizing it.
    Drag it right to grow the keyboard. */
 .kb-resize-grip {
   position: absolute;
   top: 0;
   right: calc(-1 * var(--kb-edge));
-  width: 56px;
+  width: var(--kb-resize-width);
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: var(--kb-key-radius);
+  border-radius: var(--kb-panel-radius);
   background: transparent;
   color: var(--kb-on-surface-variant);
   font-size: 16px;
@@ -313,13 +327,17 @@ body {
 
 /* ---- keys ---- */
 
-/* Flat: filled surface, zero elevation; press = plain darker fill */
+/* A key rests on the hairline and loses it on press — that is the whole system.
+   No border, no second shadow: those read as decoration, this reads as depth.
+   90ms is fast enough to feel instant, slow enough to read as a press. */
 .kb-key {
   position: relative;
   border: none;
   border-radius: var(--kb-key-radius);
   background: var(--kb-surface);
   color: var(--kb-on-surface);
+  box-shadow: var(--kb-elev-key);
+  transition: background-color 90ms ease, box-shadow 90ms ease, transform 90ms ease;
   font-family: inherit;
   font-size: var(--kb-key-font);
   /* Hug the glyphs: device CJK fonts (Noto Sans CJK) carry a tall default
@@ -329,10 +347,6 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-}
-
-.kb-key.pressed {
-  background: var(--kb-surface-variant);
 }
 
 /* Icons are 1em; give key icons their own scaled size so shift/backspace/
@@ -346,13 +360,17 @@ body {
   font-size: clamp(13px, 5.9cqh, 26px);
 }
 
-/* Frame filler: invisible, non-interactive */
+/* Frame filler: invisible, non-interactive — and no hairline to give it away. */
 .kb-key.spacer {
   background: transparent;
+  box-shadow: none;
   pointer-events: none;
 }
 
+/* Function and modifier keys sit on their own fill, so the letters read as the
+   subject of the board and everything around them as chrome. */
 .kb-key.fn {
+  background: var(--kb-background-variant);
   font-size: var(--kb-key-font-fn);
 }
 
@@ -361,18 +379,40 @@ body {
   color: var(--kb-on-primary);
 }
 
+/* Space is a function key that happens to be wide — it takes the same fill, so
+   the bottom row reads as one band of chrome under the letters. Its label is the
+   schema name: row-relative like every other key, and just under the fn labels.
+   As a share of the CARD it collapsed onto its floor and read at 8px. */
+.kb-key.space {
+  background: var(--kb-background-variant);
+  font-size: clamp(11px, 22cqh, 20px);
+  color: var(--kb-on-surface-variant);
+}
+
+/* Pressed: the key drops INTO the board — shadow off, scaled down, darker fill.
+   Declared AFTER the kinds above, not before: `.kb-key.fn` and `.kb-key.space`
+   carry the same specificity, so a press written first is simply overwritten by
+   them, and half the board silently never changed colour under the finger. The
+   cascade here runs base -> kind -> state, in that order. */
+.kb-key.pressed {
+  background: var(--kb-surface-variant);
+  box-shadow: none;
+  transform: scale(0.98);
+}
+
+/* Enter presses into its own accent rather than the neutral fill. */
 .kb-key.enter.pressed {
   background: var(--kb-primary-variant);
 }
 
-/* The schema name. Row-relative like every other key label — as a share of the
-   CARD (3.9cqh) it collapsed onto its floor the moment the type scale moved to
-   the row, and read at 8px in every placement. Sits just under the fn labels:
-   secondary information, but it names the engine you are typing with, so it has
-   to be legible at a glance. */
-.kb-key.space {
-  font-size: clamp(11px, 22cqh, 20px);
-  color: var(--kb-on-surface-variant);
+/* Press falls back to the darker fill alone — no motion left unbacked. This has
+   to sit AFTER .kb-key.pressed: a media query adds no specificity, so the two
+   rules tie and source order decides. Declared up with the other reduced-motion
+   rules, it lost, and the scale still ran. */
+@media (prefers-reduced-motion: reduce) {
+  .kb-key.pressed {
+    transform: none;
+  }
 }
 
 /* Engaged 中/英 or shift: accent glyph on the normal surface */
@@ -434,7 +474,7 @@ body {
    go instead of riding the bottom edge. */
 .kb-preview {
   position: fixed;
-  z-index: 30;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -442,7 +482,7 @@ body {
   background: var(--kb-preview);
   color: var(--kb-on-surface);
   line-height: 1.2;
-  box-shadow: 0 2px 8px var(--kb-popup-shadow);
+  box-shadow: var(--kb-elev-popup);
   pointer-events: none;
 }
 
@@ -456,16 +496,16 @@ body {
    bubble against its real height. */
 .kb-bubble {
   position: fixed;
-  z-index: 40;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   padding: 4px;
   gap: 2px;
   touch-action: none;
-  border-radius: var(--kb-key-radius);
-  background: var(--kb-preview);
-  box-shadow: 0 1px 4px var(--kb-popup-shadow);
+  border-radius: var(--kb-panel-radius);
+  background: var(--kb-popup);
+  box-shadow: var(--kb-elev-popup);
 }
 
 .kb-bubble .alt {
@@ -522,10 +562,11 @@ body {
 
 /* In the bar the circle is sized off the bar itself (the toolbar centers its
    children and the candidate row stretches them — align-self keeps both square),
-   so it scales with the keyboard instead of being a fixed 46px. */
+   so it scales with the keyboard instead of being a fixed 46px. Only 4px of
+   inset: the bar's floor is 34px, and taking 8 out of that left a 26px target. */
 .kb-bar .icon-btn {
   align-self: center;
-  width: calc(var(--kb-bar-height) - 8px);
+  width: calc(var(--kb-bar-height) - 4px);
 }
 
 .kb-candidates {
@@ -547,7 +588,7 @@ body {
   max-width: 45vw;
   border: none;
   background: transparent;
-  border-radius: var(--kb-key-radius);
+  border-radius: var(--kb-panel-radius);
   padding: 0 14px;
   font-family: inherit;
   font-size: var(--kb-candidate-font);
@@ -557,12 +598,17 @@ body {
   cursor: pointer;
 }
 
+/* The candidate the engine commits on space. The accent's whole job in this bar
+   is to say which one that is. */
 .kb-candidate:first-of-type {
   color: var(--kb-primary);
   font-weight: 500;
 }
 
-.kb-candidate:active,
+.kb-candidate:active {
+  background: var(--kb-surface);
+}
+
 .kb-toolbar {
   flex: 1;
   display: flex;
@@ -578,7 +624,7 @@ body {
 .kb-expanded {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: 15;
   display: flex;
   flex-direction: column;
   background: var(--kb-background);
@@ -593,6 +639,10 @@ body {
   gap: 4px;
   padding: 6px;
   align-content: start;
+}
+
+.kb-expanded .grid .kb-candidate:first-of-type {
+  background: var(--kb-popup-focused);
 }
 
 .kb-expanded .grid .kb-candidate {
@@ -617,7 +667,7 @@ body {
 .kb-emoji {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 15;
   display: flex;
   flex-direction: column;
   background: var(--kb-background);
@@ -643,7 +693,7 @@ body {
 .kb-emoji-cell {
   border: none;
   background: transparent;
-  border-radius: var(--kb-key-radius);
+  border-radius: var(--kb-panel-radius);
   height: var(--kb-emoji-cell);
   font-size: calc(var(--kb-emoji-cell) * 0.54);
   font-family: inherit;
@@ -679,6 +729,15 @@ body {
    These two get a card-relative size of their own. */
 .kb-emoji-side svg {
   font-size: clamp(16px, 8cqh, 28px);
+}
+
+/* These two are .kb-key but plain click buttons — they never receive the
+   .pressed class the Key component sets, so without this they are the only keys
+   on the board that do not move under a finger. */
+.kb-emoji-side:active {
+  background: var(--kb-surface-variant);
+  box-shadow: none;
+  transform: scale(0.98);
 }
 
 .kb-emoji-side {
@@ -720,7 +779,7 @@ body {
 }
 
 .kb-emoji-tabs .tab.active {
-  background: var(--kb-surface);
+  box-shadow: inset 0 -2px 0 var(--kb-primary);
   filter: none;
 }
 
@@ -728,7 +787,7 @@ body {
 
 .kb-confirm {
   position: fixed;
-  z-index: 50;
+  z-index: 21;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -736,7 +795,7 @@ body {
   border-radius: var(--kb-panel-radius);
   background: var(--kb-popup);
   color: var(--kb-on-surface);
-  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  box-shadow: var(--kb-elev-popup);
   font-size: 15px;
 }
 
@@ -768,12 +827,12 @@ body {
 
 .kb-menu {
   position: fixed;
-  z-index: 40;
+  z-index: 20;
   min-width: 180px;
   padding: 4px;
   border-radius: var(--kb-panel-radius);
   background: var(--kb-popup);
-  box-shadow: 0 2px 6px var(--kb-popup-shadow);
+  box-shadow: var(--kb-elev-popup);
   display: flex;
   flex-direction: column;
 }
@@ -781,7 +840,7 @@ body {
 .kb-menu .item {
   border: none;
   background: transparent;
-  border-radius: var(--kb-key-radius);
+  border-radius: var(--kb-panel-radius);
   padding: 12px 14px;
   font-family: inherit;
   font-size: 15px;
@@ -798,16 +857,22 @@ body {
   background: var(--kb-popup-focused);
 }
 
+/* The selected item: focused fill, accent glyph — the same pairing the alt
+   bubble uses, so "this is the one you're on" reads the same everywhere. */
 .kb-menu .item.active {
   background: var(--kb-popup-focused);
+  color: var(--kb-primary);
   font-weight: 500;
 }
 
 /* ---- scrim shared by popovers ---- */
 
+/* Backdrop of the modal popovers. It dims: --kb-popup is the same color as the
+   keys, so without this (and the popup's shadow) a menu is a slab of key-colored
+   nothing floating on the board. */
 .kb-scrim {
   position: fixed;
   inset: 0;
-  z-index: 35;
-  background: transparent;
+  z-index: 19;
+  background: var(--kb-scrim);
 }

@@ -14,9 +14,11 @@ export interface PressConfig {
     repeatIntervalMs: number;
 }
 
+// Keyline spec, "Interaction & timing": hold 300ms for the alternates bubble;
+// backspace deletes once, waits 400ms, then repeats every 50ms.
 export const kDefaultPressTiming = {
-    longPressMs: 350,
-    repeatInitialMs: 300,
+    longPressMs: 300,
+    repeatInitialMs: 400,
     repeatIntervalMs: 50,
 };
 

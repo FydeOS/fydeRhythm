@@ -67,7 +67,7 @@ describe('geometryFor', () => {
     // it: the rows are what is left over, and a 5-row layout came out at 21px
     // per key. The card refuses to go below the height its rows need.
     it('floors the floating card at the height its rows need', () => {
-        const rowsOf = (g: { height: number }, rows: number) => (g.height - 28 - 40 - 5) / rows;
+        const rowsOf = (g: { height: number }, rows: number) => (g.height - 28 - 34 - 5) / rows;
         for (const rows of [4, 5]) {
             const min = geometryFor(placement({ mode: 'floating', scale: 0.55 }), screen, rows);
             // Uniform scaling would have given 205px; the floor overrides it.
@@ -101,12 +101,12 @@ describe('geometryFor', () => {
             // Narrow enough for a thumb to sweep across, and far narrower than
             // the smallest floating keyboard (0.4 × 1280 = 512).
             expect(width).toBe(420);
-            expect(height).toBe(278);
+            expect(height).toBe(274);
             // Keys taller than wide, at phone metrics: the frame is 11.5 key
             // columns across, and a row is ~1.4× that pitch. Mirrors the CSS in
             // md3.css (--kb-edge, --kb-bar-height, .kb-onehand-bar).
             const pitch = (width - 2 * 4) / 11.5;
-            const rowHeight = (height - 34 - 40 - 4) / 4;
+            const rowHeight = (height - 34 - 36 - 4) / 4;
             expect(pitch).toBeCloseTo(35.8, 1);
             expect(rowHeight).toBe(50);
             expect(rowHeight).toBeGreaterThan(pitch);
@@ -118,8 +118,8 @@ describe('geometryFor', () => {
             // key is the same height in every layout.
             const four = geometryFor(placement({ mode: 'onehand' }), screen, 4);
             const five = geometryFor(placement({ mode: 'onehand' }), screen, 5);
-            const rowHeight = (g: { height: number }, rows: number) => (g.height - 34 - 40 - 4) / rows;
-            expect(five.height).toBe(328);
+            const rowHeight = (g: { height: number }, rows: number) => (g.height - 34 - 36 - 4) / rows;
+            expect(five.height).toBe(324);
             expect(five.height - four.height).toBe(50);
             expect(rowHeight(five, 5)).toBe(rowHeight(four, 4));
             expect(five.width).toBe(four.width);

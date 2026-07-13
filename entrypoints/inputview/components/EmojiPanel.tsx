@@ -8,7 +8,7 @@ import { t } from '../i18n';
 const kRecentsKey = 'emojiRecents';
 const kMaxRecents = 40;
 // Match the letter keys' long-press timing so the gesture feels the same.
-const kLongPressMs = 350;
+const kLongPressMs = 300; // kDefaultPressTiming.longPressMs — the same gesture
 // Finger-jitter slop before a held press reads as a scroll (the keys use a
 // similar margin) — leaving the small cell alone must NOT cancel the press.
 const kPressSlopPx = 24;

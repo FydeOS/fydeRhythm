@@ -11,6 +11,7 @@ import {
     type LayoutId,
 } from '@/lib/shared-types';
 import { kFrameUnits } from './layouts/frame';
+import { kMetrics } from './metrics';
 import type { KeyStroke } from './layouts/types';
 
 // Where the keyboard sits:
@@ -21,21 +22,17 @@ export type KeyboardMode = 'docked' | 'floating' | 'onehand';
 export type OneHandSide = 'left' | 'right';
 
 // Floating window = docked keyboard scaled uniformly; `scale` is the fraction
-// of docked size. Both constants match `.kb-handle` / `.kb-resize-grip` in
-// md3.css: the handle is the card's top strip, and the resize button sits at
-// its right end. The OS drag region stops short of the button — a draggable
-// region swallows the pointer, so anything under it can never be tapped.
-export const kFloatingHandleHeight = 28;
-export const kFloatingResizeWidth = 56;
+// of docked size. The handle is the card's top strip and the resize button sits
+// at its right end; the OS drag region stops short of the button, because a
+// draggable region swallows the pointer and anything under it could never be
+// tapped. Both numbers come from metrics.ts, which is also what md3.css lays the
+// strip out from — they cannot drift.
+export const kFloatingHandleHeight = kMetrics.handleHeight;
+export const kFloatingResizeWidth = kMetrics.resizeWidth;
 const kFloatingMargin = 8;
 export const kFloatingScaleMin = 0.55;
 export const kFloatingScaleMax = 0.85;
 export const kFloatingDefaultScale = 0.6;
-
-// Smallest key a finger can reliably hit. Material asks for 48dp; this is the
-// hard floor the geometry refuses to go below.
-const kMinKeyHeight = 32;
-const kKeyGap = 2 * 3.5; // --kb-cell-pad, both sides
 
 // "Scaled uniformly" is a half-truth: the handle and the candidate bar have
 // floors (they hold real controls), so they DON'T shrink with the card — at
@@ -45,10 +42,9 @@ const kKeyGap = 2 * 3.5; // --kb-cell-pad, both sides
 // the rows it must hold. Below it the keyboard stops getting shorter; shrinking
 // past this is what one-hand mode is for, and it reflows instead of scaling.
 function minFloatingHeight(rows: number): number {
-    return rows * (kMinKeyHeight + kKeyGap) + kFloatingHandleHeight + kMinBarHeight + kEdge;
+    const keyPitch = kMetrics.minKeyHeight + 2 * kMetrics.cellPad;
+    return rows * keyPitch + kMetrics.handleHeight + kMetrics.barMin + kMetrics.edge;
 }
-const kMinBarHeight = 40; // --kb-bar-height floor in md3.css
-const kEdge = 5; // --kb-edge
 
 // One-hand keyboard. NOT a smaller floating keyboard: scaling the docked
 // keyboard preserves its aspect, and the docked keyboard is a wide, squat
@@ -71,11 +67,7 @@ const kOneHandWidthMax = 420;
 // 4-row card drops the keys to 35px tall, which defeats the whole mode.
 export const kOneHandRows = 4;
 const kOneHandRowAspect = 1.4;
-// These three mirror `.kb-root.onehand` / `.kb-onehand-bar` in md3.css: the
-// card height is computed from them, so CSS and TS must agree.
-const kOneHandEdge = 4;
-export const kOneHandBarHeight = 34;
-const kOneHandCandidateHeight = 40;
+export const kOneHandBarHeight = kMetrics.onehand.controlBar;
 
 export interface ScreenSize {
     width: number;
@@ -134,8 +126,9 @@ export function geometryFor(p: Placement, screen: ScreenSize, rows: number = kOn
     }
     const width = Math.round(
         Math.min(kOneHandWidthMax, Math.max(kOneHandWidthMin, screen.width * kOneHandWidthFraction)));
-    const rowHeight = Math.round(((width - 2 * kOneHandEdge) / kFrameUnits) * kOneHandRowAspect);
-    const height = rowHeight * rows + kOneHandCandidateHeight + kOneHandBarHeight + kOneHandEdge;
+    const one = kMetrics.onehand;
+    const rowHeight = Math.round(((width - 2 * one.edge) / kFrameUnits) * kOneHandRowAspect);
+    const height = rowHeight * rows + one.bar + one.controlBar + one.edge;
     return {
         floating: true,
         draggable: false,

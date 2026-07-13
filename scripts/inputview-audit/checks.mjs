@@ -83,6 +83,45 @@ export function inspectKeyboard(expected) {
         bad(`layout renders ${rows} rows, the matrix says ${expected.rows} — the card was sized for the wrong row count`);
     }
 
+    // What CSS actually spent the card's height on, against what metrics.ts
+    // reserved. This is the half of the contract nothing else can see: if CSS
+    // spends MORE than TS budgeted, the keys get crushed (and the key-height
+    // check catches it) — but if it spends LESS, the keys just get bigger and
+    // everything passes, while the OS drag region (sized from the same numbers)
+    // now overhangs the candidate bar and eats taps on the first candidates.
+    const m = expected.metrics;
+    const one = root.classList.contains('onehand');
+    const px = (sel, prop) => {
+        const el = document.querySelector(sel);
+        return el ? parseFloat(getComputedStyle(el)[prop]) : null;
+    };
+    const agrees = (got, want, what) => {
+        if (got !== null && Math.abs(got - want) > 0.5) {
+            bad(`${what} renders at ${got}px, metrics.ts says ${want}px — the card and the window it lives in disagree`);
+        }
+    };
+    agrees(px('.kb-root', 'paddingBottom'), one ? m.onehand.edge : m.edge, 'the board edge');
+    agrees(px('.kb-cell', 'paddingTop'), one ? m.onehand.cellPad : m.cellPad, 'the cell padding');
+    agrees(document.querySelector('.kb-handle') && rect(document.querySelector('.kb-handle')).height, m.handleHeight, 'the drag handle');
+    agrees(document.querySelector('.kb-onehand-bar') && rect(document.querySelector('.kb-onehand-bar')).height, m.onehand.controlBar, 'the one-hand control bar');
+    agrees(document.querySelector('.kb-resize-grip') && rect(document.querySelector('.kb-resize-grip')).width, m.resizeWidth, 'the resize button');
+
+    const barEl = document.querySelector('.kb-bar');
+    if (barEl) {
+        const bar = rect(barEl).height;
+        const want = one ? m.onehand.bar : null;
+        if (want !== null) agrees(bar, want, 'the candidate bar');
+        else if (bar < m.barMin - 0.5 || bar > m.barMax + 0.5) {
+            bad(`the candidate bar is ${bar.toFixed(1)}px, outside the [${m.barMin}, ${m.barMax}] metrics.ts reserves`);
+        }
+        // The drag strip is carved out of the window by the OS from the same
+        // numbers; if the rendered strip is shorter, the region overhangs the bar.
+        const handle = document.querySelector('.kb-handle');
+        if (handle && rect(handle).bottom > rect(barEl).top + 0.5) {
+            bad('the drag strip overlaps the candidate bar — the OS drag region will swallow taps on the first candidates');
+        }
+    }
+
     if (root.scrollWidth > root.clientWidth + 1) bad('card scrolls horizontally');
     if (root.scrollHeight > root.clientHeight + 1) bad('card scrolls vertically');
 
@@ -149,7 +188,11 @@ export function inspectKeyboard(expected) {
         }
 
         const hint = key.querySelector('.hint');
-        if (hint && hint.textContent) {
+        // A hint that isn't rendered at all is a choice, not a defect — the
+        // one-hand board hides them (no room on a 31px key, and long-press still
+        // reaches the alternates). Its rect is 0x0 at the origin, which would
+        // otherwise read as "escapes the key".
+        if (hint && hint.textContent && rect(hint).width > 0) {
             const h = rect(hint);
             if (h.right > k.right - 1 || h.top < k.top - 1 || h.left < k.left) {
                 bad(`key "${name}" hint escapes the key`);
@@ -287,6 +330,73 @@ export async function inspectPress() {
         findings,
         previewed: `${label}: ${k.width.toFixed(0)}x${k.height.toFixed(0)} → ${p.width.toFixed(0)}x${p.height.toFixed(0)}`,
     };
+}
+
+// An elevated surface floats over a board the same colour as itself
+// (--kb-popup === --kb-surface in both themes), so its shadow is the ONLY thing
+// separating it. A popover with no shadow is a slab of nothing.
+export function inspectPopovers() {
+    const findings = [];
+    for (const sel of ['.kb-menu', '.kb-confirm', '.kb-bubble', '.kb-preview']) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        const cs = getComputedStyle(el);
+        if (cs.boxShadow === 'none') {
+            findings.push(`"${sel}" has no shadow — it floats over keys of its own colour with nothing to separate it (a var() pointing at a token nobody defines?)`);
+        }
+    }
+    return findings;
+}
+
+// Which of the stylesheet's selectors match anything on THIS render. Unioned
+// across the whole sweep, the ones that never matched are dead — a rule kept
+// alive by nothing, or a state the matrix never reaches. Either is worth knowing:
+// the last sweep of this codebase found a `.kb-candidate.pressed` rule for a
+// class the component stopped setting, and nobody had noticed.
+export function matchedSelectors(selectors) {
+    const hit = [];
+    for (const sel of selectors) {
+        try {
+            if (document.querySelector(sel)) hit.push(sel);
+        } catch {
+            // An unparseable selector is the audit's bug, not the keyboard's.
+            hit.push(sel);
+        }
+    }
+    return hit;
+}
+
+// The same sweep, with a finger held down: .kb-key.pressed and .kb-preview do
+// not exist at rest, and would otherwise look dead. Each KIND of key is pressed
+// in turn — a letter, enter, a function key — because the pressed styles differ
+// per kind (.kb-key.enter.pressed keeps the accent), and a sweep that only ever
+// pressed a letter would report the others as dead CSS.
+export async function matchedWhilePressed(selectors) {
+    const hit = new Set();
+    const keys = [...document.querySelectorAll('.kb-key:not(.spacer)')];
+    const kinds = [
+        keys.find((k) => k.querySelector('.glyph') && !k.classList.contains('fn') && !k.classList.contains('enter')),
+        keys.find((k) => k.classList.contains('enter')),
+        keys.find((k) => k.classList.contains('fn')),
+    ];
+
+    for (const key of kinds) {
+        if (!key) continue;
+        const r = key.getBoundingClientRect();
+        const opts = { bubbles: true, pointerId: 1, isPrimary: true, button: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+        key.dispatchEvent(new PointerEvent('pointerdown', opts));
+        await new Promise((res) => setTimeout(res, 60));
+        // Inlined rather than calling matchedSelectors: Playwright serializes
+        // this function alone, without its module scope.
+        for (const sel of selectors) {
+            try {
+                if (document.querySelector(sel)) hit.add(sel);
+            } catch { hit.add(sel); }
+        }
+        key.dispatchEvent(new PointerEvent('pointerup', opts));
+        await new Promise((res) => setTimeout(res, 20));
+    }
+    return [...hit];
 }
 
 // Drive the keyboard into a state that only exists at runtime (a layer, a

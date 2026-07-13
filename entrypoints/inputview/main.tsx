@@ -1,7 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { applyMetrics } from './metrics';
 import './md3.css';
+
+// The geometry md3.css lays the board out from — the same numbers geometryFor()
+// sizes the OS window with. Published before the first render, so the keys are
+// correct on the very first paint.
+applyMetrics(document.documentElement);
 
 // theme-init.js stamps .light/.dark before first paint, but the keyboard page
 // is long-lived — keep the theme live: re-evaluate when the options page
