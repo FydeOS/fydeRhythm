@@ -201,15 +201,6 @@
     "theme_dark": {
         "message": "深色"
     },
-    "latin_layout": {
-        "message": "英文键盘布局"
-    },
-    "latin_layout_hint": {
-        "message": "英文模式固定使用所选的字母排列。"
-    },
-    "vk_layout": {
-        "message": "键盘布局"
-    },
     "layout_zhuyin": {
         "message": "注音"
     },
@@ -218,12 +209,6 @@
     },
     "layout_hangul": {
         "message": "谚文"
-    },
-    "latin_layout_following": {
-        "message": "跟随当前方案的键盘布局，当前为 $1。"
-    },
-    "latin_layout_follow_option": {
-        "message": "跟随方案布局"
     },
     "vk_delete_word_confirm": {
         "message": "删除「$1」?"
@@ -341,5 +326,28 @@
     },
     "vk_emoji_flags": {
         "message": "旗帜"
+    },
+    "keyboard_arrangement": {
+        "message": "字母排列"
+    },
+    "keyboard_arrangement_hint": {
+        "message": "同时用于外接键盘、屏幕键盘和英文模式。"
+    },
+    "keyboard_arrangement_hint_physical": {
+        "message": "用于外接键盘和英文模式。"
+    },
+    "keyboard_script_note": {
+        "message": "$1 使用自己的按键；字母排列仍用于英文模式。",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "vk_keys": {
+        "message": "屏幕按键"
+    },
+    "layout_letters": {
+        "message": "字母"
     }
 }

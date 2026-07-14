@@ -73,20 +73,22 @@ describe('buildFastInputViewState', () => {
         expect((await withField(undefined)).numericField).toBeNull();
     });
 
-    it('resolves the per-schema layout binding', async () => {
+    it('draws a script schema with its own keys, in the chosen arrangement for English', async () => {
         const controller = fakeController(null, {
             schema: 'terra_zhuyin',
-            schemaLayouts: { terra_zhuyin: 'zhuyin' },
+            keyboardLayout: 'colemak',
         });
         const state = await buildFastInputViewState(controller as never);
         expect(state.layout).toBe('zhuyin');
-        expect(state.latinLayout).toBe('qwerty');
+        // The arrangement is not disabled by a script schema — it is what the
+        // same hands still type English with.
+        expect(state.latinLayout).toBe('colemak');
     });
 
-    it('follows the global Latin layout when a schema has no binding (跟随 rule)', async () => {
+    it('draws a Latin schema with the one chosen arrangement', async () => {
         const controller = fakeController(null, {
             schema: 'aurora_pinyin',
-            latinLayout: 'colemak',
+            keyboardLayout: 'colemak',
         });
         const state = await buildFastInputViewState(controller as never);
         expect(state.layout).toBe('colemak');
@@ -119,6 +121,17 @@ describe('refineInputViewState', () => {
         const refined = await refineInputViewState(controller as never, fast);
         expect(refined.asciiMode).toBe(false);
         expect(refined.schemaName).toBe('my_custom');
+    });
+
+    it('migrates a pre-unification profile on read, even with no storage', async () => {
+        const controller = fakeController(null, {
+            schema: 'aurora_pinyin',
+            latinLayout: 'follow',
+            schemaLayouts: { aurora_pinyin: 'dvorak' },
+        });
+        const state = await buildFastInputViewState(controller as never);
+        expect(state.layout).toBe('dvorak');
+        expect(state.latinLayout).toBe('dvorak');
     });
 
     it('treats an undefined option value as false', async () => {

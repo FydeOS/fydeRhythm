@@ -201,15 +201,6 @@
     "theme_dark": {
         "message": "Dark"
     },
-    "latin_layout": {
-        "message": "Latin keyboard layout"
-    },
-    "latin_layout_hint": {
-        "message": "English mode is pinned to the selected arrangement."
-    },
-    "vk_layout": {
-        "message": "Keyboard layout"
-    },
     "layout_zhuyin": {
         "message": "Zhuyin"
     },
@@ -218,12 +209,6 @@
     },
     "layout_hangul": {
         "message": "Hangul"
-    },
-    "latin_layout_following": {
-        "message": "Follows the active schema's keyboard layout — currently $1."
-    },
-    "latin_layout_follow_option": {
-        "message": "Follow schema layout"
     },
     "vk_delete_word_confirm": {
         "message": "Delete “$1”?"
@@ -341,5 +326,28 @@
     },
     "vk_emoji_flags": {
         "message": "Flags"
+    },
+    "keyboard_arrangement": {
+        "message": "Letter arrangement"
+    },
+    "keyboard_arrangement_hint": {
+        "message": "Applies to your keyboard, the on-screen keyboard, and English mode."
+    },
+    "keyboard_arrangement_hint_physical": {
+        "message": "Applies to your keyboard, and to English mode."
+    },
+    "keyboard_script_note": {
+        "message": "$1 draws its own keys. Your arrangement still applies in English mode.",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "vk_keys": {
+        "message": "On-screen keys"
+    },
+    "layout_letters": {
+        "message": "Letters"
     }
 }

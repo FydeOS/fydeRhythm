@@ -744,13 +744,13 @@ describe('physical-key Latin layout remap', () => {
     const keyS = { type: 'keydown', key: 's', code: 'KeyS', ctrlKey: false, altKey: false, shiftKey: false } as chrome.input.ime.KeyboardEvent;
 
     it('feeds the engine the remapped char while composing (dvorak KeyS → o)', async () => {
-        const { controller, fed } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        const { controller, fed } = remapHarness({ keyboardLayout: 'dvorak' });
         await controller.feedKey(keyS);
         expect(fed).toEqual(['o'.charCodeAt(0)]);
     });
 
     it('commits the remapped char itself when the engine passes the key through (ASCII mode)', async () => {
-        const { controller, commits, setHandled } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        const { controller, commits, setHandled } = remapHarness({ keyboardLayout: 'dvorak' });
         setHandled(false);
         const result = await controller.feedKey(keyS);
         expect(commits).toEqual(['o']);
@@ -759,15 +759,15 @@ describe('physical-key Latin layout remap', () => {
 
     it('does not remap while composing a non-Latin schema even with a global Latin layout', async () => {
         const { controller, fed } = remapHarness({
-            latinLayout: 'colemak',
-            schemaLayouts: { aurora: 'zhuyin' },
+            keyboardLayout: 'colemak',
+            schemaKeys: { aurora: 'zhuyin' },
         });
         await controller.feedKey(keyS);
         expect(fed).toEqual(['s'.charCodeAt(0)]); // raw stroke for the engine's own mapping
     });
 
     it('leaves modifier shortcuts on US positions', async () => {
-        const { controller, fed, commits } = remapHarness({ schemaLayouts: { aurora: 'dvorak' } });
+        const { controller, fed, commits } = remapHarness({ keyboardLayout: 'dvorak' });
         await controller.feedKey({ ...keyS, ctrlKey: true, key: 's' } as never);
         // Pre-existing shortcut convention: Ctrl combos feed the uppercase
         // keysym from the code field (83 = 'S'). The point here: NOT dvorak 'o'.

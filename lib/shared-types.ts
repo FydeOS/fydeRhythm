@@ -63,9 +63,18 @@ export interface RimeCandidate {
 
 export const kInputViewPortName = "inputviewMessages";
 
+// How the user's letters are arranged. One answer, used everywhere: the
+// physical remap, the InputView's letter keys, and English mode on both.
 export const kLatinLayoutIds = ["qwerty", "colemak", "dvorak"] as const;
 export type LatinLayoutId = typeof kLatinLayoutIds[number];
-export const kLayoutIds = [...kLatinLayoutIds, "zhuyin", "kana", "hangul"] as const;
+
+// Key sets a schema paints instead of letters — a fact about the schema, not a
+// preference. Only the InputView can honour them; a physical keyboard has
+// whatever is printed on it.
+export const kScriptLayoutIds = ["zhuyin", "kana", "hangul"] as const;
+export type ScriptLayoutId = typeof kScriptLayoutIds[number];
+
+export const kLayoutIds = [...kLatinLayoutIds, ...kScriptLayoutIds] as const;
 export type LayoutId = typeof kLayoutIds[number];
 
 /** A candidate as displayed in the InputView candidate bar. `index` is the

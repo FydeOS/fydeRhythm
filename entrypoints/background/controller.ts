@@ -1,8 +1,8 @@
 import { Mutex } from "async-mutex";
-import { getFs, kDefaultSettings, matchesSchemaSwitchKey, resolveEffectiveLatinLayout, resolveLayoutForSchema, type ImeSettings, type SchemaSwitchKey } from "@/lib/utils";
+import { getFs, kDefaultSettings, matchesSchemaSwitchKey, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type ImeSettings, type SchemaSwitchKey } from "@/lib/utils";
 import { type RimeCandidateIterator, RimeEngine, type RimeSession } from "./engine";
 import { parse, stringify } from 'yaml'
-import { kLatinLayoutIds, type LatinLayoutId, type RimeCandidate } from "@/lib/shared-types";
+import type { LatinLayoutId, RimeCandidate } from "@/lib/shared-types";
 import { remapPhysicalKey } from "@/lib/latin-remap";
 import EventEmitter from "events";
 import { listEnabledInstalledSchemas } from "./schemas";
@@ -211,7 +211,7 @@ export class InputController extends EventEmitter {
             if (!configObj.settings) {
                 throw Error("Could not find RIME settings, refusing to launch.");
             }
-            this.activeSettings = configObj.settings as ImeSettings;
+            this.activeSettings = migrateLayoutSettings(configObj.settings as ImeSettings);
             console.log(">>>Settings: ", JSON.stringify(this.activeSettings));
             await this.loadMutex.runExclusive(async () => {
                 console.log("this.loadMutex.runExclusive");
@@ -581,25 +581,20 @@ export class InputController extends EventEmitter {
         this.activeSettings.schemaSwitchKey = key;
     }
 
-    // Same hot-path treatment for the layout bindings: feedKey remaps physical
+    // Same hot-path treatment for the layout settings: feedKey remaps physical
     // keys through these, and they must not stay stale until the next loadRime().
-    applyLayoutSettings(settings?: Pick<ImeSettings, "latinLayout" | "schemaLayouts">): void {
-        this.activeSettings.latinLayout = settings?.latinLayout;
-        this.activeSettings.schemaLayouts = settings?.schemaLayouts;
+    applyLayoutSettings(settings?: Pick<ImeSettings, "keyboardLayout" | "schemaKeys">): void {
+        this.activeSettings.keyboardLayout = settings?.keyboardLayout;
+        this.activeSettings.schemaKeys = settings?.schemaKeys;
     }
 
-    // Layouts the physical-key remap uses. Composing (Chinese/Japanese/…)
-    // follows the schema's layout only when it IS Latin — a 注音 schema must
-    // keep raw QWERTY strokes for the engine's own mapping even when the
-    // global Latin layout is Colemak. ASCII mode follows the effective Latin
-    // layout (schema's Latin binding, else the global setting).
+    // Both derived from the one arrangement. Composing is the exception: a
+    // schema that paints its own script (注音, かな) expects the raw QWERTY
+    // strokes its Rime mapping is written against, so it is never remapped.
     remapLayouts(): { composing: LatinLayoutId; ascii: LatinLayoutId } {
-        const schema = this.activeSettings.schema;
-        const layout = resolveLayoutForSchema(this.activeSettings, schema);
-        const composing = (kLatinLayoutIds as readonly string[]).includes(layout)
-            ? layout as LatinLayoutId
-            : "qwerty";
-        return { composing, ascii: resolveEffectiveLatinLayout(this.activeSettings, schema) };
+        const arrangement = resolveKeyboardLayout(this.activeSettings);
+        const script = resolveSchemaKeys(this.activeSettings, this.activeSettings.schema);
+        return { composing: script ? "qwerty" : arrangement, ascii: arrangement };
     }
 
     // Whether a key event is a plain printable keystroke eligible for layout

@@ -201,15 +201,6 @@
     "theme_dark": {
         "message": "다크"
     },
-    "latin_layout": {
-        "message": "영문 키보드 배열"
-    },
-    "latin_layout_hint": {
-        "message": "영문 모드는 선택한 배열로 고정됩니다."
-    },
-    "vk_layout": {
-        "message": "키보드 배열"
-    },
     "layout_zhuyin": {
         "message": "주음"
     },
@@ -218,12 +209,6 @@
     },
     "layout_hangul": {
         "message": "한글"
-    },
-    "latin_layout_following": {
-        "message": "현재 스키마의 키보드 배열을 따릅니다(현재: $1)."
-    },
-    "latin_layout_follow_option": {
-        "message": "스키마 배열 따르기"
     },
     "vk_delete_word_confirm": {
         "message": "“$1”을(를) 삭제할까요?"
@@ -341,5 +326,28 @@
     },
     "vk_emoji_flags": {
         "message": "깃발"
+    },
+    "keyboard_arrangement": {
+        "message": "문자 배열"
+    },
+    "keyboard_arrangement_hint": {
+        "message": "외장 키보드, 화면 키보드, 영문 모드에 모두 적용됩니다."
+    },
+    "keyboard_arrangement_hint_physical": {
+        "message": "외장 키보드와 영문 모드에 적용됩니다."
+    },
+    "keyboard_script_note": {
+        "message": "$1 은(는) 고유한 키를 표시합니다. 문자 배열은 영문 모드에 계속 적용됩니다.",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "vk_keys": {
+        "message": "화면 키"
+    },
+    "layout_letters": {
+        "message": "영문"
     }
 }

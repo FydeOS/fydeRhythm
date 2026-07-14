@@ -1,5 +1,5 @@
 import { FastIndexedDbFsController } from './fs'
-import { kLatinLayoutIds, type LatinLayoutId, type LayoutId } from './shared-types'
+import { kLatinLayoutIds, kScriptLayoutIds, type LatinLayoutId, type LayoutId, type ScriptLayoutId } from './shared-types'
 
 export function dec2hex(dec: number): string {
     return dec.toString(16).padStart(2, "0")
@@ -52,6 +52,9 @@ export interface SchemaSwitchKey {
     shiftKey?: boolean;
 }
 
+// "latin" undoes a wrong guess (an imported "my_bopomofo_fork" → zhuyin).
+export type SchemaKeys = ScriptLayoutId | "latin";
+
 export interface ImeSettings {
     schema: string;
     pageSize: number;
@@ -65,40 +68,65 @@ export interface ImeSettings {
     //   null      → disabled, no shortcut at all
     //   object    → a user-defined binding
     schemaSwitchKey?: SchemaSwitchKey | null;
-    // Preferred arrangement for Latin letters in ASCII mode.
-    //   "follow" / undefined → follow the active schema's Latin layout binding
-    //                          (qwerty when the schema's layout is non-Latin)
-    //   a LatinLayoutId      → pinned; schema bindings never override it
+    // The one layout question the user is asked. Physical remap, on-screen
+    // letter keys and English mode are all derived from it.
+    keyboardLayout?: LatinLayoutId;
+    // Corrections to guessSchemaKeys(), keyed by schema id. Only the InputView reads these.
+    schemaKeys?: Record<string, SchemaKeys>;
+    /** @deprecated Read once by migrateLayoutSettings, then dropped. */
     latinLayout?: LatinLayoutId | "follow";
-    // Per-schema InputView layout override, keyed by schema id. A schema with no
-    // entry uses the pinned latinLayout (or qwerty under "follow").
+    /** @deprecated Read once by migrateLayoutSettings, then dropped. */
     schemaLayouts?: Record<string, LayoutId>;
 }
 
 export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [], horizontal: false };
 
-// Latin layout in effect for ASCII mode while a given schema is active. The
-// user picks it explicitly: "follow" (the default) tracks the schema's Latin
-// layout binding so toggling 中/英 never changes the arrangement; a concrete
-// layout is pinned and schema bindings never override it.
-export function resolveEffectiveLatinLayout(
-    settings: Pick<ImeSettings, "latinLayout" | "schemaLayouts"> | undefined,
-    schemaId: string,
-): LatinLayoutId {
-    const pref = settings?.latinLayout ?? "follow";
-    if (pref !== "follow") return pref;
-    const layout = resolveLayoutForSchema(settings, schemaId);
-    return (kLatinLayoutIds as readonly string[]).includes(layout)
-        ? layout as LatinLayoutId
-        : "qwerty";
+const kScriptSet = new Set<string>(kScriptLayoutIds);
+const kLatinSet = new Set<string>(kLatinLayoutIds);
+
+// The old schemaLayouts map held both kinds of value. Script values carry over
+// as corrections; Latin ones were per-schema arrangements, which no longer
+// exist — the ACTIVE schema's becomes the global arrangement (what "follow"
+// already resolved to) and the rest are dropped. Applied at every read, and
+// persisted once at startup.
+export function migrateLayoutSettings(settings: ImeSettings): ImeSettings {
+    if (settings.latinLayout === undefined && settings.schemaLayouts === undefined) {
+        return settings;
+    }
+
+    const legacy = settings.schemaLayouts ?? {};
+    const schemaKeys: Record<string, SchemaKeys> = { ...(settings.schemaKeys ?? {}) };
+    for (const [id, layout] of Object.entries(legacy)) {
+        if (kScriptSet.has(layout) && schemaKeys[id] === undefined) {
+            schemaKeys[id] = layout as ScriptLayoutId;
+        }
+    }
+
+    const activeLegacy = legacy[settings.schema];
+    const keyboardLayout: LatinLayoutId = settings.keyboardLayout
+        ?? (settings.latinLayout && settings.latinLayout !== "follow" ? settings.latinLayout : undefined)
+        ?? (activeLegacy && kLatinSet.has(activeLegacy) ? activeLegacy as LatinLayoutId : undefined)
+        ?? "qwerty";
+
+    const next: ImeSettings = { ...settings, keyboardLayout };
+    if (Object.keys(schemaKeys).length > 0) next.schemaKeys = schemaKeys;
+    delete next.latinLayout;
+    delete next.schemaLayouts;
+    return next;
 }
 
-// Best-effort layout guess for a schema the user hasn't bound explicitly.
-// Keyword matching on id+name is deliberately simple and transparent — schemas
-// are arbitrary user imports, so anything cleverer (parsing schema YAML) would
-// still be a guess, just a slower one. Returns undefined for Latin-typed
-// schemas (pinyin, wubi, cangjie…), which follow the global Latin layout.
-export function guessLayoutForSchema(schemaId: string, schemaName?: string): LayoutId | undefined {
+// Physical keys, on-screen letter keys and English mode alike.
+export function resolveKeyboardLayout(
+    settings: Pick<ImeSettings, "keyboardLayout"> | undefined,
+): LatinLayoutId {
+    return settings?.keyboardLayout ?? "qwerty";
+}
+
+// Best-effort guess at the key set a schema paints. Keyword matching on id+name
+// is deliberately simple: schemas are arbitrary user imports, so anything
+// cleverer (parsing schema YAML) would still be a guess, just a slower one.
+// Undefined for Latin-typed schemas (pinyin, wubi, cangjie…).
+export function guessSchemaKeys(schemaId: string, schemaName?: string): ScriptLayoutId | undefined {
     const haystack = `${schemaId} ${schemaName ?? ""}`.toLowerCase();
     if (/zhuyin|bopomofo|注音/.test(haystack)) return "zhuyin";
     // "jap" catches the store's jap_poly, whose id lacks the full word.
@@ -107,8 +135,20 @@ export function guessLayoutForSchema(schemaId: string, schemaName?: string): Lay
     return undefined;
 }
 
+// The script a schema paints, after any correction. Undefined means letters.
+export function resolveSchemaKeys(
+    settings: Pick<ImeSettings, "schemaKeys"> | undefined,
+    schemaId: string,
+    schemaName?: string,
+): ScriptLayoutId | undefined {
+    const corrected = settings?.schemaKeys?.[schemaId];
+    if (corrected === "latin") return undefined;
+    if (corrected) return corrected;
+    return guessSchemaKeys(schemaId, schemaName);
+}
+
 // Writing system of a schema, for the ASCII-toggle badge. Keyword matching on
-// id+name (like guessLayoutForSchema), with the bound layout as a fallback
+// id+name (like guessSchemaKeys), with the bound layout as a fallback
 // signal: romaji-driven Japanese schemas have a qwerty LAYOUT but are still
 // Japanese, so the layout alone can't decide this.
 export function guessScriptForSchema(
@@ -126,20 +166,14 @@ export function guessScriptForSchema(
     return "zh";
 }
 
-// Layout shown for a schema when not in ASCII mode: the user's per-schema
-// binding if set, then the keyword guess, then the pinned Latin layout
-// (qwerty when the Latin layout is set to "follow" — the follow direction is
-// Latin-follows-schema, never the reverse, which would be circular).
+// The keyboard drawn for a schema outside ASCII mode: its own script if it has
+// one, else the user's arrangement.
 export function resolveLayoutForSchema(
-    settings: Pick<ImeSettings, "latinLayout" | "schemaLayouts"> | undefined,
+    settings: Pick<ImeSettings, "keyboardLayout" | "schemaKeys"> | undefined,
     schemaId: string,
     schemaName?: string,
 ): LayoutId {
-    const bound = settings?.schemaLayouts?.[schemaId]
-        ?? guessLayoutForSchema(schemaId, schemaName);
-    if (bound) return bound;
-    const pref = settings?.latinLayout ?? "follow";
-    return pref === "follow" ? "qwerty" : pref;
+    return resolveSchemaKeys(settings, schemaId, schemaName) ?? resolveKeyboardLayout(settings);
 }
 
 // The historical default — matches RIME's own Control+grave convention.

@@ -201,15 +201,6 @@
     "theme_dark": {
         "message": "ダーク"
     },
-    "latin_layout": {
-        "message": "英字キーボード配列"
-    },
-    "latin_layout_hint": {
-        "message": "英語モードは選択した配列に固定されます。"
-    },
-    "vk_layout": {
-        "message": "キーボード配列"
-    },
     "layout_zhuyin": {
         "message": "注音"
     },
@@ -218,12 +209,6 @@
     },
     "layout_hangul": {
         "message": "ハングル"
-    },
-    "latin_layout_following": {
-        "message": "現在のスキーマのキーボード配列に従います（現在: $1）。"
-    },
-    "latin_layout_follow_option": {
-        "message": "スキーマの配列に従う"
     },
     "vk_delete_word_confirm": {
         "message": "「$1」を削除しますか?"
@@ -341,5 +326,28 @@
     },
     "vk_emoji_flags": {
         "message": "旗"
+    },
+    "keyboard_arrangement": {
+        "message": "文字配列"
+    },
+    "keyboard_arrangement_hint": {
+        "message": "外付けキーボード、画面キーボード、英字モードに適用されます。"
+    },
+    "keyboard_arrangement_hint_physical": {
+        "message": "外付けキーボードと英字モードに適用されます。"
+    },
+    "keyboard_script_note": {
+        "message": "$1 は専用のキーを表示します。文字配列は英字モードで有効です。",
+        "placeholders": {
+            "schema": {
+                "content": "$1"
+            }
+        }
+    },
+    "vk_keys": {
+        "message": "画面のキー"
+    },
+    "layout_letters": {
+        "message": "英字"
     }
 }

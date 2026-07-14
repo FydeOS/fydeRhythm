@@ -42,31 +42,55 @@ describe('generateId', () => {
     });
 });
 
-describe('InputView layout resolution', () => {
-    it('guesses non-Latin layouts from schema id/name keywords', async () => {
-        const { guessLayoutForSchema } = await import('../lib/utils');
-        expect(guessLayoutForSchema('terra_zhuyin')).toBe('zhuyin');
-        expect(guessLayoutForSchema('bopomofo_tw')).toBe('zhuyin');
-        expect(guessLayoutForSchema('custom', '注音方案')).toBe('zhuyin');
-        expect(guessLayoutForSchema('japanese_kana')).toBe('kana');
+const base = { schema: 'aurora_pinyin', pageSize: 5, algebraList: [] };
+
+describe('schema key sets (a fact about the schema, not a preference)', () => {
+    it('guesses the script a schema paints from its id/name keywords', async () => {
+        const { guessSchemaKeys } = await import('../lib/utils');
+        expect(guessSchemaKeys('terra_zhuyin')).toBe('zhuyin');
+        expect(guessSchemaKeys('bopomofo_tw')).toBe('zhuyin');
+        expect(guessSchemaKeys('custom', '注音方案')).toBe('zhuyin');
+        expect(guessSchemaKeys('japanese_kana')).toBe('kana');
         // Store catalog ids that lack the full keyword.
-        expect(guessLayoutForSchema('jap_poly', 'Poly 日文输入法')).toBe('kana');
-        expect(guessLayoutForSchema('hangeul2set')).toBe('hangul');
-        expect(guessLayoutForSchema('hangul_2set')).toBe('hangul');
-        expect(guessLayoutForSchema('aurora_pinyin', '极光拼音')).toBeUndefined();
-        expect(guessLayoutForSchema('wubi98')).toBeUndefined();
+        expect(guessSchemaKeys('jap_poly', 'Poly 日文输入法')).toBe('kana');
+        expect(guessSchemaKeys('hangeul2set')).toBe('hangul');
+        expect(guessSchemaKeys('hangul_2set')).toBe('hangul');
+        // Latin-typed schemas paint letters.
+        expect(guessSchemaKeys('aurora_pinyin', '极光拼音')).toBeUndefined();
+        expect(guessSchemaKeys('wubi98')).toBeUndefined();
     });
 
-    it('resolves binding > guess > Latin layout, in that order', async () => {
+    it('lets a correction override a wrong guess, in both directions', async () => {
+        const { resolveSchemaKeys } = await import('../lib/utils');
+        // "latin" is how a wrong zhuyin guess gets undone.
+        expect(resolveSchemaKeys(
+            { schemaKeys: { my_bopomofo_fork: 'latin' } }, 'my_bopomofo_fork')).toBeUndefined();
+        // ...and a schema whose name says nothing can be pinned to a script.
+        expect(resolveSchemaKeys({ schemaKeys: { mystery: 'kana' } }, 'mystery')).toBe('kana');
+        // Uncorrected schemas keep the guess.
+        expect(resolveSchemaKeys({}, 'terra_zhuyin')).toBe('zhuyin');
+    });
+});
+
+describe('one arrangement, everywhere', () => {
+    it('draws a schema with its own script, else with the chosen arrangement', async () => {
         const { resolveLayoutForSchema } = await import('../lib/utils');
-        // Explicit binding wins over the keyword guess.
+        // A script schema paints its script, whatever the arrangement is.
+        expect(resolveLayoutForSchema({ keyboardLayout: 'colemak' }, 'terra_zhuyin')).toBe('zhuyin');
+        // A Latin-typed schema paints the user's arrangement.
+        expect(resolveLayoutForSchema({ keyboardLayout: 'colemak' }, 'aurora_pinyin')).toBe('colemak');
+        // A corrected schema paints letters — in the user's arrangement.
         expect(resolveLayoutForSchema(
-            { schemaLayouts: { terra_zhuyin: 'qwerty' } }, 'terra_zhuyin')).toBe('qwerty');
-        // Keyword guess beats the global Latin layout.
-        expect(resolveLayoutForSchema({ latinLayout: 'colemak' }, 'terra_zhuyin')).toBe('zhuyin');
-        // Latin-typed schemas follow the global Latin layout (跟随 rule).
-        expect(resolveLayoutForSchema({ latinLayout: 'colemak' }, 'aurora_pinyin')).toBe('colemak');
+            { keyboardLayout: 'dvorak', schemaKeys: { terra_zhuyin: 'latin' } }, 'terra_zhuyin')).toBe('dvorak');
+        // Nothing configured yet: QWERTY.
         expect(resolveLayoutForSchema(undefined, 'aurora_pinyin')).toBe('qwerty');
+    });
+
+    it('never varies the arrangement by schema — there is only one answer', async () => {
+        const { resolveKeyboardLayout } = await import('../lib/utils');
+        expect(resolveKeyboardLayout({ keyboardLayout: 'dvorak' })).toBe('dvorak');
+        expect(resolveKeyboardLayout({})).toBe('qwerty');
+        expect(resolveKeyboardLayout(undefined)).toBe('qwerty');
     });
 });
 
@@ -97,37 +121,44 @@ describe('guessScriptForSchema (poly regression)', () => {
     });
 });
 
-describe('resolveEffectiveLatinLayout (English follows Latin schema bindings)', () => {
-    it('follows a Latin per-schema binding so 中/英 never changes the arrangement', async () => {
-        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
-        // Schema bound to Colemak → English mode is Colemak too, even though
-        // the global Latin layout is qwerty.
-        expect(resolveEffectiveLatinLayout(
-            { schemaLayouts: { aurora_pinyin: 'colemak' } }, 'aurora_pinyin')).toBe('colemak');
+describe('migrating the pre-unification layout config', () => {
+    it('keeps script bindings as corrections and drops the Latin ones', async () => {
+        const { migrateLayoutSettings } = await import('../lib/utils');
+        const next = migrateLayoutSettings({
+            ...base,
+            schema: 'aurora_pinyin',
+            latinLayout: 'follow',
+            schemaLayouts: { terra_zhuyin: 'zhuyin', jap_poly: 'kana', aurora_pinyin: 'colemak' },
+        });
+        // The active schema's Latin binding IS what "follow" resolved to, so it
+        // becomes the one arrangement.
+        expect(next.keyboardLayout).toBe('colemak');
+        expect(next.schemaKeys).toEqual({ terra_zhuyin: 'zhuyin', jap_poly: 'kana' });
+        expect(next.latinLayout).toBeUndefined();
+        expect(next.schemaLayouts).toBeUndefined();
     });
 
-    it('falls back to the global Latin layout for non-Latin schema layouts', async () => {
-        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
-        expect(resolveEffectiveLatinLayout(
-            { latinLayout: 'dvorak', schemaLayouts: { terra_zhuyin: 'zhuyin' } }, 'terra_zhuyin')).toBe('dvorak');
-        expect(resolveEffectiveLatinLayout(undefined, 'aurora_pinyin')).toBe('qwerty');
-    });
-});
-
-describe('latinLayout "follow" is an explicit choice', () => {
-    it('a pinned Latin layout is never overridden by schema bindings', async () => {
-        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
-        expect(resolveEffectiveLatinLayout(
-            { latinLayout: 'qwerty', schemaLayouts: { aurora_pinyin: 'colemak' } },
-            'aurora_pinyin')).toBe('qwerty');
+    it('carries a pinned Latin layout over verbatim', async () => {
+        const { migrateLayoutSettings } = await import('../lib/utils');
+        const next = migrateLayoutSettings({
+            ...base,
+            schema: 'terra_zhuyin',
+            latinLayout: 'dvorak',
+            schemaLayouts: { terra_zhuyin: 'zhuyin' },
+        });
+        expect(next.keyboardLayout).toBe('dvorak');
+        expect(next.schemaKeys).toEqual({ terra_zhuyin: 'zhuyin' });
     });
 
-    it('follow (and the undefined default) tracks the schema binding', async () => {
-        const { resolveEffectiveLatinLayout } = await import('../lib/utils');
-        expect(resolveEffectiveLatinLayout(
-            { latinLayout: 'follow', schemaLayouts: { aurora_pinyin: 'colemak' } },
-            'aurora_pinyin')).toBe('colemak');
-        expect(resolveEffectiveLatinLayout(
-            { schemaLayouts: { terra_zhuyin: 'zhuyin' } }, 'terra_zhuyin')).toBe('qwerty');
+    it('defaults to QWERTY when the old config said nothing concrete', async () => {
+        const { migrateLayoutSettings } = await import('../lib/utils');
+        const next = migrateLayoutSettings({ ...base, latinLayout: 'follow' });
+        expect(next.keyboardLayout).toBe('qwerty');
+    });
+
+    it('leaves an already-migrated profile untouched (same object)', async () => {
+        const { migrateLayoutSettings } = await import('../lib/utils');
+        const settings = { ...base, keyboardLayout: 'colemak' as const, schemaKeys: { x: 'kana' as const } };
+        expect(migrateLayoutSettings(settings)).toBe(settings);
     });
 });

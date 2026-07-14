@@ -1,5 +1,5 @@
 import { parse } from "yaml";
-import { getFs, guessScriptForSchema, kDefaultSettings, resolveEffectiveLatinLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
+import { getFs, guessScriptForSchema, kDefaultSettings, migrateLayoutSettings, resolveKeyboardLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
 import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground, type NumericFieldKind } from "@/lib/shared-types";
 import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
@@ -62,7 +62,12 @@ export async function restoreEngineId(): Promise<void> {
   await refreshImeMenuItems();
 }
 
-async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSettings | null> {
+async function resolveStartupSettings(stored: ImeSettings): Promise<ImeSettings | null> {
+  // Every read migrates anyway; this write just stops us carrying the legacy
+  // keys around forever.
+  const settings = migrateLayoutSettings(stored);
+  const migrated = settings !== stored;
+
   const fs = await getFs();
   const schema = resolveInstalledSchemaId(
     await fs.readAll(),
@@ -73,6 +78,9 @@ async function resolveStartupSettings(settings: ImeSettings): Promise<ImeSetting
     return null;
   }
   if (schema === settings.schema) {
+    if (migrated) {
+      await chrome.storage.sync.set({ settings });
+    }
     return settings;
   }
 
@@ -110,12 +118,16 @@ async function readAsciiMode(controller: InputController | undefined): Promise<b
 // controller's active copy. Read fresh on every state build so layout-binding
 // edits reach the InputView without an engine reload.
 async function readSettings(controller: InputController | undefined): Promise<ImeSettings | undefined> {
+  let settings: ImeSettings | undefined;
   try {
     const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
-    return obj.settings ?? controller?.activeSettings;
+    settings = obj.settings ?? controller?.activeSettings;
   } catch {
-    return controller?.activeSettings;
+    settings = controller?.activeSettings;
   }
+  // Migrate on every path, including the failed read: a legacy profile must
+  // resolve the same either way.
+  return settings && migrateLayoutSettings(settings);
 }
 
 // Fast snapshot: reads ONLY chrome.storage — never the engine or the schema
@@ -130,7 +142,7 @@ export async function buildFastInputViewState(controller: InputController | unde
   return {
     asciiMode: false,
     layout,
-    latinLayout: resolveEffectiveLatinLayout(settings, schemaId),
+    latinLayout: resolveKeyboardLayout(settings),
     script: guessScriptForSchema(schemaId, undefined, layout),
     schemaId,
     schemaName: schemaId,
@@ -340,8 +352,9 @@ export default defineBackground({
         // Keep the schema-switch shortcut live on the hot key path without waiting
         // for a full engine reload — feedKey reads activeSettings.schemaSwitchKey,
         // which would otherwise stay stale until the next loadRime().
-        self.controller?.applySchemaSwitchKey((changes.settings.newValue as ImeSettings | undefined)?.schemaSwitchKey);
-        self.controller?.applyLayoutSettings(changes.settings.newValue as ImeSettings | undefined);
+        const next = changes.settings.newValue as ImeSettings | undefined;
+        self.controller?.applySchemaSwitchKey(next?.schemaSwitchKey);
+        self.controller?.applyLayoutSettings(next && migrateLayoutSettings(next));
         refreshImeMenuItems();
         // Layout bindings / Latin layout may have changed — push fresh state to
         // any connected InputView.

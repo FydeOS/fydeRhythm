@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { parse } from 'yaml'
 import { ThemeProvider, useColorScheme } from '@mui/material/styles';
-import Tooltip from "@mui/material/Tooltip";
 
 import theme from "./theme"
 import styles from "./styles.module.less";
@@ -34,8 +33,10 @@ import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlin
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
-import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey, resolveLayoutForSchema, resolveEffectiveLatinLayout } from "@/lib/utils";
-import { kLatinLayoutIds, kLayoutIds, type LatinLayoutId, type LayoutId } from "@/lib/shared-types";
+import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type SchemaKeys } from "@/lib/utils";
+import { kLatinLayoutIds, kScriptLayoutIds, type LatinLayoutId, type LayoutId } from "@/lib/shared-types";
+import { hasInputView } from "@/lib/platform";
+import { SegmentedPill } from "./SegmentedPill";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Divider from "@mui/material/Divider";
@@ -107,157 +108,27 @@ const kConventerUrl = 'https://rime-conf-translator.fydeos.io'
 
 // Light / System / Dark pill in the top-right corner. Persistence and the
 // <html> class are handled by MUI's useColorScheme, so it renders inside the
-// ThemeProvider. Supports click, keyboard, and drag/swipe.
+// ThemeProvider. The pill itself is shared with the arrangement picker below.
 function AppearanceToggle() {
     const { mode, setMode } = useColorScheme();
     const current = mode ?? 'system';
     // System sits at the edge: light↔dark form a natural continuum, and a
     // "follow system" wedged between them breaks it.
     const options = [
-        { value: 'system' as const, icon: <SettingsBrightnessIcon sx={{ fontSize: 18 }} />, label: $$("theme_system") },
-        { value: 'light' as const, icon: <LightModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_light") },
-        { value: 'dark' as const, icon: <DarkModeIcon sx={{ fontSize: 18 }} />, label: $$("theme_dark") },
+        { value: 'system' as const, label: $$("theme_system"), content: <SettingsBrightnessIcon sx={{ fontSize: 18 }} /> },
+        { value: 'light' as const, label: $$("theme_light"), content: <LightModeIcon sx={{ fontSize: 18 }} /> },
+        { value: 'dark' as const, label: $$("theme_dark"), content: <DarkModeIcon sx={{ fontSize: 18 }} /> },
     ];
-    const size = 34;
-    const gap = 2;
-    const step = size + gap;
-    const n = options.length;
-    const activeIndex = Math.max(0, options.findIndex((o) => o.value === current));
-
-    const trackRef = useRef<HTMLDivElement | null>(null);
-    const draggingRef = useRef(false);
-    // Distinguishes a drag from a click so a drag ending on a segment doesn't
-    // also trigger its onClick.
-    const movedRef = useRef(false);
-    const startXRef = useRef(0);
-    const rectLeftRef = useRef(0);
-    // Snapped slot under the pointer while dragging; null follows the selection.
-    const [dragIndex, setDragIndex] = useState<number | null>(null);
-
-    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-    const indexFromClientX = (clientX: number) =>
-        clamp(Math.round((clientX - rectLeftRef.current - size / 2) / step), 0, n - 1);
-
-    function onPointerDown(e: React.PointerEvent) {
-        draggingRef.current = true;
-        movedRef.current = false;
-        startXRef.current = e.clientX;
-        // Measured once (pill is fixed-position) to keep pointermove reflow-free.
-        rectLeftRef.current = trackRef.current?.getBoundingClientRect().left ?? 0;
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
-    function onPointerMove(e: React.PointerEvent) {
-        if (!draggingRef.current) return;
-        if (Math.abs(e.clientX - startXRef.current) > 4) movedRef.current = true;
-        if (movedRef.current) {
-            const idx = indexFromClientX(e.clientX);
-            setDragIndex((prev) => (prev === idx ? prev : idx));
-        }
-    }
-    function endDrag(e: React.PointerEvent) {
-        if (!draggingRef.current) return;
-        draggingRef.current = false;
-        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* already released */ }
-        if (movedRef.current) setMode(options[indexFromClientX(e.clientX)].value);
-        setDragIndex(null);
-    }
-
-    const dragging = dragIndex != null;
-    const litIndex = dragging ? dragIndex! : activeIndex;
 
     return (
-        <Box
-            role="radiogroup"
-            aria-label={$$("appearance")}
-            sx={{
-                position: 'fixed',
-                top: 16,
-                right: 16,
-                zIndex: 10,
-                p: '4px',
-                borderRadius: '999px',
-                bgcolor: 'background.paper',
-                border: '1px solid',
-                borderColor: 'divider',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 28px rgba(0,0,0,0.08)',
-            }}
-        >
-            <Box
-                ref={trackRef}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                sx={{
-                    position: 'relative',
-                    display: 'inline-flex',
-                    gap: `${gap}px`,
-                    touchAction: 'none',
-                    userSelect: 'none',
-                    cursor: dragging ? 'grabbing' : 'default',
-                }}
-            >
-                <Box
-                    aria-hidden
-                    sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: size,
-                        height: size,
-                        borderRadius: '999px',
-                        background: 'linear-gradient(135deg, #F5316E 0%, #E40046 100%)',
-                        transform: `translateX(${litIndex * step}px) scale(${dragging ? 1.08 : 1})`,
-                        boxShadow: dragging
-                            ? '0 6px 16px rgba(228,0,70,0.44)'
-                            : '0 3px 8px rgba(228,0,70,0.32)',
-                        transition: 'transform .3s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease',
-                        pointerEvents: 'none',
-                    }}
-                />
-                {options.map((opt, i) => {
-                    const selected = i === litIndex;
-                    return (
-                        <Tooltip key={opt.value} title={opt.label} arrow>
-                            <Box
-                                component="button"
-                                type="button"
-                                role="radio"
-                                aria-checked={current === opt.value}
-                                aria-label={opt.label}
-                                onClick={() => { if (!movedRef.current) setMode(opt.value); }}
-                                sx={{
-                                    position: 'relative',
-                                    zIndex: 1,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: size,
-                                    height: size,
-                                    p: 0,
-                                    m: 0,
-                                    border: 0,
-                                    borderRadius: '999px',
-                                    cursor: dragging ? 'grabbing' : 'pointer',
-                                    appearance: 'none',
-                                    background: 'transparent',
-                                    outline: 'none',
-                                    touchAction: 'none',
-                                    WebkitTapHighlightColor: 'transparent',
-                                    color: selected ? '#fff' : 'text.secondary',
-                                    transition: 'color .25s ease',
-                                    '& svg': { transition: 'transform .3s cubic-bezier(.34, 1.56, .64, 1)' },
-                                    '&:hover': { color: selected ? '#fff' : 'text.primary' },
-                                    '&:hover svg': { transform: selected ? 'none' : 'scale(1.12)' },
-                                    '&:focus-visible': { boxShadow: '0 0 0 2px var(--mui-palette-primary-main)' },
-                                }}
-                            >
-                                {opt.icon}
-                            </Box>
-                        </Tooltip>
-                    );
-                })}
-            </Box>
+        <Box sx={{ position: 'fixed', top: 16, right: 16, zIndex: 10 }}>
+            <SegmentedPill
+                options={options}
+                value={current}
+                onChange={setMode}
+                ariaLabel={$$("appearance")}
+                tooltips
+            />
         </Box>
     );
 }
@@ -318,7 +189,8 @@ function OptionsPage() {
     async function loadSettings() {
         const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
         if (obj.settings) {
-            setImeSettings(obj.settings);
+            // The page only ever edits the current shape; saving rewrites it.
+            setImeSettings(migrateLayoutSettings(obj.settings));
             setSettingsDirty(SettingsDirtyStatus.NotDirty);
         }
     }
@@ -506,8 +378,7 @@ function OptionsPage() {
         changeSettings({ enabledSchemas: next });
     }
 
-    // Display names for InputView layouts. Latin layouts are proper nouns;
-    // the rest are localized.
+    // Latin arrangements are proper nouns; the scripts are localized.
     const layoutNames: Record<LayoutId, string> = {
         qwerty: "QWERTY",
         colemak: "Colemak",
@@ -517,14 +388,13 @@ function OptionsPage() {
         hangul: $$("layout_hangul"),
     };
 
-    // What "follow the schema" currently resolves to for the active schema —
-    // shown in the hint so the follow option is never opaque.
-    const effectiveLatin = resolveEffectiveLatinLayout(imeSettings, imeSettings.schema);
-    const latinFollowing = (imeSettings.latinLayout ?? "follow") === "follow";
+    const arrangement = resolveKeyboardLayout(imeSettings);
+    const activeSchemaName = currentSchemaInfo()?.name;
+    const activeScript = resolveSchemaKeys(imeSettings, imeSettings.schema, activeSchemaName);
 
-    // Per-schema keyboard layout binding (always explicit).
-    function setSchemaLayout(id: string, layout: LayoutId) {
-        changeSettings({ schemaLayouts: { ...(imeSettings.schemaLayouts ?? {}), [id]: layout } });
+    // Correct a schema whose key set was guessed wrong.
+    function setSchemaKeys(id: string, keys: SchemaKeys) {
+        changeSettings({ schemaKeys: { ...(imeSettings.schemaKeys ?? {}), [id]: keys } });
     }
 
     // Called at the end of each install path (download / convert / import).
@@ -536,6 +406,16 @@ function OptionsPage() {
         changeSettings({ schema: id, ...(nextEnabled ? { enabledSchemas: nextEnabled } : {}) });
     }
 
+    const schemaKeysNames: Record<SchemaKeys, string> = {
+        latin: $$("layout_letters"),
+        zhuyin: layoutNames.zhuyin,
+        kana: layoutNames.kana,
+        hangul: layoutNames.hangul,
+    };
+
+    // No on-screen keyboard means a schema's key set has no surface to appear
+    // on, so we neither ask about it nor preview it.
+    const showsInputView = hasInputView();
     let engineStatusString: string = $$("rime_engine_not_started");
     let engineColor = "error.main";
     if (engineStatus.loading) {
@@ -1175,27 +1055,31 @@ function OptionsPage() {
                                                         </Box>
                                                     </Box>
 
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                                                            {$$("vk_layout")}
+                                                    {/* The keys this schema paints — a fact about the schema, so
+                                                        it lives on the schema. The arrangement is global and lives
+                                                        in the keyboard card. */}
+                                                    {showsInputView && (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                                {$$("vk_keys")}
+                                                            </Box>
+                                                            <Select
+                                                                size="small"
+                                                                variant="standard"
+                                                                disableUnderline
+                                                                // Resolved: correction → guess → letters.
+                                                                value={resolveSchemaKeys(imeSettings, schema.id, schema.name) ?? "latin"}
+                                                                onChange={(e) => setSchemaKeys(schema.id, e.target.value as SchemaKeys)}
+                                                                inputProps={{ 'aria-label': `${$$("vk_keys")} — ${schema.name || schema.id}` }}
+                                                                sx={{ fontSize: '0.8rem', color: 'text.secondary', '& .MuiSelect-select': { py: 0.25 } }}
+                                                            >
+                                                                <MenuItem value="latin">{schemaKeysNames.latin}</MenuItem>
+                                                                {kScriptLayoutIds.map((id) => (
+                                                                    <MenuItem key={id} value={id}>{schemaKeysNames[id]}</MenuItem>
+                                                                ))}
+                                                            </Select>
                                                         </Box>
-                                                        <Select
-                                                            size="small"
-                                                            variant="standard"
-                                                            disableUnderline
-                                                            // Always show the RESOLVED layout (binding → keyword
-                                                            // guess → qwerty); picking a value writes an explicit
-                                                            // binding. No "follow Latin" indirection here — the
-                                                            // Latin setting is the one that follows the schema.
-                                                            value={resolveLayoutForSchema(imeSettings, schema.id, schema.name)}
-                                                            onChange={(e) => setSchemaLayout(schema.id, e.target.value as LayoutId)}
-                                                            sx={{ fontSize: '0.8rem', color: 'text.secondary', '& .MuiSelect-select': { py: 0.25 } }}
-                                                        >
-                                                            {kLayoutIds.map((id) => (
-                                                                <MenuItem key={id} value={id}>{layoutNames[id]}</MenuItem>
-                                                            ))}
-                                                        </Select>
-                                                    </Box>
+                                                    )}
 
                                                 </Box>
                                             )}
@@ -1410,27 +1294,24 @@ function OptionsPage() {
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
                         <Box sx={{ pr: 2 }}>
                             <Box component="h2" sx={{ m: 0, fontSize: '15px', fontWeight: 600, color: 'text.primary', letterSpacing: '-0.01em' }}>
-                                {$$("latin_layout")}
+                                {$$("keyboard_arrangement")}
                             </Box>
-                            {/* Follow is an explicit choice; surface what it resolves
-                                to right now so the option is never opaque. */}
                             <Box sx={{ fontSize: '13px', color: 'text.secondary', mt: 0.5 }}>
-                                {latinFollowing
-                                    ? $$("latin_layout_following", layoutNames[effectiveLatin])
-                                    : $$("latin_layout_hint")}
+                                {activeScript && showsInputView
+                                    ? $$("keyboard_script_note", activeSchemaName || imeSettings.schema)
+                                    : showsInputView
+                                        ? $$("keyboard_arrangement_hint")
+                                        : $$("keyboard_arrangement_hint_physical")}
                             </Box>
                         </Box>
-                        <Select
-                            size="small"
-                            value={imeSettings.latinLayout ?? "follow"}
-                            onChange={(e) => changeSettings({ latinLayout: e.target.value as LatinLayoutId | "follow" })}
-                            sx={{ minWidth: 170 }}
-                        >
-                            <MenuItem value="follow">{$$("latin_layout_follow_option")}</MenuItem>
-                            {kLatinLayoutIds.map((id) => (
-                                <MenuItem key={id} value={id}>{layoutNames[id]}</MenuItem>
-                            ))}
-                        </Select>
+                        <SegmentedPill
+                            options={kLatinLayoutIds.map((id) => ({ value: id, label: layoutNames[id], content: layoutNames[id] }))}
+                            value={arrangement}
+                            onChange={(id: LatinLayoutId) => changeSettings({ keyboardLayout: id })}
+                            ariaLabel={$$("keyboard_arrangement")}
+                            width={92}
+                            height={32}
+                        />
                     </Box>
                 </div>
             </div>
