@@ -16,7 +16,10 @@
   --kb-surface: #ffffff;             /* letter keys */
   --kb-surface-variant: #d5d9de;     /* pressed-key fill */
   --kb-popup: #ffffff;               /* bubbles, menus */
-  --kb-popup-focused: #e8f0fe;       /* selected item */
+  /* Selected item. Tinted FROM the accent, not a borrowed blue: the spec's
+     #e8f0fe is Material's blue selection, which reads as a foreign hue on a
+     rose board — and it is the colour you stare at while picking a placement. */
+  --kb-popup-focused: color-mix(in srgb, var(--kb-primary) 12%, var(--kb-popup));
   --kb-preview: #ffffff;             /* magnified key preview */
   --kb-on-background: #202124;       /* candidates, bar icons */
   --kb-on-surface: #202124;          /* key glyphs */
@@ -41,7 +44,7 @@
   --kb-surface: #3c4043;
   --kb-surface-variant: #4c5155;
   --kb-popup: #3c4043;
-  --kb-popup-focused: #394457;
+  --kb-popup-focused: color-mix(in srgb, var(--kb-primary) 22%, var(--kb-popup));
   --kb-preview: #3c4043;
   --kb-on-background: #e8eaed;
   --kb-on-surface: #e8eaed;
@@ -149,6 +152,13 @@ body {
   .kb-candidate:hover,
   .kb-emoji-cell:hover {
     background: var(--kb-surface);
+  }
+
+  .kb-clipboard-tile:hover,
+  .kb-clipboard-delete:hover,
+  .kb-clipboard-retry:hover,
+  .kb-clipboard-close:hover {
+    background: var(--kb-popup-focused);
   }
 
   .kb-menu .item:hover {
@@ -357,6 +367,9 @@ body {
 
 .icon-btn svg,
 .kb-emoji-tabs .tab svg {
+  flex: none;
+  width: 1em;
+  height: 1em;
   font-size: clamp(13px, 5.9cqh, 26px);
 }
 
@@ -560,6 +573,11 @@ body {
   background: var(--kb-surface);
 }
 
+.icon-btn.selected {
+  background: var(--kb-popup-focused);
+  color: var(--kb-primary);
+}
+
 /* In the bar the circle is sized off the bar itself (the toolbar centers its
    children and the candidate row stretches them — align-self keeps both square),
    so it scales with the keyboard instead of being a fixed 46px. Only 4px of
@@ -660,6 +678,264 @@ body {
   flex-direction: column;
   padding: 6px;
   gap: 4px;
+}
+
+/* ---- Clipboard panel ---- */
+
+/* Gboard-style shelf: opening Clipboard swaps the key area for a grid of
+   fixed-size tiles. A single current item stays one tile instead of inflating
+   into an empty full-screen card; the grid is ready for history items later. */
+.kb-clipboard-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  background: var(--kb-background);
+  color: var(--kb-on-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.kb-clipboard-header {
+  flex: none;
+  height: clamp(36px, 14cqh, 48px);
+  padding: 0 clamp(10px, 1.5cqw, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kb-clipboard-header h2 {
+  font-size: clamp(13px, 5cqh, 18px);
+  font-weight: 600;
+  color: var(--kb-on-background);
+}
+
+.kb-clipboard-heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.kb-clipboard-heading > span {
+  overflow: hidden;
+  color: var(--kb-secondary);
+  font-size: clamp(10px, 3.7cqh, 13px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-clipboard-grid {
+  --kb-clipboard-tile-width: clamp(150px, 22cqw, 260px);
+  --kb-clipboard-tile-height: clamp(92px, 34cqh, 128px);
+  flex: 1;
+  min-height: 0;
+  padding: clamp(6px, 1.4cqw, 18px);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--kb-clipboard-tile-width));
+  grid-auto-rows: var(--kb-clipboard-tile-height);
+  align-content: start;
+  gap: clamp(8px, 1cqw, 14px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.kb-clipboard-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.kb-clipboard-tile {
+  position: relative;
+  border-radius: clamp(12px, 4cqh, 16px);
+  background: var(--kb-surface);
+  color: var(--kb-on-surface);
+  box-shadow: var(--kb-elev-key);
+  overflow: hidden;
+  transition: background-color 90ms ease, box-shadow 90ms ease, transform 90ms ease;
+}
+
+.kb-clipboard-tile-paste {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: clamp(11px, 3.6cqh, 15px);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: clamp(12px, 4.7cqh, 17px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.kb-clipboard-preview {
+  padding-right: 24px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.kb-clipboard-tile-footer {
+  color: var(--kb-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(10px, 3.8cqh, 13px);
+  font-weight: 600;
+}
+
+.kb-clipboard-tile-footer svg {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.kb-clipboard-tile-paste:active {
+  background: var(--kb-surface-variant);
+}
+
+.kb-clipboard-tile:has(.kb-clipboard-tile-paste:active) {
+  box-shadow: none;
+  transform: scale(0.985);
+}
+
+.kb-clipboard-delete {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 34px;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--kb-surface) 88%, transparent);
+  color: var(--kb-on-surface-variant);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.kb-clipboard-delete svg {
+  width: 17px;
+  height: 17px;
+}
+
+.kb-clipboard-delete:active {
+  background: var(--kb-surface-variant);
+  color: var(--kb-primary);
+}
+
+.kb-clipboard-delete:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.kb-clipboard-image {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  border-radius: calc(clamp(12px, 4cqh, 16px) - 4px);
+  object-fit: cover;
+}
+
+.kb-clipboard-status {
+  flex: 1;
+  min-height: 0;
+  color: var(--kb-on-surface-variant);
+  font-size: clamp(12px, 4.4cqh, 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+}
+
+.kb-clipboard-status-label {
+  text-align: center;
+}
+
+.kb-clipboard-status-icon {
+  flex: none;
+  width: clamp(36px, 14cqh, 48px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--kb-popup-focused);
+  color: var(--kb-primary);
+  display: grid;
+  place-items: center;
+}
+
+.kb-clipboard-status-icon svg {
+  width: 50%;
+  height: 50%;
+}
+
+.kb-clipboard-spinner {
+  width: 46%;
+  aspect-ratio: 1;
+  border: 2px solid color-mix(in srgb, var(--kb-primary) 24%, transparent);
+  border-top-color: var(--kb-primary);
+  border-radius: 50%;
+  animation: kb-clipboard-spin 700ms linear infinite;
+}
+
+@keyframes kb-clipboard-spin {
+  to { transform: rotate(360deg); }
+}
+
+.kb-clipboard-retry {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  min-height: clamp(32px, 12cqh, 40px);
+  padding: 0 14px;
+  background: var(--kb-popup-focused);
+  color: var(--kb-primary);
+  font-family: inherit;
+  font-size: clamp(11px, 4cqh, 14px);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.kb-clipboard-retry svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.kb-clipboard-close {
+  flex: none;
+  width: clamp(28px, 10cqh, 36px);
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--kb-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kb-clipboard-close svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.kb-clipboard-retry:active,
+.kb-clipboard-close:active {
+  background: var(--kb-surface-variant);
 }
 
 /* ---- emoji panel ---- */

@@ -13,6 +13,11 @@ import {
 import { kFrameUnits } from './layouts/frame';
 import { kMetrics } from './metrics';
 import type { KeyStroke } from './layouts/types';
+import {
+    readClipboard,
+    type ClipboardHistoryItem,
+    type ClipboardReadResult,
+} from './clipboard';
 
 // Where the keyboard sits:
 //   docked   — full-width, bottom of the screen.
@@ -143,6 +148,10 @@ export interface VkHost {
     readonly mock: boolean;
     typeStroke(s: KeyStroke): void;
     insertText(text: string): void;
+    readClipboard(): Promise<ClipboardReadResult>;
+    pasteClipboardItem(item: ClipboardHistoryItem): Promise<boolean>;
+    deleteClipboardItem(itemId: string): Promise<boolean>;
+    subscribeClipboard(onChange: () => void): () => void;
     hideKeyboard(): void;
     keyboardLoaded(): void;
     // Size/place the container (docked full-width, or floating). Resolves once
@@ -213,6 +222,20 @@ interface VirtualKeyboardPrivate {
     setDraggableArea(bounds: object): void;
     setHitTestBounds(bounds: object[]): void;
     openSettings(): void;
+    getClipboardHistory?(
+        options: { itemIds?: string[] },
+        callback: (items: ClipboardHistoryItem[]) => void,
+    ): void;
+    pasteClipboardItem?(itemId: string, callback?: () => void): void;
+    deleteClipboardItem?(itemId: string, callback?: () => void): void;
+    onClipboardHistoryChanged?: {
+        addListener(listener: (itemIds: string[]) => void): void;
+        removeListener(listener: (itemIds: string[]) => void): void;
+    };
+    onClipboardItemUpdated?: {
+        addListener(listener: (item: ClipboardHistoryItem) => void): void;
+        removeListener(listener: (item: ClipboardHistoryItem) => void): void;
+    };
 }
 
 // Kept under the original key so a stored placement survives the upgrade.
@@ -281,6 +304,116 @@ export class RealHost implements VkHost {
 
     insertText(text: string): void {
         this.vk.insertText(text);
+    }
+
+    readClipboard(): Promise<ClipboardReadResult> {
+        const getClipboardHistory = this.vk.getClipboardHistory;
+        if (!getClipboardHistory) return Promise.resolve({ status: 'unavailable' });
+
+        return readClipboard({
+            getHistory: () => new Promise((resolve, reject) => {
+                try {
+                    getClipboardHistory.call(this.vk, {}, (items) => {
+                        const runtimeError = chrome.runtime.lastError;
+                        if (runtimeError) {
+                            reject(new Error(runtimeError.message));
+                            return;
+                        }
+                        resolve(items);
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            }),
+        }, { canDelete: typeof this.vk.deleteClipboardItem === 'function' });
+    }
+
+    pasteClipboardItem(item: ClipboardHistoryItem): Promise<boolean> {
+        const paste = this.vk.pasteClipboardItem;
+        if (!paste) {
+            if (typeof item.textData !== 'string') return Promise.resolve(false);
+            this.vk.insertText(item.textData);
+            return Promise.resolve(true);
+        }
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = (result: boolean) => {
+                if (settled) return;
+                settled = true;
+                resolve(result);
+            };
+            // Some older ChromeOS/FydeOS builds expose the command but ignore
+            // its optional callback. Do not leave the tile permanently busy.
+            const fallback = window.setTimeout(() => finish(true), 500);
+            try {
+                paste.call(this.vk, item.id, () => {
+                    window.clearTimeout(fallback);
+                    const failed = Boolean(chrome.runtime.lastError);
+                    if (failed && typeof item.textData === 'string') this.vk.insertText(item.textData);
+                    finish(!failed || typeof item.textData === 'string');
+                });
+            } catch {
+                window.clearTimeout(fallback);
+                // Older bindings expose the command without the optional
+                // callback and throw "No matching signature" when it is passed.
+                try {
+                    paste.call(this.vk, item.id);
+                    finish(true);
+                    return;
+                } catch {
+                    // Text remains pasteable even if the history command is not.
+                }
+                if (typeof item.textData !== 'string') {
+                    finish(false);
+                    return;
+                }
+                this.vk.insertText(item.textData);
+                finish(true);
+            }
+        });
+    }
+
+    deleteClipboardItem(itemId: string): Promise<boolean> {
+        const remove = this.vk.deleteClipboardItem;
+        if (!remove) return Promise.resolve(false);
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = (result: boolean) => {
+                if (settled) return;
+                settled = true;
+                resolve(result);
+            };
+            const fallback = window.setTimeout(() => finish(true), 500);
+            try {
+                remove.call(this.vk, itemId, () => {
+                    window.clearTimeout(fallback);
+                    finish(!chrome.runtime.lastError);
+                });
+            } catch {
+                window.clearTimeout(fallback);
+                // FydeOS releases based on older Chromium schemas accept only
+                // the item id; retry without the newer optional callback.
+                try {
+                    remove.call(this.vk, itemId);
+                    finish(true);
+                } catch {
+                    finish(false);
+                }
+            }
+        });
+    }
+
+    subscribeClipboard(onChange: () => void): () => void {
+        const history = this.vk.onClipboardHistoryChanged;
+        const updated = this.vk.onClipboardItemUpdated;
+        const onHistory = () => onChange();
+        const onUpdated = () => onChange();
+        history?.addListener(onHistory);
+        updated?.addListener(onUpdated);
+        return () => {
+            history?.removeListener(onHistory);
+            updated?.removeListener(onUpdated);
+        };
     }
 
     hideKeyboard(): void {
@@ -499,6 +632,24 @@ class MockHost implements VkHost {
 
     insertText(text: string): void {
         console.log('[mock] insertText', text);
+    }
+
+    readClipboard(): Promise<ClipboardReadResult> {
+        return import('./mock-clipboard').then(({ readMockClipboard }) => readMockClipboard());
+    }
+
+    pasteClipboardItem(item: ClipboardHistoryItem): Promise<boolean> {
+        console.log('[mock] pasteClipboardItem', item.id);
+        return Promise.resolve(true);
+    }
+
+    deleteClipboardItem(itemId: string): Promise<boolean> {
+        console.log('[mock] deleteClipboardItem', itemId);
+        return import('./mock-clipboard').then(({ deleteMockClipboardItem }) => deleteMockClipboardItem());
+    }
+
+    subscribeClipboard(): () => void {
+        return () => undefined;
     }
 
     hideKeyboard(): void {

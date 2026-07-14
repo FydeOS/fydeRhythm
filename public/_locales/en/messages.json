@@ -219,6 +219,42 @@
     "vk_emoji": {
         "message": "Emoji"
     },
+    "vk_clipboard": {
+        "message": "Clipboard"
+    },
+    "vk_clipboard_current": {
+        "message": "Current clipboard"
+    },
+    "vk_clipboard_paste_short": {
+        "message": "Paste"
+    },
+    "vk_clipboard_loading": {
+        "message": "Reading clipboard…"
+    },
+    "vk_clipboard_empty": {
+        "message": "Clipboard has no text"
+    },
+    "vk_clipboard_unavailable": {
+        "message": "Clipboard isn’t available"
+    },
+    "vk_clipboard_error": {
+        "message": "Couldn’t read the clipboard"
+    },
+    "vk_clipboard_retry": {
+        "message": "Try again"
+    },
+    "vk_clipboard_paste": {
+        "message": "Paste clipboard text"
+    },
+    "vk_clipboard_close": {
+        "message": "Close clipboard"
+    },
+    "vk_clipboard_delete": {
+        "message": "Delete clipboard item"
+    },
+    "vk_clipboard_delete_error": {
+        "message": "Couldn’t delete. Try again"
+    },
     "vk_switch_schema": {
         "message": "Switch schema"
     },

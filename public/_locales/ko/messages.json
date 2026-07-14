@@ -219,6 +219,42 @@
     "vk_emoji": {
         "message": "이모티콘"
     },
+    "vk_clipboard": {
+        "message": "클립보드"
+    },
+    "vk_clipboard_current": {
+        "message": "현재 클립보드"
+    },
+    "vk_clipboard_paste_short": {
+        "message": "붙여넣기"
+    },
+    "vk_clipboard_loading": {
+        "message": "클립보드를 읽는 중…"
+    },
+    "vk_clipboard_empty": {
+        "message": "클립보드에 텍스트가 없습니다"
+    },
+    "vk_clipboard_unavailable": {
+        "message": "클립보드를 사용할 수 없습니다"
+    },
+    "vk_clipboard_error": {
+        "message": "클립보드를 읽을 수 없습니다"
+    },
+    "vk_clipboard_retry": {
+        "message": "다시 시도"
+    },
+    "vk_clipboard_paste": {
+        "message": "클립보드 텍스트 붙여넣기"
+    },
+    "vk_clipboard_close": {
+        "message": "클립보드 닫기"
+    },
+    "vk_clipboard_delete": {
+        "message": "클립보드 항목 삭제"
+    },
+    "vk_clipboard_delete_error": {
+        "message": "삭제하지 못했습니다. 다시 시도하세요"
+    },
     "vk_switch_schema": {
         "message": "스키마 전환"
     },

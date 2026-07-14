@@ -219,6 +219,42 @@
     "vk_emoji": {
         "message": "表情符號"
     },
+    "vk_clipboard": {
+        "message": "剪貼簿"
+    },
+    "vk_clipboard_current": {
+        "message": "目前剪貼簿"
+    },
+    "vk_clipboard_paste_short": {
+        "message": "貼上"
+    },
+    "vk_clipboard_loading": {
+        "message": "正在讀取剪貼簿…"
+    },
+    "vk_clipboard_empty": {
+        "message": "剪貼簿中沒有文字"
+    },
+    "vk_clipboard_unavailable": {
+        "message": "剪貼簿無法使用"
+    },
+    "vk_clipboard_error": {
+        "message": "無法讀取剪貼簿"
+    },
+    "vk_clipboard_retry": {
+        "message": "重試"
+    },
+    "vk_clipboard_paste": {
+        "message": "貼上剪貼簿文字"
+    },
+    "vk_clipboard_close": {
+        "message": "關閉剪貼簿"
+    },
+    "vk_clipboard_delete": {
+        "message": "刪除剪貼簿項目"
+    },
+    "vk_clipboard_delete_error": {
+        "message": "無法刪除，請再試一次"
+    },
     "vk_switch_schema": {
         "message": "切換方案"
     },

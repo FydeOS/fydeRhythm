@@ -60,4 +60,9 @@ export const states = [
     { name: 'schema-menu', rows: 4, steps: [{ sel: '.kb-key[aria-label="中英切换"]', hold: 700, expect: '.kb-menu' }] },
     { name: 'placement-menu', rows: 4, steps: [{ sel: '.kb-key[aria-label="收起键盘"]', hold: 700, expect: '.kb-menu' }] },
     { name: 'emoji', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(2)', expect: '.kb-emoji-tabs' }] },
+    { name: 'clipboard', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-tile' }] },
+    { name: 'clipboard-loading', query: '?clipboard=loading', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-spinner' }] },
+    { name: 'clipboard-empty', query: '?clipboard=empty', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-retry' }] },
+    { name: 'clipboard-delete-pending', query: '?clipboard=delete-pending', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)' }, { sel: '.kb-clipboard-delete', expect: '.kb-clipboard-delete:disabled' }] },
+    { name: 'clipboard-delete-error', query: '?clipboard=delete-fails', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)' }, { sel: '.kb-clipboard-delete', expect: '.kb-clipboard-heading > span' }] },
 ];

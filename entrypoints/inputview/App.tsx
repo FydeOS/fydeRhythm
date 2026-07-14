@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
 import { strokeForChar } from '@/lib/latin-remap';
 import {
@@ -20,9 +20,11 @@ import { CandidateBar } from './components/CandidateBar';
 import { ExpandedPanel } from './components/ExpandedPanel';
 import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
 import { EmojiPanel } from './components/EmojiPanel';
+import { ClipboardPanel } from './components/ClipboardPanel';
 import { ChevronLeftIcon, ChevronRightIcon, ResizeGripIcon } from './components/icons';
 import { acceptCandidatePacket, type CandidateOrder } from './candidate-order';
 import { tapShift, typeWithShift } from './shift-state';
+import type { ClipboardHistoryItem, ClipboardReadResult } from './clipboard';
 
 type Popover =
     | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -32,6 +34,7 @@ type Popover =
     | null;
 
 type FloatingPos = { left: number; top: number };
+type InputPanel = 'emoji' | 'clipboard' | null;
 
 function readWindowPos(): FloatingPos {
     return { left: window.screenX, top: window.screenY };
@@ -65,6 +68,8 @@ export default function App() {
     const candidateOrderRef = useRef<CandidateOrder | null>(null);
     const [schemas, setSchemas] = useState<Array<{ id: string; label: string }>>([]);
     const [layer, setLayer] = useState<LayerId>('main');
+    const [panel, setPanel] = useState<InputPanel>(null);
+    const [clipboardRequest, setClipboardRequest] = useState<Promise<ClipboardReadResult> | null>(null);
     // On a numeric field, the user tapped ABC to see the letter keyboard.
     const [numericLetters, setNumericLetters] = useState(false);
     const [shift, setShift] = useState<ShiftState>('off');
@@ -106,6 +111,11 @@ export default function App() {
     const loadMoreMark = useRef(-1);
 
     const post = (msg: InputViewToBackground) => postRef.current?.(msg);
+    const readClipboard = useCallback(() => host.readClipboard(), [host]);
+    const pasteClipboardItem = useCallback((item: ClipboardHistoryItem) =>
+        host.pasteClipboardItem(item), [host]);
+    const deleteClipboardItem = useCallback((itemId: string) => host.deleteClipboardItem(itemId), [host]);
+    const subscribeClipboard = useCallback((refresh: () => void) => host.subscribeClipboard(refresh), [host]);
 
     // Placement read off the mirrors, so the mount-only handlers and the resize
     // gesture always see the live values. `over` applies a not-yet-committed
@@ -208,11 +218,9 @@ export default function App() {
         const activeLayoutId = vk.asciiMode ? vk.latinLayout : vk.layout;
         // Numeric field → numberpad, unless the user tapped ABC for letters.
         const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
-        const layout = numpad || layer === 'emoji'
-            ? null
-            : layer === 'main'
-                ? getLayout(activeLayoutId, vk.asciiMode)
-                : getLayerLayout(layer, vk.asciiMode);
+        const layout = numpad || (layer === 'main'
+            ? getLayout(activeLayoutId, vk.asciiMode)
+            : getLayerLayout(layer, vk.asciiMode));
         let bottom = bottomRow({
             layer,
             asciiMode: vk.asciiMode,
@@ -226,15 +234,12 @@ export default function App() {
                 ? { id: 'to-numpad', label: '123', kind: 'function', action: { type: 'numericLetters', on: false }, width: k.width } as KeyDef
                 : k);
         }
-        const rows: KeyDef[][] | null = numpad
-            ? numpad.rows
-            : layout
-                ? [...layout.rows, bottom]
-                : null;
-        return { gridId: numpad ? numpad.id : layout?.id ?? 'emoji', rows };
+        const rows: KeyDef[][] = numpad ? numpad.rows : [...layout.rows, bottom];
+        return { gridId: numpad ? numpad.id : layout.id, rows };
     }, [vk, layer, numericLetters]);
 
-    // Rows on screen; null on the emoji panel, which keeps the card as it is.
+    // Panels use the active keys' row-derived geometry and replace the keys
+    // without changing the keyboard's layout.
     const rowCount = view?.rows?.length ?? null;
 
     // Publish the row count for the render below and the effect after it. Both
@@ -301,7 +306,14 @@ export default function App() {
         return { key: stroke.key, code: inverse.code, ...(inverse.shiftKey ? { shiftKey: true } : {}) };
     };
 
+    const dismissClipboard = () => {
+        if (panel !== 'clipboard') return;
+        setPanel(null);
+        setClipboardRequest(null);
+    };
+
     const performAction = (action: KeyAction) => {
+        dismissClipboard();
         const finishTyping = () => {
             const next = typeWithShift({ mode: shift, lastTap: lastShiftTap.current });
             lastShiftTap.current = next.lastTap;
@@ -329,6 +341,7 @@ export default function App() {
             }
             case 'layer':
                 setLayer(action.layer);
+                setPanel(null);
                 setShift('off');
                 break;
             case 'toggleAscii':
@@ -362,13 +375,31 @@ export default function App() {
 
     const openBubble = (def: KeyDef, anchor: DOMRect, pointerId: number) => {
         if (def.alts?.length) {
+            dismissClipboard();
             setPopover({ type: 'bubble', alts: def.alts, anchor, pointerId });
         }
     };
 
     const openSchemaMenu = (anchor: DOMRect) => {
+        dismissClipboard();
         post({ kind: 'getSchemaList' });
         setPopover({ type: 'menu', anchor });
+    };
+
+    const closePanel = () => {
+        setPanel(null);
+        setClipboardRequest(null);
+        setLayer('main');
+    };
+
+    const openClipboard = () => {
+        if (panel === 'clipboard') {
+            closePanel();
+            return;
+        }
+        setPopover(null);
+        setClipboardRequest(readClipboard());
+        setPanel('clipboard');
     };
 
     // iPadOS-style: a long-press on the hide key opens the placement menu (a
@@ -494,17 +525,28 @@ export default function App() {
                 onDeleteRequest={(candidate, anchor) => setPopover({ type: 'confirm', candidate, anchor })}
                 onLoadMore={requestLoadMore}
                 onExpand={() => { requestLoadMore(); setExpanded(true); }}
-                onOpenSettings={() => host.openSettings()}
-                onEmoji={() => setLayer('emoji')}
-                onHide={() => host.hideKeyboard()}
+                onOpenSettings={() => { dismissClipboard(); host.openSettings(); }}
+                onEmoji={() => { dismissClipboard(); setPanel('emoji'); }}
+                onClipboard={openClipboard}
+                activeTool={panel ?? undefined}
+                onHide={() => { dismissClipboard(); host.hideKeyboard(); }}
                 onSchemaMenu={openSchemaMenu}
             />
             <div className="kb-keys">
-                {layer === 'emoji' ? (
+                {panel === 'emoji' ? (
                     <EmojiPanel
                         onInsert={(emoji) => host.insertText(emoji)}
-                        onBack={() => setLayer('main')}
+                        onBack={closePanel}
                         onBackspace={() => host.typeStroke({ key: 'Backspace', code: 'Backspace' })}
+                    />
+                ) : panel === 'clipboard' && clipboardRequest ? (
+                    <ClipboardPanel
+                        initialRequest={clipboardRequest}
+                        onRead={readClipboard}
+                        onPaste={pasteClipboardItem}
+                        onDelete={deleteClipboardItem}
+                        onHistoryChange={subscribeClipboard}
+                        onClose={closePanel}
                     />
                 ) : (
                     // Every key sits in a fixed-fraction cell of a shared unit grid,
@@ -536,7 +578,10 @@ export default function App() {
                                                     onOpenBubble={openBubble}
                                                     onLongPressMenu={
                                                         def.id === 'ascii-toggle' ? (_def, anchor) => openSchemaMenu(anchor)
-                                                            : def.id === 'hide' ? (_def, anchor) => setPopover({ type: 'kbmode', anchor })
+                                                            : def.id === 'hide' ? (_def, anchor) => {
+                                                                dismissClipboard();
+                                                                setPopover({ type: 'kbmode', anchor });
+                                                            }
                                                                 : undefined
                                                     }
                                                 />

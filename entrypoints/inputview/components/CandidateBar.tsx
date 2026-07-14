@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import type { InputViewCandidate } from '@/lib/shared-types';
 import { t } from '../i18n';
-import { ChevronLeftIcon, ChevronRightIcon, ExpandMoreIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
 
 export interface CandidateBarProps {
     candidates: InputViewCandidate[];
@@ -11,6 +11,8 @@ export interface CandidateBarProps {
     onExpand: () => void;
     onOpenSettings: () => void;
     onEmoji: () => void;
+    onClipboard: () => void;
+    activeTool?: 'emoji' | 'clipboard';
     onHide: () => void;
     // Opens the schema menu anchored at the globe button.
     onSchemaMenu: (anchor: DOMRect) => void;
@@ -65,12 +67,29 @@ export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
 export function CandidateBar(props: CandidateBarProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    if (props.candidates.length === 0) {
+    if (props.candidates.length === 0 || props.activeTool === 'clipboard') {
         return (
             <div className="kb-bar">
                 <div className="kb-toolbar">
                     <button className="icon-btn" aria-label={t('vk_settings')} onClick={props.onOpenSettings}><SettingsIcon /></button>
-                    <button className="icon-btn" aria-label={t('vk_emoji')} onClick={props.onEmoji}><MoodIcon /></button>
+                    <button
+                        className={`icon-btn${props.activeTool === 'emoji' ? ' selected' : ''}`}
+                        aria-label={t('vk_emoji')}
+                        aria-pressed={props.activeTool === 'emoji'}
+                        onClick={props.onEmoji}
+                    >
+                        <MoodIcon />
+                    </button>
+                    <button
+                        className={`icon-btn${props.activeTool === 'clipboard' ? ' selected' : ''}`}
+                        aria-label={t('vk_clipboard')}
+                        aria-pressed={props.activeTool === 'clipboard'}
+                        aria-expanded={props.activeTool === 'clipboard'}
+                        aria-controls={props.activeTool === 'clipboard' ? 'kb-clipboard-panel' : undefined}
+                        onClick={props.onClipboard}
+                    >
+                        <ClipboardIcon />
+                    </button>
                     <button
                         className="icon-btn"
                         aria-label={t('vk_switch_schema')}

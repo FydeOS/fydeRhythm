@@ -219,6 +219,42 @@
     "vk_emoji": {
         "message": "表情符号"
     },
+    "vk_clipboard": {
+        "message": "剪贴板"
+    },
+    "vk_clipboard_current": {
+        "message": "当前剪贴板"
+    },
+    "vk_clipboard_paste_short": {
+        "message": "粘贴"
+    },
+    "vk_clipboard_loading": {
+        "message": "正在读取剪贴板…"
+    },
+    "vk_clipboard_empty": {
+        "message": "剪贴板中没有文本"
+    },
+    "vk_clipboard_unavailable": {
+        "message": "剪贴板不可用"
+    },
+    "vk_clipboard_error": {
+        "message": "无法读取剪贴板"
+    },
+    "vk_clipboard_retry": {
+        "message": "重试"
+    },
+    "vk_clipboard_paste": {
+        "message": "粘贴剪贴板文本"
+    },
+    "vk_clipboard_close": {
+        "message": "关闭剪贴板"
+    },
+    "vk_clipboard_delete": {
+        "message": "删除剪贴板项目"
+    },
+    "vk_clipboard_delete_error": {
+        "message": "未能删除，请重试"
+    },
     "vk_switch_schema": {
         "message": "切换方案"
     },

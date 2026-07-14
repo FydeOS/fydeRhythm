@@ -49,6 +49,10 @@ function stylesheetSelectors() {
             // Skip at-rules, the root/global rules, and anything left empty.
             if (!sel || sel.startsWith('@') || /^[*]$/.test(sel)) continue;
             if (/^(html|body|:root|#root)/.test(sel)) continue;
+            // Animation steps are declarations inside @keyframes, not DOM
+            // selectors. The lightweight parser intentionally does not build a
+            // full CSS AST, so discard their selector-like tokens here.
+            if (sel === 'from' || sel === 'to' || /^\d+%$/.test(sel)) continue;
             selectors.add(sel);
         }
     }

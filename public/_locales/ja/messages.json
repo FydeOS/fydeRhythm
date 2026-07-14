@@ -219,6 +219,42 @@
     "vk_emoji": {
         "message": "絵文字"
     },
+    "vk_clipboard": {
+        "message": "クリップボード"
+    },
+    "vk_clipboard_current": {
+        "message": "現在のクリップボード"
+    },
+    "vk_clipboard_paste_short": {
+        "message": "貼り付け"
+    },
+    "vk_clipboard_loading": {
+        "message": "クリップボードを読み込んでいます…"
+    },
+    "vk_clipboard_empty": {
+        "message": "クリップボードにテキストがありません"
+    },
+    "vk_clipboard_unavailable": {
+        "message": "クリップボードを利用できません"
+    },
+    "vk_clipboard_error": {
+        "message": "クリップボードを読み込めませんでした"
+    },
+    "vk_clipboard_retry": {
+        "message": "再試行"
+    },
+    "vk_clipboard_paste": {
+        "message": "クリップボードのテキストを貼り付け"
+    },
+    "vk_clipboard_close": {
+        "message": "クリップボードを閉じる"
+    },
+    "vk_clipboard_delete": {
+        "message": "クリップボードの項目を削除"
+    },
+    "vk_clipboard_delete_error": {
+        "message": "削除できませんでした。もう一度お試しください"
+    },
     "vk_switch_schema": {
         "message": "スキーマ切り替え"
     },
