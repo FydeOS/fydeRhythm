@@ -1291,12 +1291,26 @@ describe('physical-key Latin layout remap', () => {
         expect(fed).toEqual(['o'.charCodeAt(0)]);
     });
 
+    it('honors Caps Lock and Shift+Caps Lock while composing', async () => {
+        const { controller, fed } = remapHarness({ keyboardLayout: 'dvorak' });
+        await controller.feedKey({ ...keyS, capsLock: true } as never);
+        await controller.feedKey({ ...keyS, key: 'S', shiftKey: true, capsLock: true } as never);
+        expect(fed).toEqual(['O'.charCodeAt(0), 'o'.charCodeAt(0)]);
+    });
+
     it('commits the remapped char itself when the engine passes the key through (ASCII mode)', async () => {
         const { controller, commits, setHandled } = remapHarness({ keyboardLayout: 'dvorak' });
         setHandled(false);
         const result = await controller.feedKey(keyS);
         expect(commits).toEqual(['o']);
         expect(result).toBe(true); // swallowed — the system must not also insert 's'
+    });
+
+    it('honors Caps Lock when committing an ASCII pass-through key', async () => {
+        const { controller, commits, setHandled } = remapHarness({ keyboardLayout: 'dvorak' });
+        setHandled(false);
+        await controller.feedKey({ ...keyS, capsLock: true } as never);
+        expect(commits).toEqual(['O']);
     });
 
     it('does not remap while composing a non-Latin schema even with a global Latin layout', async () => {

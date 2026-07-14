@@ -1,6 +1,7 @@
 import React from 'react';
 import type { KeyboardMode } from '../chrome-shim';
 import { t } from '../i18n';
+import { fitMenuToViewport } from '../popover-geometry';
 
 // Confirm chip for deleting a user-learned word (long-press on a candidate).
 export function DeleteConfirm({ text, anchor, onConfirm, onCancel }: {
@@ -73,19 +74,22 @@ export function SchemaMenu({ schemas, activeSchema, anchor, onPick, onClose }: {
 }) {
     const height = schemas.length * 44 + 12;
     // Prefer opening above the anchor (bottom-row 中/英 key); when the anchor
-    // sits near the top (toolbar globe button), open below it instead.
-    const top = anchor.top - height - 8 >= 4
-        ? anchor.top - height - 8
-        : Math.min(anchor.bottom + 8, window.innerHeight - height - 4);
+    // sits near the top (toolbar globe button), open below it instead. Long
+    // lists are clamped to the window and scroll inside it.
+    const { top, maxHeight } = fitMenuToViewport(anchor, height, window.innerHeight);
     const left = Math.max(4, Math.min(anchor.left, window.innerWidth - 200));
     return (
         <>
             <div className="kb-scrim" aria-hidden="true" onPointerDown={onClose} />
-            <div className="kb-menu" style={{ top, left }}>
+            <div
+                className="kb-menu"
+                style={{ top, left, maxHeight, overflowY: 'auto', boxSizing: 'border-box' }}
+            >
                 {schemas.map((s) => (
                     <button
                         key={s.id}
                         className={`item${s.id === activeSchema ? ' active' : ''}`}
+                        style={{ flex: '0 0 auto' }}
                         onClick={() => {
                             onClose();
                             if (s.id !== activeSchema) onPick(s.id);

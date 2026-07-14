@@ -16,6 +16,13 @@ describe('remapPhysicalKey (physical keyboard follows the chosen layout)', () =>
         expect(remapPhysicalKey('dvorak', 'KeyZ', true)).toBe(':');
     });
 
+    it('combines Caps Lock with Shift for letters but not punctuation', () => {
+        expect(remapPhysicalKey('dvorak', 'KeyS', false, true)).toBe('O');
+        expect(remapPhysicalKey('dvorak', 'KeyS', true, true)).toBe('o');
+        expect(remapPhysicalKey('dvorak', 'KeyQ', false, true)).toBe("'");
+        expect(remapPhysicalKey('dvorak', 'KeyQ', true, true)).toBe('"');
+    });
+
     it('returns null for qwerty and for keys the layouts do not move', () => {
         expect(remapPhysicalKey('qwerty', 'KeyS', false)).toBeNull();
         expect(remapPhysicalKey('colemak', 'Digit2', false)).toBeNull();

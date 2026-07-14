@@ -806,7 +806,12 @@ export class InputController extends EventEmitter {
                     // pins the system layout); remap by key POSITION so the
                     // chosen Latin layout applies to external keyboards too.
                     const composed = this.isPlainPrintable(keyData)
-                        ? remapPhysicalKey(this.remapLayouts().composing, keyData.code, !!keyData.shiftKey)
+                        ? remapPhysicalKey(
+                            this.remapLayouts().composing,
+                            keyData.code,
+                            !!keyData.shiftKey,
+                            !!keyData.capsLock,
+                        )
                         : null;
                     code = (composed ?? keyData.key).charCodeAt(0);
                 }
@@ -833,7 +838,12 @@ export class InputController extends EventEmitter {
                 // ourselves and swallow the event. keydown only — the system
                 // inserts nothing on keyup.
                 if (!handled && !release && this.isPlainPrintable(keyData) && this.context) {
-                    const asciiChar = remapPhysicalKey(this.remapLayouts().ascii, keyData.code, !!keyData.shiftKey);
+                    const asciiChar = remapPhysicalKey(
+                        this.remapLayouts().ascii,
+                        keyData.code,
+                        !!keyData.shiftKey,
+                        !!keyData.capsLock,
+                    );
                     if (asciiChar !== null && asciiChar !== keyData.key) {
                         const contextId = this.context.contextID;
                         await new Promise<void>((res) => {
@@ -887,7 +897,12 @@ export class InputController extends EventEmitter {
                     }
                 } else {
                     const char = (this.isPlainPrintable(keyData)
-                        ? remapPhysicalKey(this.remapLayouts().composing, keyData.code, !!keyData.shiftKey)
+                        ? remapPhysicalKey(
+                            this.remapLayouts().composing,
+                            keyData.code,
+                            !!keyData.shiftKey,
+                            !!keyData.capsLock,
+                        )
                         : null) ?? keyData.key;
                     if (bufferedInput.length == 0 && !(/^[a-z]$/.test(char))) {
                         // If buffer is empty and input is not letter, just put it to screen directly

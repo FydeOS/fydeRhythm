@@ -47,10 +47,19 @@ for (const layout of Object.keys(kLayoutChars) as LatinLayoutId[]) {
 
 /** The character a physical key produces under the given layout, or null when
  *  the key is not remapped (digits, specials) or the layout is plain QWERTY. */
-export function remapPhysicalKey(layout: LatinLayoutId, code: string, shifted: boolean): string | null {
+export function remapPhysicalKey(
+    layout: LatinLayoutId,
+    code: string,
+    shifted: boolean,
+    capsLock: boolean = false,
+): string | null {
     if (layout === "qwerty") return null;
     const base = kForward[layout][code];
     if (base === undefined) return null;
+    // Caps Lock changes letter case, while Shift both inverts that case and
+    // selects shifted punctuation. Treating Caps Lock as plain Shift would turn
+    // Dvorak's apostrophe position into a quote.
+    if (/^[a-z]$/.test(base)) return shifted !== capsLock ? base.toUpperCase() : base;
     return shifted ? shiftChar(base) : base;
 }
 

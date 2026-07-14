@@ -22,6 +22,7 @@ import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popove
 import { EmojiPanel } from './components/EmojiPanel';
 import { ChevronLeftIcon, ChevronRightIcon, ResizeGripIcon } from './components/icons';
 import { acceptCandidatePacket, type CandidateOrder } from './candidate-order';
+import { tapShift, typeWithShift } from './shift-state';
 
 type Popover =
     | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -301,29 +302,29 @@ export default function App() {
     };
 
     const performAction = (action: KeyAction) => {
+        const finishTyping = () => {
+            const next = typeWithShift({ mode: shift, lastTap: lastShiftTap.current });
+            lastShiftTap.current = next.lastTap;
+            if (next.mode !== shift) setShift(next.mode);
+        };
         switch (action.type) {
             case 'stroke':
                 host.typeStroke(layoutStroke(action.stroke));
-                if (shift === 'shift') setShift('off');
+                finishTyping();
                 break;
             case 'strokes':
                 for (const s of action.strokes) host.typeStroke(layoutStroke(s));
-                if (shift === 'shift') setShift('off');
+                finishTyping();
                 break;
             case 'commit':
                 host.insertText(action.text);
-                if (shift === 'shift') setShift('off');
+                finishTyping();
                 break;
             case 'shift': {
                 const now = Date.now();
-                if (shift === 'off') {
-                    setShift(now - lastShiftTap.current < 350 ? 'caps' : 'shift');
-                } else if (shift === 'shift') {
-                    setShift(now - lastShiftTap.current < 350 ? 'caps' : 'off');
-                } else {
-                    setShift('off');
-                }
-                lastShiftTap.current = now;
+                const next = tapShift({ mode: shift, lastTap: lastShiftTap.current }, now);
+                lastShiftTap.current = next.lastTap;
+                setShift(next.mode);
                 break;
             }
             case 'layer':

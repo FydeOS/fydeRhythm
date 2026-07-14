@@ -17,10 +17,21 @@ export interface EmojiCategory {
 
 export const kSkinTones = ['\u{1F3FB}', '\u{1F3FC}', '\u{1F3FD}', '\u{1F3FE}', '\u{1F3FF}'];
 
-// Apply a skin-tone modifier: strip an existing VS16 (U+FE0F) first — a
-// modifier already implies emoji presentation.
+const kEmojiModifierBase = /\p{Emoji_Modifier_Base}/u;
+
+// Apply a skin-tone modifier to the person at each edge of a compound sequence.
+// Multi-person sequences tone both people, while connectors in the middle stay
+// unchanged. VS16 on a toned base is redundant, but selectors on later symbols
+// still matter (for example the one after ⚕ in 🧑‍⚕️).
 export function withSkinTone(base: string, tone: string): string {
-    return base.replace(/️/g, '') + tone;
+    const components = base.split('\u200D');
+    const toneComponent = (component: string) => component.replace(/\uFE0F/g, '') + tone;
+    components[0] = toneComponent(components[0]);
+    const last = components.length - 1;
+    if (last > 0 && kEmojiModifierBase.test(components[last])) {
+        components[last] = toneComponent(components[last]);
+    }
+    return components.join('\u200D');
 }
 
 export function skinVariants(base: string): string[] {

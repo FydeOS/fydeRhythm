@@ -15,11 +15,21 @@ describe('emoji catalog', () => {
             for (const e of cat.emoji) {
                 if (!e.skin) continue;
                 const toned = withSkinTone(e.char, kSkinTones[0]);
-                // A modifier must never sit after VS16, and the base must change.
-                expect(toned).not.toContain('️');
+                // The modifier must be attached to the first component, never
+                // appended after an entire ZWJ sequence.
+                expect(toned.indexOf(kSkinTones[0])).toBeLessThan(
+                    toned.indexOf('\u200D') < 0 ? toned.length : toned.indexOf('\u200D'),
+                );
                 expect(toned).not.toBe(e.char);
             }
         }
+    });
+
+    it('inserts a tone before a ZWJ and preserves selectors in later components', () => {
+        expect(withSkinTone('🧑‍⚕️', kSkinTones[0])).toBe('🧑🏻‍⚕️');
+        expect(withSkinTone('🧑‍🤝‍🧑', kSkinTones[0])).toBe('🧑🏻‍🤝‍🧑🏻');
+        expect(withSkinTone('👩‍❤️‍💋‍👨', kSkinTones[0])).toBe('👩🏻‍❤️‍💋‍👨🏻');
+        expect(withSkinTone('✌️', kSkinTones[0])).toBe('✌🏻');
     });
 
     it('skinVariants returns the base plus five tones', () => {
