@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface LocaleMessage {
@@ -7,7 +7,8 @@ interface LocaleMessage {
     placeholders?: Record<string, { content: string }>;
 }
 
-const localesDir = join(__dirname, '..', 'public', '_locales');
+const repoRoot = join(__dirname, '..');
+const localesDir = join(repoRoot, 'public', '_locales');
 const locales = readdirSync(localesDir);
 
 function loadMessages(locale: string): Record<string, LocaleMessage> {
@@ -51,4 +52,36 @@ describe('locale message files', () => {
             }
         }
     });
+
+    it('has no message nothing references', () => {
+        const source = sourceFiles(repoRoot).map((f) => readFileSync(f, 'utf8')).join('\n');
+        const orphans = Object.keys(referenceMessages).filter((key) => !isReferenced(key, source));
+        expect(orphans).toEqual([]);
+    });
 });
+
+// .wxt holds a GENERATED i18n.d.ts listing every key, which would make any
+// message look used.
+const kSkip = ['node_modules', '.git', '.wxt', '.output', 'build', 'public', 'media', 'dist'];
+
+function sourceFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+        if (kSkip.includes(entry)) continue;
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) out.push(...sourceFiles(path));
+        else if (/\.(ts|tsx|html)$/.test(entry)) out.push(path);
+    }
+    return out;
+}
+
+// The emoji tabs do t(`vk_emoji_${id}`), so only the prefix appears in source.
+const kTemplateBuilt = /^vk_emoji_/;
+
+function isReferenced(key: string, source: string): boolean {
+    if (kTemplateBuilt.test(key)) return source.includes('vk_emoji_${');
+    return source.includes(`"${key}"`)
+        || source.includes(`'${key}'`)
+        || source.includes(`\`${key}\``)
+        || source.includes(`__MSG_${key}__`);
+}

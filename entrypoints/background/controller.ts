@@ -568,7 +568,10 @@ export class InputController extends EventEmitter {
                             auxiliaryText: chrome.i18n.getMessage("candidate_page", (rimeContext.menu.pageNumber + 1).toString())
                                 + (rimeContext.menu.isLastPage ? chrome.i18n.getMessage("candidate_page_last") : ""),
                             windowPosition: 'composition',
-                            vertical: !this.activeSettings.horizontal
+                            // 7a03c1a made this configurable and hid the control in the same
+                            // commit ("chromium bug"), so horizontal was never reachable and
+                            // is untested. Don't re-expose it without a real device.
+                            vertical: true
                         }));
                         if (this.context != null) {
                             const contextId = this.context.contextID;
@@ -718,9 +721,8 @@ export class InputController extends EventEmitter {
         this.activeSettings.schemaKeys = settings?.schemaKeys;
     }
 
-    // Both derived from the one arrangement. Composing is the exception: a
-    // schema that paints its own script (注音, かな) expects the raw QWERTY
-    // strokes its Rime mapping is written against, so it is never remapped.
+    // A schema that paints its own script (注音, かな) expects the raw QWERTY
+    // strokes its Rime mapping is written against, so composing is never remapped.
     remapLayouts(): { composing: LatinLayoutId; ascii: LatinLayoutId } {
         const arrangement = resolveKeyboardLayout(this.activeSettings);
         const script = resolveSchemaKeys(this.activeSettings, this.activeSettings.schema);

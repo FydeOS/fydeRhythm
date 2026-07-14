@@ -82,9 +82,6 @@
     "fuzzy_pinyin": {
         "message": "あいまいピンイン"
     },
-    "rime_engine_status": {
-        "message": "エンジンの状態："
-    },
     "settings_changed_snackbar": {
         "message": "設定が変更されました。"
     },
@@ -150,15 +147,6 @@
     },
     "config_editor_title": {
         "message": "RIME 設定エディター"
-    },
-    "candidates_layout": {
-        "message": "候補リストのレイアウト"
-    },
-    "layout_vertical": {
-        "message": "縦"
-    },
-    "layout_horizontal": {
-        "message": "横（ChromeOS でのみ利用可能、FydeOS では利用不可）"
     },
     "remove_schema_confirm_title": {
         "message": "入力スキーマを削除"

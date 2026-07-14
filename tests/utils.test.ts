@@ -62,12 +62,9 @@ describe('schema key sets (a fact about the schema, not a preference)', () => {
 
     it('lets a correction override a wrong guess, in both directions', async () => {
         const { resolveSchemaKeys } = await import('../lib/utils');
-        // "latin" is how a wrong zhuyin guess gets undone.
         expect(resolveSchemaKeys(
             { schemaKeys: { my_bopomofo_fork: 'latin' } }, 'my_bopomofo_fork')).toBeUndefined();
-        // ...and a schema whose name says nothing can be pinned to a script.
         expect(resolveSchemaKeys({ schemaKeys: { mystery: 'kana' } }, 'mystery')).toBe('kana');
-        // Uncorrected schemas keep the guess.
         expect(resolveSchemaKeys({}, 'terra_zhuyin')).toBe('zhuyin');
     });
 });
@@ -75,18 +72,14 @@ describe('schema key sets (a fact about the schema, not a preference)', () => {
 describe('one arrangement, everywhere', () => {
     it('draws a schema with its own script, else with the chosen arrangement', async () => {
         const { resolveLayoutForSchema } = await import('../lib/utils');
-        // A script schema paints its script, whatever the arrangement is.
         expect(resolveLayoutForSchema({ keyboardLayout: 'colemak' }, 'terra_zhuyin')).toBe('zhuyin');
-        // A Latin-typed schema paints the user's arrangement.
         expect(resolveLayoutForSchema({ keyboardLayout: 'colemak' }, 'aurora_pinyin')).toBe('colemak');
-        // A corrected schema paints letters — in the user's arrangement.
         expect(resolveLayoutForSchema(
             { keyboardLayout: 'dvorak', schemaKeys: { terra_zhuyin: 'latin' } }, 'terra_zhuyin')).toBe('dvorak');
-        // Nothing configured yet: QWERTY.
         expect(resolveLayoutForSchema(undefined, 'aurora_pinyin')).toBe('qwerty');
     });
 
-    it('never varies the arrangement by schema — there is only one answer', async () => {
+    it('never varies the arrangement by schema', async () => {
         const { resolveKeyboardLayout } = await import('../lib/utils');
         expect(resolveKeyboardLayout({ keyboardLayout: 'dvorak' })).toBe('dvorak');
         expect(resolveKeyboardLayout({})).toBe('qwerty');
@@ -130,8 +123,6 @@ describe('migrating the pre-unification layout config', () => {
             latinLayout: 'follow',
             schemaLayouts: { terra_zhuyin: 'zhuyin', jap_poly: 'kana', aurora_pinyin: 'colemak' },
         });
-        // The active schema's Latin binding IS what "follow" resolved to, so it
-        // becomes the one arrangement.
         expect(next.keyboardLayout).toBe('colemak');
         expect(next.schemaKeys).toEqual({ terra_zhuyin: 'zhuyin', jap_poly: 'kana' });
         expect(next.latinLayout).toBeUndefined();

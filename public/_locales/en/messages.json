@@ -82,9 +82,6 @@
     "fuzzy_pinyin": {
         "message": "Fuzzy Pinyin"
     },
-    "rime_engine_status": {
-        "message": "Engine Status: "
-    },
     "settings_changed_snackbar": {
         "message": "Settings Changed."
     },
@@ -150,15 +147,6 @@
     },
     "config_editor_title": {
         "message": "RIME Config Editor"
-    },
-    "candidates_layout": {
-        "message": "Candidate List Layout"
-    },
-    "layout_vertical": {
-        "message": "Vertical"
-    },
-    "layout_horizontal": {
-        "message": "Horizontal (only available for ChromeOS, unavailable for FydeOS)"
     },
     "remove_schema_confirm_title": {
         "message": "Remove Input Schema"

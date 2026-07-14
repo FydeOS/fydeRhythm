@@ -59,7 +59,6 @@ export interface ImeSettings {
     schema: string;
     pageSize: number;
     algebraList: string[];
-    horizontal?: boolean;
     // Ids of schemas visible in the IME tray menu. Undefined = legacy "all downloaded are enabled".
     // The currently active schema is always implicitly enabled regardless of this list.
     enabledSchemas?: string[];
@@ -68,10 +67,9 @@ export interface ImeSettings {
     //   null      → disabled, no shortcut at all
     //   object    → a user-defined binding
     schemaSwitchKey?: SchemaSwitchKey | null;
-    // The one layout question the user is asked. Physical remap, on-screen
-    // letter keys and English mode are all derived from it.
+    // Physical remap, on-screen letter keys and English mode all derive from this.
     keyboardLayout?: LatinLayoutId;
-    // Corrections to guessSchemaKeys(), keyed by schema id. Only the InputView reads these.
+    // Corrections to guessSchemaKeys(). Only the InputView reads these.
     schemaKeys?: Record<string, SchemaKeys>;
     /** @deprecated Read once by migrateLayoutSettings, then dropped. */
     latinLayout?: LatinLayoutId | "follow";
@@ -79,16 +77,14 @@ export interface ImeSettings {
     schemaLayouts?: Record<string, LayoutId>;
 }
 
-export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [], horizontal: false };
+export const kDefaultSettings: ImeSettings = { schema: "aurora_pinyin", pageSize: 5, algebraList: [] };
 
 const kScriptSet = new Set<string>(kScriptLayoutIds);
 const kLatinSet = new Set<string>(kLatinLayoutIds);
 
-// The old schemaLayouts map held both kinds of value. Script values carry over
-// as corrections; Latin ones were per-schema arrangements, which no longer
-// exist — the ACTIVE schema's becomes the global arrangement (what "follow"
-// already resolved to) and the rest are dropped. Applied at every read, and
-// persisted once at startup.
+// Latin values in the old schemaLayouts were per-schema arrangements, which no
+// longer exist: the ACTIVE schema's becomes the global one (what "follow" already
+// resolved to) and the rest are dropped.
 export function migrateLayoutSettings(settings: ImeSettings): ImeSettings {
     if (settings.latinLayout === undefined && settings.schemaLayouts === undefined) {
         return settings;
@@ -115,7 +111,6 @@ export function migrateLayoutSettings(settings: ImeSettings): ImeSettings {
     return next;
 }
 
-// Physical keys, on-screen letter keys and English mode alike.
 export function resolveKeyboardLayout(
     settings: Pick<ImeSettings, "keyboardLayout"> | undefined,
 ): LatinLayoutId {
@@ -135,7 +130,7 @@ export function guessSchemaKeys(schemaId: string, schemaName?: string): ScriptLa
     return undefined;
 }
 
-// The script a schema paints, after any correction. Undefined means letters.
+// Undefined means letters.
 export function resolveSchemaKeys(
     settings: Pick<ImeSettings, "schemaKeys"> | undefined,
     schemaId: string,
@@ -166,8 +161,6 @@ export function guessScriptForSchema(
     return "zh";
 }
 
-// The keyboard drawn for a schema outside ASCII mode: its own script if it has
-// one, else the user's arrangement.
 export function resolveLayoutForSchema(
     settings: Pick<ImeSettings, "keyboardLayout" | "schemaKeys"> | undefined,
     schemaId: string,

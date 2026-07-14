@@ -11,7 +11,7 @@ export interface KeyStroke {
     shiftKey?: boolean;
 }
 
-export type LayerId = 'main' | 'sym' | 'sym2' | 'emoji';
+export type LayerId = 'main' | 'sym' | 'sym2';
 
 export type KeyAction =
     // Inject a keystroke (letters, digits, punctuation, Backspace, Enter, …)

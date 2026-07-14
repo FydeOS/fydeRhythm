@@ -2,9 +2,7 @@ import React, { useRef, useState } from "react";
 import Box from "@mui/material/Box";
 import Tooltip from "@mui/material/Tooltip";
 
-// The sliding pill: a radiogroup whose selection springs between segments.
-// Click, keyboard and drag/swipe all work. Shared by the appearance toggle
-// (icons) and the letter-arrangement picker (words).
+// Shared by the appearance toggle (icons) and the arrangement picker (words).
 
 export interface PillOption<T extends string> {
     value: T;
@@ -18,7 +16,6 @@ export interface SegmentedPillProps<T extends string> {
     value: T;
     onChange: (value: T) => void;
     ariaLabel: string;
-    /** Segment box. Square for icons; wider for words. */
     width?: number;
     height?: number;
     /** Icon segments need their name on hover; word segments already say it. */

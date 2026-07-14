@@ -108,7 +108,7 @@ const kConventerUrl = 'https://rime-conf-translator.fydeos.io'
 
 // Light / System / Dark pill in the top-right corner. Persistence and the
 // <html> class are handled by MUI's useColorScheme, so it renders inside the
-// ThemeProvider. The pill itself is shared with the arrangement picker below.
+// ThemeProvider. Supports click, keyboard, and drag/swipe.
 function AppearanceToggle() {
     const { mode, setMode } = useColorScheme();
     const current = mode ?? 'system';
@@ -189,7 +189,6 @@ function OptionsPage() {
     async function loadSettings() {
         const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
         if (obj.settings) {
-            // The page only ever edits the current shape; saving rewrites it.
             setImeSettings(migrateLayoutSettings(obj.settings));
             setSettingsDirty(SettingsDirtyStatus.NotDirty);
         }
@@ -378,7 +377,6 @@ function OptionsPage() {
         changeSettings({ enabledSchemas: next });
     }
 
-    // Latin arrangements are proper nouns; the scripts are localized.
     const layoutNames: Record<LayoutId, string> = {
         qwerty: "QWERTY",
         colemak: "Colemak",
@@ -392,7 +390,6 @@ function OptionsPage() {
     const activeSchemaName = currentSchemaInfo()?.name;
     const activeScript = resolveSchemaKeys(imeSettings, imeSettings.schema, activeSchemaName);
 
-    // Correct a schema whose key set was guessed wrong.
     function setSchemaKeys(id: string, keys: SchemaKeys) {
         changeSettings({ schemaKeys: { ...(imeSettings.schemaKeys ?? {}), [id]: keys } });
     }
@@ -413,8 +410,6 @@ function OptionsPage() {
         hangul: layoutNames.hangul,
     };
 
-    // No on-screen keyboard means a schema's key set has no surface to appear
-    // on, so we neither ask about it nor preview it.
     const showsInputView = hasInputView();
     let engineStatusString: string = $$("rime_engine_not_started");
     let engineColor = "error.main";

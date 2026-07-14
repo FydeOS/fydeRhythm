@@ -63,8 +63,6 @@ export async function restoreEngineId(): Promise<void> {
 }
 
 async function resolveStartupSettings(stored: ImeSettings): Promise<ImeSettings | null> {
-  // Every read migrates anyway; this write just stops us carrying the legacy
-  // keys around forever.
   const settings = migrateLayoutSettings(stored);
   const migrated = settings !== stored;
 
@@ -125,8 +123,7 @@ async function readSettings(controller: InputController | undefined): Promise<Im
   } catch {
     settings = controller?.activeSettings;
   }
-  // Migrate on every path, including the failed read: a legacy profile must
-  // resolve the same either way.
+  // Migrate on the failed read too, or a legacy profile resolves differently there.
   return settings && migrateLayoutSettings(settings);
 }
 

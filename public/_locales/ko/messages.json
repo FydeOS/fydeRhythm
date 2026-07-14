@@ -82,9 +82,6 @@
     "fuzzy_pinyin": {
         "message": "모호한 병음"
     },
-    "rime_engine_status": {
-        "message": "엔진 상태: "
-    },
     "settings_changed_snackbar": {
         "message": "설정이 변경되었습니다."
     },
@@ -150,15 +147,6 @@
     },
     "config_editor_title": {
         "message": "RIME 설정 에디터"
-    },
-    "candidates_layout": {
-        "message": "후보 목록 레이아웃"
-    },
-    "layout_vertical": {
-        "message": "세로"
-    },
-    "layout_horizontal": {
-        "message": "가로 (ChromeOS 에서만 사용 가능, FydeOS 에서는 사용 불가)"
     },
     "remove_schema_confirm_title": {
         "message": "입력 스키마 제거"

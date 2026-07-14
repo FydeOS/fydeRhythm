@@ -129,8 +129,6 @@ describe('buildFastInputViewState', () => {
         });
         const state = await buildFastInputViewState(controller as never);
         expect(state.layout).toBe('zhuyin');
-        // The arrangement is not disabled by a script schema — it is what the
-        // same hands still type English with.
         expect(state.latinLayout).toBe('colemak');
     });
 
@@ -142,6 +140,17 @@ describe('buildFastInputViewState', () => {
         const state = await buildFastInputViewState(controller as never);
         expect(state.layout).toBe('colemak');
         expect(state.latinLayout).toBe('colemak');
+    });
+
+    it('migrates a pre-unification profile on read, even with no storage', async () => {
+        const controller = fakeController(null, {
+            schema: 'aurora_pinyin',
+            latinLayout: 'follow',
+            schemaLayouts: { aurora_pinyin: 'dvorak' },
+        });
+        const state = await buildFastInputViewState(controller as never);
+        expect(state.layout).toBe('dvorak');
+        expect(state.latinLayout).toBe('dvorak');
     });
 });
 
@@ -170,17 +179,6 @@ describe('refineInputViewState', () => {
         const refined = await refineInputViewState(controller as never, fast);
         expect(refined.asciiMode).toBe(false);
         expect(refined.schemaName).toBe('my_custom');
-    });
-
-    it('migrates a pre-unification profile on read, even with no storage', async () => {
-        const controller = fakeController(null, {
-            schema: 'aurora_pinyin',
-            latinLayout: 'follow',
-            schemaLayouts: { aurora_pinyin: 'dvorak' },
-        });
-        const state = await buildFastInputViewState(controller as never);
-        expect(state.layout).toBe('dvorak');
-        expect(state.latinLayout).toBe('dvorak');
     });
 
     it('treats an undefined option value as false', async () => {
