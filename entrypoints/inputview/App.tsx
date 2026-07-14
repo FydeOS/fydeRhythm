@@ -21,6 +21,7 @@ import { ExpandedPanel } from './components/ExpandedPanel';
 import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
 import { EmojiPanel } from './components/EmojiPanel';
 import { ChevronLeftIcon, ChevronRightIcon, ResizeGripIcon } from './components/icons';
+import { acceptCandidatePacket, type CandidateOrder } from './candidate-order';
 
 type Popover =
     | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -58,6 +59,9 @@ export default function App() {
 
     const [vk, setVk] = useState<InputViewState | null>(null);
     const [candidates, setCandidates] = useState<InputViewCandidate[]>([]);
+    // Ordering metadata is transient: keep it out of React state so accepting
+    // a candidate packet causes only the candidate render itself.
+    const candidateOrderRef = useRef<CandidateOrder | null>(null);
     const [schemas, setSchemas] = useState<Array<{ id: string; label: string }>>([]);
     const [layer, setLayer] = useState<LayerId>('main');
     // On a numeric field, the user tapped ABC to see the letter keyboard.
@@ -122,13 +126,17 @@ export default function App() {
                 case 'state':
                     setVk(msg.state);
                     break;
-                case 'candidates':
-                    setCandidates(msg.candidates);
-                    if (msg.candidates.length === 0) {
+                case 'candidates': {
+                    const accepted = acceptCandidatePacket(candidateOrderRef.current, msg);
+                    if (!accepted) break;
+                    candidateOrderRef.current = accepted.order;
+                    setCandidates(accepted.candidates);
+                    if (accepted.collapseExpanded) {
                         setExpanded(false);
                         loadMoreMark.current = -1;
                     }
                     break;
+                }
                 case 'schemaList':
                     setSchemas(msg.schemas);
                     break;

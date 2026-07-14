@@ -106,7 +106,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // ready, the read fails, or the engine is too busy loading to answer promptly.
 async function readAsciiMode(controller: InputController | undefined): Promise<boolean> {
   try {
-    const read = controller?.session?.getOption("ascii_mode");
+    const read = controller?.getAsciiMode();
     if (!read) return false;
     return (await withTimeout(read, 3000)) ?? false;
   } catch {
@@ -218,6 +218,47 @@ async function postSchemaList(
 // One poster per connected InputView, so global events (settings edits in the
 // options page) can push fresh state without the page asking.
 const inputViewPosters = new Set<(msg: BackgroundToInputView) => void>();
+const visibleInputViewConnections = new Set<symbol>();
+
+export function updateVisibleInputViewConnections(
+  connections: Set<symbol>,
+  connection: symbol,
+  visible: boolean,
+): boolean | null {
+  const wasVisible = connections.size > 0;
+  if (visible) connections.add(connection);
+  else connections.delete(connection);
+  const isVisible = connections.size > 0;
+  return wasVisible === isVisible ? null : isVisible;
+}
+
+function reportInputViewError(operation: string, error: unknown): void {
+  console.error(`InputView ${operation} failed:`, error);
+  self.controller?.printErr(`InputView ${operation} failed: ${String(error)}`);
+}
+
+function setInputViewConnectionVisible(connection: symbol, visible: boolean): void {
+  const transition = updateVisibleInputViewConnections(visibleInputViewConnections, connection, visible);
+  if (transition === null) return;
+  void self.controller.handleInputViewVisibilityChanged(transition)
+    .catch((error: unknown) => reportInputViewError("visibility", error));
+}
+
+export function settleKeyEventResult(
+  result: boolean | Promise<boolean>,
+  requestId: string,
+  onError: (error: unknown) => void,
+): boolean | undefined {
+  if (typeof result === "boolean") return result;
+  result.then(
+    (handled) => chrome.input.ime.keyEventHandled(requestId, handled),
+    (error) => {
+      onError(error);
+      chrome.input.ime.keyEventHandled(requestId, false);
+    },
+  );
+  return undefined;
+}
 
 // Last numberpad routing pushed to the InputView. Focus moves between ordinary
 // text fields must NOT re-push state (it would flash the schema label); we only
@@ -261,7 +302,7 @@ export default defineBackground({
         // Todo: in incognito tab, context.shouldDoLearning = false,
         // we should disable rime learning in such context
         console.log("Got focus event, context = ", context);
-        self.controller.context = context;
+        self.controller.setContext(context);
 
         // Swap the keyboard into (or out of) the numberpad when the focused
         // field's numeric-ness changes. Refined state carries the correct
@@ -270,32 +311,40 @@ export default defineBackground({
         if (nf !== lastNumericField) {
           lastNumericField = nf;
           for (const poster of inputViewPosters) {
-            void postRefinedInputViewState(self.controller, poster);
+            void postRefinedInputViewState(self.controller, poster)
+              .catch((error: unknown) => reportInputViewError("focusStateChanged", error));
           }
         }
       });
 
       chrome.input.ime.onBlur.addListener((ctxId) => {
         if (self.controller.context?.contextID == ctxId) {
-          self.controller.clearContext();
+          void self.controller.clearContext(ctxId)
+            .catch((error: unknown) => self.controller.printErr(`clearContext: ${String(error)}`));
         }
       });
 
       chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
         console.log("Processing key: ", JSON.stringify(keyData));
-        const result = self.controller.feedKey(keyData);
-        if (result === false || result === true) {
-          return result;
-        } else {
-          result.then((handled: boolean) => chrome.input.ime.keyEventHandled(requestId, handled));
-          return undefined;
+        let result: boolean | Promise<boolean>;
+        try {
+          result = self.controller.feedKey(keyData);
+        } catch (error) {
+          self.controller.printErr(`feedKey: ${String(error)}`);
+          return false;
         }
+        return settleKeyEventResult(
+          result,
+          requestId,
+          (error) => self.controller.printErr(`feedKey: ${String(error)}`),
+        );
       });
 
       chrome.input.ime.onCandidateClicked.addListener((engineId, candidateId, button) => {
         console.log(candidateId, button);
         if (button == 'left') {
-          self.controller.selectCandidate(candidateId);
+          void self.controller.selectCandidate(candidateId)
+            .catch((error: unknown) => self.controller.printErr(`selectCandidate: ${String(error)}`));
           self.controller.lastRightClickItem = -1;
         } else if (button == 'right') {
           self.controller.rightClick(candidateId);
@@ -341,7 +390,8 @@ export default defineBackground({
     });
 
     chrome.input.ime.onDeactivated.addListener((engineId) => {
-      self.controller.deactivate(engineId);
+      void self.controller.deactivate(engineId)
+        .catch((error: unknown) => self.controller.printErr(`deactivate: ${String(error)}`));
     });
 
     // Rebuild menu when schemas are installed/removed or active setting changes elsewhere
@@ -359,7 +409,8 @@ export default defineBackground({
         // Layout bindings / Latin layout may have changed — push fresh state to
         // any connected InputView.
         for (const poster of inputViewPosters) {
-          void postRefinedInputViewState(self.controller, poster);
+          void postRefinedInputViewState(self.controller, poster)
+            .catch((error: unknown) => reportInputViewError("settingsStateChanged", error));
         }
       }
     });
@@ -372,7 +423,7 @@ export default defineBackground({
       let currentSchema = "";
 
       if (loaded && !loading) {
-        currentSchema = (await self.controller.session?.getCurrentSchema()) ?? "";
+        currentSchema = await self.controller.getCurrentSchema();
       }
 
       return { loading, loaded, schemaList, currentSchema };
@@ -380,7 +431,7 @@ export default defineBackground({
 
     onMessage('GetAsciiMode', async () => {
       try {
-        const asciiMode = await self.controller.session?.getOption("ascii_mode") ?? false;
+        const asciiMode = await self.controller.getAsciiMode();
         return { asciiMode };
       } catch (ex) {
         console.error("Error while getting ascii mode", ex);
@@ -409,6 +460,7 @@ export default defineBackground({
       if (port.name == kInputViewPortName) {
         console.log("InputView Port Connecting");
 
+        const connection = Symbol("inputview-connection");
         let inputViewDisconnected = false;
         const postToPort = (msg: BackgroundToInputView) => {
           if (inputViewDisconnected) return;
@@ -420,15 +472,20 @@ export default defineBackground({
         };
         inputViewPosters.add(postToPort);
 
-        void postInputViewState(self.controller, postToPort);
+        void postInputViewState(self.controller, postToPort)
+          .catch((error: unknown) => reportInputViewError("connectState", error));
         // Sync the candidate list too: after an MV3 worker restart the page
         // reconnects holding whatever it displayed last — usually this posts
         // an empty list and unfreezes a stale candidate bar.
+        const snapshot = self.controller.getCandidateSnapshot();
         postToPort({
           kind: "candidates",
-          candidates: (self.controller?.candidateCache ?? []).map(
-            (c: { text: string; index: number }) => ({ text: c.text, index: c.index }),
-          ),
+          streamId: snapshot.streamId,
+          sequence: snapshot.sequence,
+          candidates: snapshot.candidates.map((candidate: { candidate: string; ix: number }) => ({
+            text: candidate.candidate,
+            index: candidate.ix,
+          })),
         });
 
         port.onMessage.addListener((raw) => {
@@ -437,35 +494,51 @@ export default defineBackground({
           const msg = raw as InputViewToBackground;
           switch (msg.kind) {
             case "visibility":
-              self.controller.handleInputViewVisibilityChanged(msg.visible);
+              setInputViewConnectionVisible(connection, msg.visible);
               break;
             case "setAsciiMode":
-              self.controller.setAsciiMode(msg.asciiMode);
+              void self.controller.setAsciiMode(msg.asciiMode)
+                .catch((error: unknown) => reportInputViewError("setAsciiMode", error));
               break;
             case "selectCandidate":
-              self.controller.selectCandidate(msg.index, false);
+              void self.controller.selectCandidate(msg.index, false)
+                .catch((error: unknown) => reportInputViewError("selectCandidate", error));
               break;
             case "deleteCandidate":
-              self.controller.deleteCandidate(msg.index, false);
+              void self.controller.deleteCandidate(msg.index, false)
+                .catch((error: unknown) => reportInputViewError("deleteCandidate", error));
               break;
             case "loadMoreCandidates":
-              self.controller.fetchMoreCandidates(msg.count);
+              void self.controller.fetchMoreCandidates(msg.count)
+                .catch((error: unknown) => reportInputViewError("loadMoreCandidates", error));
               break;
             case "switchSchema":
-              void activateSchema(msg.schemaId);
+              void activateSchema(msg.schemaId)
+                .catch((error: unknown) => reportInputViewError("switchSchema", error));
               break;
             case "getSchemaList":
-              void postSchemaList(self.controller, postToPort);
+              void postSchemaList(self.controller, postToPort)
+                .catch((error: unknown) => reportInputViewError("getSchemaList", error));
               break;
           }
         });
 
         const onStateChanged = function () {
-          void postRefinedInputViewState(self.controller, postToPort);
+          void postRefinedInputViewState(self.controller, postToPort)
+            .catch((error: unknown) => reportInputViewError("inputViewStateChanged", error));
         }
 
-        const onCandidatesBack = function (candidates: Array<{ candidate: string, ix: number }>) {
-          postToPort({ kind: "candidates", candidates: candidates.map((c) => ({ text: c.candidate, index: c.ix })) });
+        const onCandidatesBack = function (
+          candidates: Array<{ candidate: string, ix: number }>,
+          sequence: number,
+          streamId: string,
+        ) {
+          postToPort({
+            kind: "candidates",
+            streamId,
+            sequence,
+            candidates: candidates.map((c) => ({ text: c.candidate, index: c.ix })),
+          });
         }
 
         self.controller.addListener("toggleLanguageState", onStateChanged);
@@ -479,7 +552,7 @@ export default defineBackground({
           self.controller.removeListener("toggleLanguageState", onStateChanged);
           self.controller.removeListener("candidatesBack", onCandidatesBack);
           self.controller.removeListener("schemaSwitched", onStateChanged);
-          self.controller.handleInputViewVisibilityChanged(false);
+          setInputViewConnectionVisible(connection, false);
         });
       }
     });

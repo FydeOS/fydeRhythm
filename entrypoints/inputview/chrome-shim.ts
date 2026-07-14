@@ -245,7 +245,7 @@ function getVkPrivate(): VirtualKeyboardPrivate | undefined {
         ?.virtualKeyboardPrivate;
 }
 
-class RealHost implements VkHost {
+export class RealHost implements VkHost {
     readonly mock = false;
 
     constructor(private readonly vk: VirtualKeyboardPrivate) {
@@ -397,12 +397,17 @@ class RealHost implements VkHost {
         };
 
         const open = () => {
-            port = chrome.runtime.connect(undefined, { name: kInputViewPortName });
-            port.onMessage.addListener((raw) => {
+            const connectedPort = chrome.runtime.connect(undefined, { name: kInputViewPortName });
+            port = connectedPort;
+            connectedPort.onMessage.addListener((raw) => {
+                // A queued packet from a disconnected port must not enter the
+                // new candidate stream after reconnect.
+                if (port !== connectedPort) return;
                 console.log('inputview: message from background', raw);
                 onMessage(raw as BackgroundToInputView);
             });
-            port.onDisconnect.addListener(() => {
+            connectedPort.onDisconnect.addListener(() => {
+                if (port !== connectedPort) return;
                 // MV3 kills the service worker after ~30s idle, which severs
                 // this port. Without reconnecting, the keyboard freezes on its
                 // last candidate list forever. Reconnecting wakes the worker,
@@ -433,6 +438,7 @@ class MockHost implements VkHost {
     private composition = '';
     private candidateTotal = 0;
     private asciiMode = false;
+    private candidateSequence = 0;
 
     private post(msg: BackgroundToInputView): void {
         this.onMessage?.(msg);
@@ -465,7 +471,12 @@ class MockHost implements VkHost {
             text: `${words[i % words.length]}${i >= words.length ? i : ''}`,
             index: i,
         }));
-        this.post({ kind: 'candidates', candidates });
+        this.post({
+            kind: 'candidates',
+            streamId: 'mock',
+            sequence: ++this.candidateSequence,
+            candidates,
+        });
     }
 
     typeStroke(s: KeyStroke): void {

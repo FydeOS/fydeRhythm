@@ -48,7 +48,14 @@ export class InputController extends EventEmitter {
     engineId: string | null;
     engine: RimeEngine | null;
     loadMutex: Mutex;
+    // One owner for every operation that reads/mutates/replaces a RIME session.
+    sessionMutex: Mutex;
+    refreshMutex: Mutex;
+    candidateFetchMutex: Mutex;
     inputCache: Array<string | null>;
+    sessionEpoch = 0;
+    contextEpoch = 0;
+    visibilityEpoch = 0;
 
     rimeLogBuffer: string[];
     rimeLogBufferPos: number;
@@ -69,6 +76,9 @@ export class InputController extends EventEmitter {
         this.session = null;
         this.inputCache = [];
         this.loadMutex = new Mutex();
+        this.sessionMutex = new Mutex();
+        this.refreshMutex = new Mutex();
+        this.candidateFetchMutex = new Mutex();
         this.candidateCache = [];
         this.candidateIterator = null;
     }
@@ -90,15 +100,19 @@ export class InputController extends EventEmitter {
             this.resetUI();
         }
         await this.loadMutex.runExclusive(async () => {
-            if (this.engine) {
-                if (this.session) {
-                    this.session.destroy();
-                    this.session = null;
+            await this.sessionMutex.runExclusive(async () => {
+                await this.invalidateCandidateCache();
+                if (this.engine) {
+                    if (this.session) {
+                        this.session.destroy();
+                        this.session = null;
+                    }
+                    await this.engine.destroy();
+                    this.engine = null;
+                    this.sessionEpoch++;
+                    this.notifyRimeStatusChanged();
                 }
-                this.engine.destroy();
-                this.engine = null;
-                this.notifyRimeStatusChanged();
-            }
+            });
         });
     }
 
@@ -138,8 +152,10 @@ export class InputController extends EventEmitter {
     }
 
     async flushInputCacheToSession(session: RimeSession) {
-        if (this.inputCache.length > 0) {
-            this.invalidateCandidateCache();
+        // Drain until stable. New keys can be buffered at any await while the
+        // engine is loading; a single snapshot can strand late keys forever.
+        while (this.inputCache.length > 0) {
+            await this.invalidateCandidateCache();
             const list = this.inputCache;
             this.inputCache = [];
             for (const c of list) {
@@ -202,7 +218,10 @@ export class InputController extends EventEmitter {
             await this.loadMutex.waitForUnlock();
             // Engine is loaded. If we want to run maintenance, we should reload the engine; or else just exit because engine is loaded.
             if (!maintenance) {
-                return true;
+                // Unlock means the other attempt finished, not that it
+                // succeeded. Never report a phantom ready engine after the
+                // attempt we were waiting on failed.
+                return this.engine !== null && this.session !== null;
             }
         }
         try {
@@ -215,75 +234,99 @@ export class InputController extends EventEmitter {
             console.log(">>>Settings: ", JSON.stringify(this.activeSettings));
             await this.loadMutex.runExclusive(async () => {
                 console.log("this.loadMutex.runExclusive");
-                let asciiMode = false;
-                if (this.engine) {
-                    if (this.session) {
-                        asciiMode = await this.session?.getOption("ascii_mode");
-                        this.session.destroy();
-                        this.session = null;
+                // Publish the loading transition only after the mutex is held,
+                // so GetEngineStatus observes loading=true.
+                this.notifyRimeStatusChanged();
+                await this.sessionMutex.runExclusive(async () => {
+                    await this.invalidateCandidateCache();
+                    let asciiMode = false;
+                    if (this.engine) {
+                        if (this.session) {
+                            asciiMode = await this.session.getOption("ascii_mode");
+                            this.session.destroy();
+                            this.session = null;
+                        }
+                        await this.engine.destroy();
+                        this.engine = null;
+                        this.sessionEpoch++;
                     }
-                    this.engine.destroy();
-                    this.engine = null;
-                    this.notifyRimeStatusChanged();
-                }
 
-                await new Promise(r => setTimeout(r, 10));
-                console.log("loadRimeConfig");
-                const config = await this.loadRimeConfig(this.activeSettings);
-                const fs = await getFs();
-                const schemaBasePath = `/root/${this.activeSettings.schema}`;
-                const dirs = [`${schemaBasePath}/build`, `${schemaBasePath}/shared`, `${schemaBasePath}/user`, `${schemaBasePath}/shared/opencc`];
-                for (const d of dirs) {
-                    if (!await fs.readEntryRaw(d)) {
-                        await fs.createDirectory(d);
+                    await new Promise(r => setTimeout(r, 10));
+                    console.log("loadRimeConfig");
+                    const config = await this.loadRimeConfig(this.activeSettings);
+                    const fs = await getFs();
+                    const schemaBasePath = `/root/${this.activeSettings.schema}`;
+                    const dirs = [`${schemaBasePath}/build`, `${schemaBasePath}/shared`, `${schemaBasePath}/user`, `${schemaBasePath}/shared/opencc`];
+                    for (const d of dirs) {
+                        if (!await fs.readEntryRaw(d)) {
+                            await fs.createDirectory(d);
+                        }
                     }
-                }
-                if (maintenance) {
-                    if (config.includes("lua_")) {
+                    if (maintenance && config.includes("lua_")) {
                         const luaContent = await fs.readWholeFile(`${schemaBasePath}/shared/${this.activeSettings.schema}.rime.lua`);
                         await fs.writeWholeFile(`${schemaBasePath}/user/rime.lua`, luaContent);
                     }
-                }
-                // TODO: add GUI for switch key config
-                await fs.writeWholeFile(`${schemaBasePath}/build/default.yaml`, new TextEncoder().encode(stringify(
-                    { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code", Shift_R: "commit_code" } } }
-                )));
-                console.log("new RimeEngine()");
-                const engine = new RimeEngine();
-                await engine.initialize(this.printErr.bind(this), fs, schemaBasePath);
-                if (maintenance) {
-                    await engine.rebuildPrism(this.activeSettings.schema, config);
-                }
-                console.log("engine.createSession");
-                const session = await engine.createSession(this.activeSettings.schema, config);
-                await this.flushInputCacheToSession(session);
-                this.engine = engine;
-                this.session = session;
-                await this.session.setOption("ascii_mode", asciiMode);
-                this.session.addListener('optionChanged', (name: string, val: boolean) => {
-                    if (name == "ascii_mode") {
-                        this.onToggleLanguageState(val);
-                    }
-                    if (this.session) {
-                        void this.session.getOptionLabel(name, val).then((v) => {
-                            const empty = v == null || v.trim() == "";
-                            if (!empty) {
-                                showFydeLanguageState(v);
-                            } else if (name == "ascii_mode") {
-                                showFydeLanguageState(val ? "EN" : "中");
-                            } else {
-                                showFydeLanguageState(`${name}: ${val}`);
+                    // TODO: add GUI for switch key config
+                    await fs.writeWholeFile(`${schemaBasePath}/build/default.yaml`, new TextEncoder().encode(stringify(
+                        { ascii_composer: { good_old_caps_lock: true, switch_key: { Caps_Lock: "clear", Shift_L: "commit_code", Shift_R: "commit_code" } } }
+                    )));
+
+                    console.log("new RimeEngine()");
+                    const engine = new RimeEngine();
+                    let session: RimeSession | null = null;
+                    try {
+                        await engine.initialize(this.printErr.bind(this), fs, schemaBasePath);
+                        if (maintenance) {
+                            await engine.rebuildPrism(this.activeSettings.schema, config);
+                        }
+                        console.log("engine.createSession");
+                        session = await engine.createSession(this.activeSettings.schema, config);
+                        await session.setOption("ascii_mode", asciiMode);
+                        const installedSession = session;
+                        session.addListener('optionChanged', (name: string, val: boolean) => {
+                            if (this.session !== installedSession) return;
+                            if (name == "ascii_mode") {
+                                this.onToggleLanguageState(val);
                             }
-                        }).catch((ex) => {
-                            console.error("Error while showing option language state", ex);
+                            void installedSession.getOptionLabel(name, val).then((v) => {
+                                const empty = v == null || v.trim() == "";
+                                if (!empty) {
+                                    showFydeLanguageState(v);
+                                } else if (name == "ascii_mode") {
+                                    showFydeLanguageState(val ? "EN" : "中");
+                                } else {
+                                    showFydeLanguageState(`${name}: ${val}`);
+                                }
+                            }).catch((ex) => {
+                                console.error("Error while showing option language state", ex);
+                            });
                         });
+
+                        // Publish only a fully initialized session. New key
+                        // events now queue behind sessionMutex while the cached
+                        // loading-time input is replayed in order.
+                        this.engine = engine;
+                        this.session = session;
+                        this.sessionEpoch++;
+                        await this.flushInputCacheToSession(session);
+                    } catch (error) {
+                        if (this.session === session) this.session = null;
+                        if (this.engine === engine) this.engine = null;
+                        session?.destroy();
+                        await engine.destroy();
+                        this.sessionEpoch++;
+                        throw error;
                     }
                 });
-                this.notifyRimeStatusChanged();
             });
+            // runExclusive releases the mutex before resolving.  This terminal
+            // notification must live outside it: when it was sent from inside
+            // the critical section, GetEngineStatus still returned
+            // loading=true and the options page stayed on "Starting" forever.
+            this.notifyRimeStatusChanged();
             await this.refreshContext();
             try {
-                const status = await this.session?.getStatus();
+                const status = await this.getRimeStatus();
                 showFydeLanguageState(status?.schemaName || status?.schemaId || this.activeSettings.schema);
             } catch (ex) {
                 console.error("Error while showing schema language state", ex);
@@ -307,6 +350,11 @@ export class InputController extends EventEmitter {
                     this.printErr(`Fallback to "${fallback}" also failed: ${String(fallbackEx)}`);
                 }
             }
+            // Loading text is presentation state, not engine state.  Every
+            // terminal failure must remove it from both candidate surfaces and
+            // discard the preedit buffer that produced it.
+            this.inputCache = [];
+            this.resetUI();
             this.notifyRimeStatusChanged();
             return false;
         }
@@ -314,36 +362,61 @@ export class InputController extends EventEmitter {
 
     resetUI() {
         if (this.context != null) {
-            this.setComposition({
+            void this.setComposition({
                 contextID: this.context.contextID,
                 cursor: 0,
                 selectionEnd: 0,
                 selectionStart: 0,
                 text: ""
+            }).catch((error) => {
+                if (!this.isInactiveImeError(error)) this.printErr(`resetUI composition: ${String(error)}`);
             });
         }
         if (this.engineId != null) {
             void this.setCandidateWindowProperties(this.engineId, { visible: false });
         }
-        this.invalidateCandidateCache();
-        this.sendCandidatesToInputView([]);
+        void this.invalidateCandidateCache();
     }
 
-    deactivate(engineId?: string) {
+    async deactivate(engineId?: string): Promise<void> {
         if (engineId && this.engineId !== engineId) return;
-        this.session?.clearComposition();
+        const session = this.session;
+        const sessionEpoch = this.sessionEpoch;
         this.engineId = null;
         this.context = null;
+        const contextEpoch = ++this.contextEpoch;
         this.inputCache = [];
         this.preeditEmpty = true;
-        this.invalidateCandidateCache();
-        this.sendCandidatesToInputView([]);
+        void this.invalidateCandidateCache();
+        await this.sessionMutex.runExclusive(async () => {
+            if (this.session === session && this.sessionEpoch === sessionEpoch &&
+                this.contextEpoch === contextEpoch && this.engineId === null) {
+                await session?.clearComposition();
+            }
+        });
     }
 
-    async clearContext() {
-        this.session?.clearComposition();
+    setContext(context: chrome.input.ime.InputContext): void {
+        this.context = context;
+        this.contextEpoch++;
+        void this.invalidateCandidateCache();
+    }
+
+    async clearContext(contextId?: number) {
+        if (contextId !== undefined && this.context?.contextID !== contextId) return;
+        const session = this.session;
+        const sessionEpoch = this.sessionEpoch;
         this.context = null;
+        const contextEpoch = ++this.contextEpoch;
         this.resetUI();
+        await this.sessionMutex.runExclusive(async () => {
+            // A newer focus owns the shared RIME composition; an old blur must
+            // never clear it after waiting for the operation queue.
+            if (this.session === session && this.sessionEpoch === sessionEpoch &&
+                this.contextEpoch === contextEpoch && this.context === null) {
+                await session?.clearComposition();
+            }
+        });
     }
 
     preeditEmpty = false;
@@ -421,7 +494,17 @@ export class InputController extends EventEmitter {
 
 
     sendCandidatesToInputView(candidates: Array<{ candidate: string, ix: number }>) {
-        this.emit("candidatesBack", candidates);
+        this.lastPublishedCandidates = candidates.map((candidate) => ({ ...candidate }));
+        const sequence = ++this.candidateSequence;
+        this.emit("candidatesBack", candidates, sequence, this.candidateStreamId);
+    }
+
+    getCandidateSnapshot() {
+        return {
+            streamId: this.candidateStreamId,
+            sequence: this.candidateSequence,
+            candidates: this.lastPublishedCandidates.map((candidate) => ({ ...candidate })),
+        };
     }
 
     sendCandidateCacheToInputView() {
@@ -432,12 +515,35 @@ export class InputController extends EventEmitter {
     }
 
     async refreshContext(): Promise<void> {
+        await this.sessionMutex.runExclusive(() => this.refreshContextInSessionOperation());
+    }
+
+    private async refreshContextInSessionOperation(): Promise<void> {
+        await this.refreshMutex.runExclusive(() => this.refreshContextExclusive());
+    }
+
+    private async refreshLoadingContext(): Promise<void> {
+        await this.refreshMutex.runExclusive(() => this.refreshContextExclusive());
+    }
+
+    private async refreshContextExclusive(): Promise<void> {
         const engineId = this.engineId;
         if (!engineId) return;
+        const session = this.session;
+        const sessionEpoch = this.sessionEpoch;
+        const contextEpoch = this.contextEpoch;
+        const visibilityEpoch = this.visibilityEpoch;
+        let generation = this.candidateGeneration;
         const promises: Array<Promise<void>> = [];
-        if (this.session != null && !this.loadMutex.isLocked()) {
-            const rimeContext = await this.session?.getContext();
-            if (this.engineId !== engineId) return;
+        if (session != null && !this.loadMutex.isLocked()) {
+            const rimeContext = await session.getContext();
+            // A newer keystroke invalidates candidates before processing it.
+            // If that happened while getContext was pending, this snapshot is
+            // older than the UI state already being built and must be dropped.
+            if (this.engineId !== engineId || this.session !== session ||
+                this.sessionEpoch !== sessionEpoch || this.contextEpoch !== contextEpoch ||
+                this.visibilityEpoch !== visibilityEpoch ||
+                generation !== this.candidateGeneration) return;
             if (rimeContext) {
                 if (this.context != null) {
                     const c = {
@@ -495,25 +601,43 @@ export class InputController extends EventEmitter {
                         // whenever the preedit changes, and send an empty list when the
                         // composition ended so the keyboard returns to its idle toolbar.
                         await this.invalidateCandidateCache();
+                        generation = this.candidateGeneration;
                     }
                     if (!this.candidateIterator && preedit.length > 0) {
+                        const iterator = await session.iterateCandidates(0);
+                        // Do not install an iterator obtained for a composition
+                        // superseded while iterateCandidates was pending. This
+                        // was the remaining gap in the generation protection.
+                        if (this.engineId !== engineId || this.session !== session ||
+                            this.sessionEpoch !== sessionEpoch || this.contextEpoch !== contextEpoch ||
+                            this.visibilityEpoch !== visibilityEpoch ||
+                            generation !== this.candidateGeneration) {
+                            await iterator.destroy();
+                            return;
+                        }
                         this.candidateIteratorPreedit = preedit;
-                        this.candidateIterator = await this.session.iterateCandidates(0);
+                        this.candidateIterator = iterator;
                         await this.fetchMoreCandidates(10);
                     }
+                    if (generation !== this.candidateGeneration) return;
                     this.sendCandidateCacheToInputView();
                 }
             } else {
                 this.resetUI();
             }
         } else {
-            if (this.inputCache.length > 0) {
+            // inputCache is an event log, so it can be non-empty while its
+            // effective preedit is empty (for example ['a', null] after the
+            // user types a and then Backspace).  Presentation must follow the
+            // effective text, not the number of historical events, otherwise
+            // the loading candidate remains above an empty keyboard.
+            const bufferedPreedit = this.inputCacheToString();
+            if (bufferedPreedit.length > 0) {
                 if (this.context != null) {
-                    const preedit = this.inputCacheToString();
                     const c = {
                         contextID: this.context.contextID,
-                        cursor: preedit.length,
-                        text: preedit,
+                        cursor: bufferedPreedit.length,
+                        text: bufferedPreedit,
                     };
                     promises.push(this.setComposition(c));
                 }
@@ -554,22 +678,28 @@ export class InputController extends EventEmitter {
         await Promise.all(promises);
     }
 
-    async commitIfAvailable() {
-        if (!this.session || !this.context) {
-            return;
-        }
-        const commit = await this.session.getCommit();
+    async commitIfAvailable(
+        session = this.session,
+        context = this.context,
+        sessionEpoch = this.sessionEpoch,
+        contextEpoch = this.contextEpoch,
+    ): Promise<boolean> {
+        if (!session || !context) return false;
+        const commit = await session.getCommit();
+        if (this.session !== session || this.sessionEpoch !== sessionEpoch ||
+            this.context !== context || this.contextEpoch !== contextEpoch) return false;
         if (commit) {
-            const contextId = this.context.contextID;
+            const contextId = context.contextID;
             await new Promise<void>((res, rej) => {
                 chrome.input.ime.commitText({
                     contextID: contextId,
                     text: commit.text
                 }, (ok) => ok ? res() : rej());
             });
-            this.invalidateCandidateCache();
-            this.sendCandidatesToInputView([]);
+            await this.invalidateCandidateCache();
+            return true;
         }
+        return false;
     }
 
     // feedKey reads activeSettings.schemaSwitchKey on the hot path, so the
@@ -679,8 +809,14 @@ export class InputController extends EventEmitter {
                     code = (composed ?? keyData.key).charCodeAt(0);
                 }
             }
-            this.invalidateCandidateCache();
-            return (async () => {
+            void this.invalidateCandidateCache();
+            const keyGeneration = this.candidateGeneration;
+            const sessionEpoch = this.sessionEpoch;
+            const context = this.context;
+            const contextEpoch = this.contextEpoch;
+            return this.sessionMutex.runExclusive(async () => {
+                // A reload may replace the session while this key is queued.
+                if (this.session !== session || this.sessionEpoch !== sessionEpoch) return false;
                 let handled = false;
                 try {
                     handled = await session.processKey(code, mask);
@@ -704,26 +840,41 @@ export class InputController extends EventEmitter {
                         handled = true;
                     }
                 }
-                await this.refreshContext();
-                await this.commitIfAvailable();
+                const committed = await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch);
+                // Newer queued input owns presentation. Processing still runs
+                // in order, but an intermediate key must not repaint over the
+                // candidate state requested by a later key.
+                if (!committed && keyGeneration === this.candidateGeneration) {
+                    await this.refreshContextInSessionOperation();
+                }
                 if (!this.preeditEmpty && (keyData.code == "PageUp" || keyData.code == "PageDown")) {
                     // Chrome will crash if PageUp or PageDown is sent while user is typing in OmniBar and candidate box is shown
                     // So we always return handled = true in this case, to prevent key event being sent to Chrome
                     return true;
                 }
                 return handled;
-            })();
+            });
         } else {
             if (!release && this.loadMutex.isLocked()) {
                 // RIME is loading
-                if (keyData.key.length > 1 && this.inputCache.length > 0) {
+                // inputCache is a replay log; bufferedInput is its visible
+                // value. All editing decisions must use the latter. Using the
+                // log length here makes ['a', null] behave like non-empty text.
+                const bufferedInput = this.inputCacheToString();
+                if (keyData.key.length > 1 && bufferedInput.length > 0) {
                     if (keyData.code == "Backspace") {
                         this.inputCache.push(null);
+                        // A fully cancelled preedit has nothing useful to
+                        // replay into the new session. Compact it so the core
+                        // invariant holds: empty visible input => empty log.
+                        if (this.inputCacheToString().length === 0) {
+                            this.inputCache = [];
+                        }
                     } else if (keyData.code == "Enter") {
                         if (this.context) {
                             chrome.input.ime.commitText({
                                 contextID: this.context.contextID,
-                                text: this.inputCacheToString()
+                                text: bufferedInput
                             });
                             this.inputCache = [];
                         }
@@ -736,13 +887,13 @@ export class InputController extends EventEmitter {
                     const char = (this.isPlainPrintable(keyData)
                         ? remapPhysicalKey(this.remapLayouts().composing, keyData.code, !!keyData.shiftKey)
                         : null) ?? keyData.key;
-                    if (this.inputCache.length == 0 && !(/^[a-z]$/.test(char))) {
+                    if (bufferedInput.length == 0 && !(/^[a-z]$/.test(char))) {
                         // If buffer is empty and input is not letter, just put it to screen directly
                         return false;
                     }
                     this.inputCache.push(char);
                 }
-                return this.refreshContext().then(() => true);
+                return this.refreshLoadingContext().then(() => true);
             } else {
                 return false;
             }
@@ -750,20 +901,37 @@ export class InputController extends EventEmitter {
     }
 
     async selectCandidate(index: number, currentPage: boolean = true) {
-        this.invalidateCandidateCache();
-        await this.session?.actionCandidate(index, 'select', currentPage);
-        await this.commitIfAvailable();
-        await this.refreshContext();
+        await this.invalidateCandidateCache();
+        await this.sessionMutex.runExclusive(async () => {
+            const session = this.session;
+            const context = this.context;
+            const sessionEpoch = this.sessionEpoch;
+            const contextEpoch = this.contextEpoch;
+            if (!session) return;
+            await session.actionCandidate(index, 'select', currentPage);
+            const committed = await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch);
+            if (!committed && this.session === session && this.sessionEpoch === sessionEpoch) {
+                await this.refreshContextInSessionOperation();
+            }
+        });
     }
 
     async deleteCandidate(index: number, currentPage: boolean = true) {
-        await this.session?.actionCandidate(index, 'delete', currentPage);
+        // Invalidate before the action so an active pagination loop cannot
+        // publish the candidate being deleted while the action is pending.
+        await this.invalidateCandidateCache();
+        await this.sessionMutex.runExclusive(async () => {
+            const session = this.session;
+            const sessionEpoch = this.sessionEpoch;
+            if (!session) return;
+            await session.actionCandidate(index, 'delete', currentPage);
+            if (this.session !== session || this.sessionEpoch !== sessionEpoch) return;
+            await this.refreshContextInSessionOperation();
+        });
         // Deleting rewrites the menu WITHOUT changing the preedit, so the
         // preedit-based staleness check in refreshContext won't fire — without
         // an explicit invalidation the deleted word is re-sent from the old
         // cache and appears to survive deletion.
-        await this.invalidateCandidateCache();
-        await this.refreshContext();
     }
 
     lastRightClickItem = -1;
@@ -773,11 +941,11 @@ export class InputController extends EventEmitter {
         const curTime = (new Date()).getTime();
         if (this.lastRightClickItem == index && curTime - this.lastRightClickTime < 3000) {
             console.log("Del candidate");
-            this.deleteCandidate(index);
+            void this.deleteCandidate(index).catch((error) => this.printErr(`deleteCandidate: ${String(error)}`));
             this.lastRightClickItem = -1;
         } else {
             console.log("Ready Del candidate");
-            this.deleteCandidate(index);
+            void this.deleteCandidate(index).catch((error) => this.printErr(`deleteCandidate: ${String(error)}`));
             this.lastRightClickItem = index;
             this.lastRightClickTime = curTime;
         }
@@ -786,23 +954,49 @@ export class InputController extends EventEmitter {
     inputViewVisible = false;
 
     async setAsciiMode(isAscii: boolean) {
-        await this.session?.setOption("ascii_mode", isAscii);
+        await this.sessionMutex.runExclusive(async () => {
+            await this.session?.setOption("ascii_mode", isAscii);
+        });
+    }
+
+    async getAsciiMode(): Promise<boolean> {
+        return await this.sessionMutex.runExclusive(async () =>
+            await this.session?.getOption("ascii_mode") ?? false);
+    }
+
+    async getCurrentSchema(): Promise<string> {
+        return await this.sessionMutex.runExclusive(async () =>
+            await this.session?.getCurrentSchema() ?? "");
+    }
+
+    async getRimeStatus() {
+        return await this.sessionMutex.runExclusive(async () =>
+            await this.session?.getStatus());
     }
 
     async handleInputViewVisibilityChanged(visible: boolean) {
+        const visibilityEpoch = ++this.visibilityEpoch;
         this.inputViewVisible = visible;
+        await this.invalidateCandidateCache();
         // Await both: fire-and-forget here let refreshContext read the engine
         // context before the composition was actually cleared, resurrecting
         // stale candidates when the keyboard was re-shown.
-        if (!visible) {
-            await this.session?.clearComposition();
-        }
-        await this.refreshContext();
+        await this.sessionMutex.runExclusive(async () => {
+            if (visibilityEpoch !== this.visibilityEpoch || this.inputViewVisible !== visible) return;
+            if (!visible) {
+                await this.session?.clearComposition();
+            }
+            if (visibilityEpoch !== this.visibilityEpoch || this.inputViewVisible !== visible) return;
+            await this.refreshContextInSessionOperation();
+        });
     }
 
     // Only used in input view
     candidateCache: RimeCandidate[];
     candidateIterator: RimeCandidateIterator | null;
+    candidateStreamId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    candidateSequence = 0;
+    lastPublishedCandidates: Array<{ candidate: string, ix: number }> = [];
     // Preedit the iterator was created for; a mismatch means the iterator is stale.
     candidateIteratorPreedit: string | null = null;
     // Bumped on every invalidation. fetchMoreCandidates is a slow async loop;
@@ -810,29 +1004,41 @@ export class InputController extends EventEmitter {
     // must drop its results instead of pushing old-composition candidates into
     // the fresh cache and re-sending them AFTER the list was cleared.
     candidateGeneration = 0;
+    candidateDisposal: Promise<void> = Promise.resolve();
 
     async fetchMoreCandidates(count: number) {
-        const generation = this.candidateGeneration;
-        const iterator = this.candidateIterator;
-        if (!iterator) return;
-        for (let i = 0; i < count; i++) {
-            await iterator.advance();
-            if (generation !== this.candidateGeneration) return;
-            const c = await iterator.current();
-            if (generation !== this.candidateGeneration) return;
-            if (c == null)
-                break;
-            this.candidateCache.push(c);
-        }
-        if (generation !== this.candidateGeneration) return;
-        this.sendCandidateCacheToInputView();
+        await this.candidateFetchMutex.runExclusive(async () => {
+            const generation = this.candidateGeneration;
+            const iterator = this.candidateIterator;
+            if (!iterator) return;
+            for (let i = 0; i < count; i++) {
+                await iterator.advance();
+                if (generation !== this.candidateGeneration || iterator !== this.candidateIterator) return;
+                const c = await iterator.current();
+                if (generation !== this.candidateGeneration || iterator !== this.candidateIterator) return;
+                if (c == null)
+                    break;
+                this.candidateCache.push(c);
+            }
+            if (generation !== this.candidateGeneration || iterator !== this.candidateIterator) return;
+            this.sendCandidateCacheToInputView();
+        });
     }
 
     async invalidateCandidateCache() {
         this.candidateGeneration++;
         this.candidateCache = [];
-        this.candidateIterator?.destroy();
+        const iterator = this.candidateIterator;
         this.candidateIterator = null;
         this.candidateIteratorPreedit = null;
+        // Clear the actual UI at the same moment as internal invalidation. If
+        // any later RIME/Chrome call fails, stale words still cannot remain.
+        this.sendCandidatesToInputView([]);
+        if (iterator) {
+            this.candidateDisposal = this.candidateDisposal
+                .then(() => iterator.destroy())
+                .catch((error) => this.printErr(`candidate iterator disposal: ${String(error)}`));
+        }
+        await this.candidateDisposal;
     }
 }

@@ -114,7 +114,14 @@ export interface InputViewState {
 
 export type BackgroundToInputView =
     | { kind: "state"; state: InputViewState }
-    | { kind: "candidates"; candidates: InputViewCandidate[] }
+    | {
+        kind: "candidates";
+        /** Identifies one background-worker lifetime. */
+        streamId: string;
+        /** Monotonic within streamId; older updates must be ignored. */
+        sequence: number;
+        candidates: InputViewCandidate[];
+    }
     | { kind: "schemaList"; schemas: Array<{ id: string; label: string }>; activeSchema: string };
 
 export type InputViewToBackground =

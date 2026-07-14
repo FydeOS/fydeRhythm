@@ -31,7 +31,14 @@ vi.mock('@/lib/schema-install', () => ({
     resolveInstalledSchemaId: vi.fn(),
 }));
 
-const { buildFastInputViewState, refineInputViewState, postInputViewState, postRefinedInputViewState } =
+const {
+    buildFastInputViewState,
+    refineInputViewState,
+    postInputViewState,
+    postRefinedInputViewState,
+    settleKeyEventResult,
+    updateVisibleInputViewConnections,
+} =
     await import('../entrypoints/background/index');
 const { listEnabledInstalledSchemas } = await import('../entrypoints/background/schemas');
 
@@ -39,12 +46,54 @@ const { listEnabledInstalledSchemas } = await import('../entrypoints/background/
 // There is no chrome global in this environment, so readSettings falls back to
 // activeSettings — the same path a real cold start takes when storage is empty.
 function fakeController(session: unknown, activeSettings?: object) {
-    return { session, activeSettings };
+    return {
+        session,
+        activeSettings,
+        getAsciiMode: () => (session as { getOption?: (name: string) => Promise<boolean> } | null)
+            ?.getOption?.('ascii_mode') ?? Promise.resolve(false),
+    };
 }
 
 beforeEach(() => {
     vi.mocked(listEnabledInstalledSchemas).mockReset();
     vi.mocked(listEnabledInstalledSchemas).mockImplementation(async () => []);
+});
+
+describe('asynchronous Chrome key acknowledgement', () => {
+    it('acknowledges a rejected key request exactly once as unhandled', async () => {
+        const keyEventHandled = vi.fn();
+        vi.stubGlobal('chrome', { input: { ime: { keyEventHandled } } });
+        const onError = vi.fn();
+
+        expect(settleKeyEventResult(Promise.reject(new Error('refresh failed')), 'request-1', onError))
+            .toBeUndefined();
+        await Promise.resolve();
+
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(keyEventHandled).toHaveBeenCalledTimes(1);
+        expect(keyEventHandled).toHaveBeenCalledWith('request-1', false);
+    });
+
+    it('returns synchronous decisions without calling the async callback', () => {
+        const keyEventHandled = vi.fn();
+        vi.stubGlobal('chrome', { input: { ime: { keyEventHandled } } });
+        expect(settleKeyEventResult(true, 'request-2', vi.fn())).toBe(true);
+        expect(keyEventHandled).not.toHaveBeenCalled();
+    });
+});
+
+describe('overlapping InputView visibility connections', () => {
+    it('changes global visibility only on the first show and last hide', () => {
+        const connections = new Set<symbol>();
+        const first = Symbol('first');
+        const replacement = Symbol('replacement');
+
+        expect(updateVisibleInputViewConnections(connections, first, true)).toBe(true);
+        expect(updateVisibleInputViewConnections(connections, replacement, true)).toBeNull();
+        expect(updateVisibleInputViewConnections(connections, first, false)).toBeNull();
+        expect(updateVisibleInputViewConnections(connections, replacement, false)).toBe(false);
+        expect(connections.size).toBe(0);
+    });
 });
 
 describe('buildFastInputViewState', () => {

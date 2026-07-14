@@ -441,7 +441,7 @@ describe('InputController schema switching', () => {
         expect(cycle).toHaveBeenCalledTimes(1);
     });
 
-    it('clears active RIME composition when deactivated', () => {
+    it('clears active RIME composition when deactivated', async () => {
         stubChrome(settings());
         const controller = new InputController();
         const clearComposition = vi.fn();
@@ -457,7 +457,7 @@ describe('InputController schema switching', () => {
         controller.candidateIterator = candidateIterator as any;
         controller.addListener('candidatesBack', candidatesBack);
 
-        controller.deactivate('engine');
+        await controller.deactivate('engine');
 
         expect(clearComposition).toHaveBeenCalledTimes(1);
         expect(controller.engineId).toBeNull();
@@ -467,7 +467,7 @@ describe('InputController schema switching', () => {
         expect(controller.candidateCache).toEqual([]);
         expect(candidateIterator.destroy).toHaveBeenCalledTimes(1);
         expect(controller.candidateIterator).toBeNull();
-        expect(candidatesBack).toHaveBeenCalledWith([]);
+        expect(candidatesBack.mock.calls.at(-1)?.[0]).toEqual([]);
     });
 
     it('records the last successfully loaded schema', async () => {
@@ -481,6 +481,21 @@ describe('InputController schema switching', () => {
 
         expect(controller.lastSuccessfulSchema).toBe('aurora');
         expect(schemaSwitched).toHaveBeenCalledWith('aurora');
+    });
+
+    it('publishes the ready status only after the loading mutex is unlocked', async () => {
+        stubChrome(settings({ schema: 'aurora' }));
+        const controller = new InputController();
+        const observedLoadingStates: boolean[] = [];
+        vi.spyOn(controller, 'notifyRimeStatusChanged').mockImplementation(() => {
+            observedLoadingStates.push(controller.engineLoading);
+        });
+        vi.spyOn(controller, 'loadRimeConfig').mockResolvedValue('schema: aurora\n');
+
+        await expect(controller.loadRime(false)).resolves.toBe(true);
+
+        expect(observedLoadingStates).toContain(true);
+        expect(observedLoadingStates.at(-1)).toBe(false);
     });
 
     it('falls back to the last successfully loaded schema when a later schema fails', async () => {
@@ -520,6 +535,194 @@ describe('InputController schema switching', () => {
         expect(chromeMock.set).not.toHaveBeenCalled();
         expect(loadRimeConfig).toHaveBeenCalledTimes(1);
         expect(chromeMock.sendMessage).toHaveBeenCalledWith({ rimeStatusChanged: true }, {}, expect.any(Function));
+    });
+
+    it('clears loading candidates and buffered preedit after a terminal load failure', async () => {
+        stubChrome(settings({ schema: 'broken' }));
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.inputViewVisible = true;
+        controller.inputCache = ['n', 'i'];
+        const candidatesBack = vi.fn();
+        controller.addListener('candidatesBack', candidatesBack);
+        vi.spyOn(controller, 'loadRimeConfig').mockRejectedValue(new Error('bad schema'));
+
+        await expect(controller.loadRime(false)).resolves.toBe(false);
+
+        expect(controller.inputCache).toEqual([]);
+        expect(candidatesBack.mock.calls.at(-1)?.[0]).toEqual([]);
+        expect(controller.engineLoading).toBe(false);
+    });
+
+    it('does not report success to a concurrent waiter when the active load fails', async () => {
+        stubChrome(settings({ schema: 'broken' }));
+        const controller = new InputController();
+        let rejectConfig!: (reason: Error) => void;
+        const configStarted = new Promise<void>((resolve) => {
+            vi.spyOn(controller, 'loadRimeConfig').mockImplementation(() => {
+                resolve();
+                return new Promise<string>((_resolve, reject) => { rejectConfig = reject; });
+            });
+        });
+
+        const activeLoad = controller.loadRime(false);
+        await configStarted;
+        const waitingLoad = controller.loadRime(false);
+        rejectConfig(new Error('bad schema'));
+
+        await expect(activeLoad).resolves.toBe(false);
+        await expect(waitingLoad).resolves.toBe(false);
+        expect(controller.engine).toBeNull();
+        expect(controller.session).toBeNull();
+    });
+
+    it('does not publish or retain a partially initialized session', async () => {
+        stubChrome(settings({ schema: 'aurora' }));
+        const controller = new InputController();
+        vi.spyOn(controller, 'loadRimeConfig').mockResolvedValue('schema: aurora\n');
+        const session = {
+            ...mocks.createSession('aurora'),
+            setOption: vi.fn(async () => { throw new Error('setOption failed'); }),
+            destroy: vi.fn(),
+        };
+        const engine = {
+            createSession: vi.fn(async () => session),
+            destroy: vi.fn(async () => { }),
+            initialize: vi.fn(async () => { }),
+            rebuildPrism: vi.fn(async () => { }),
+        };
+        mocks.createEngine.mockReturnValueOnce(engine);
+
+        await expect(controller.loadRime(false)).resolves.toBe(false);
+
+        expect(controller.session).toBeNull();
+        expect(controller.engine).toBeNull();
+        expect(session.destroy).toHaveBeenCalledTimes(1);
+        expect(engine.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for an active key transaction before replacing its session', async () => {
+        stubChrome(settings({ schema: 'aurora' }));
+        const controller = new InputController();
+        vi.spyOn(controller, 'loadRimeConfig').mockResolvedValue('schema: aurora\n');
+        let releaseKey!: () => void;
+        const keyGate = new Promise<void>((resolve) => { releaseKey = resolve; });
+        const oldSession = {
+            processKey: vi.fn(async () => { await keyGate; return true; }),
+            getOption: vi.fn(async () => false),
+            destroy: vi.fn(),
+        };
+        const oldEngine = { destroy: vi.fn(async () => { }) };
+        controller.session = oldSession as never;
+        controller.engine = oldEngine as never;
+
+        const key = controller.feedKey({
+            type: 'keydown', key: 'a', code: 'KeyA',
+            ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent) as Promise<boolean>;
+        await vi.waitFor(() => expect(oldSession.processKey).toHaveBeenCalledTimes(1));
+        const reload = controller.loadRime(false);
+        await Promise.resolve();
+        expect(oldSession.destroy).not.toHaveBeenCalled();
+        expect(oldEngine.destroy).not.toHaveBeenCalled();
+
+        releaseKey();
+        await Promise.all([key, reload]);
+        expect(oldSession.destroy).toHaveBeenCalledTimes(1);
+        expect(oldEngine.destroy).toHaveBeenCalledTimes(1);
+        expect(controller.session).not.toBe(oldSession);
+    });
+
+    it('waits for an active key transaction before unloading its session', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        let releaseKey!: () => void;
+        const keyGate = new Promise<void>((resolve) => { releaseKey = resolve; });
+        const session = {
+            processKey: vi.fn(async () => { await keyGate; return true; }),
+            destroy: vi.fn(),
+        };
+        const engine = { destroy: vi.fn(async () => { }) };
+        controller.session = session as never;
+        controller.engine = engine as never;
+
+        const key = controller.feedKey({
+            type: 'keydown', key: 'a', code: 'KeyA',
+            ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent) as Promise<boolean>;
+        await vi.waitFor(() => expect(session.processKey).toHaveBeenCalledTimes(1));
+        const unload = controller.unloadRime();
+        await Promise.resolve();
+        expect(session.destroy).not.toHaveBeenCalled();
+        expect(engine.destroy).not.toHaveBeenCalled();
+
+        releaseKey();
+        await Promise.all([key, unload]);
+        expect(session.destroy).toHaveBeenCalledTimes(1);
+        expect(engine.destroy).toHaveBeenCalledTimes(1);
+        expect(controller.session).toBeNull();
+        expect(controller.engine).toBeNull();
+    });
+
+    it('does not let an old blur clear the composition owned by a newer focus', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        const clearComposition = vi.fn(async () => { });
+        controller.session = { clearComposition } as never;
+        controller.setContext({ contextID: 1 } as chrome.input.ime.InputContext);
+
+        const release = await controller.sessionMutex.acquire();
+        const clearing = controller.clearContext(1);
+        controller.setContext({ contextID: 2 } as chrome.input.ime.InputContext);
+        release();
+        await clearing;
+
+        expect(clearComposition).not.toHaveBeenCalled();
+        expect(controller.context?.contextID).toBe(2);
+    });
+
+    it('serializes candidate actions, option writes, and session reads behind a key', async () => {
+        stubChrome(settings());
+        const controller = new InputController();
+        let releaseKey!: () => void;
+        const keyGate = new Promise<void>((resolve) => { releaseKey = resolve; });
+        const session = {
+            processKey: vi.fn(async () => { await keyGate; return true; }),
+            actionCandidate: vi.fn(async () => { }),
+            setOption: vi.fn(async () => { }),
+            getOption: vi.fn(async () => true),
+            getCurrentSchema: vi.fn(async () => 'aurora'),
+            getStatus: vi.fn(async () => ({ schemaId: 'aurora' })),
+        };
+        controller.session = session as never;
+
+        const key = controller.feedKey({
+            type: 'keydown', key: 'a', code: 'KeyA',
+            ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent) as Promise<boolean>;
+        await vi.waitFor(() => expect(session.processKey).toHaveBeenCalledTimes(1));
+        const operations = [
+            controller.selectCandidate(0, false),
+            controller.deleteCandidate(0, false),
+            controller.setAsciiMode(true),
+            controller.getAsciiMode(),
+            controller.getCurrentSchema(),
+            controller.getRimeStatus(),
+        ];
+        await Promise.resolve();
+        expect(session.actionCandidate).not.toHaveBeenCalled();
+        expect(session.setOption).not.toHaveBeenCalled();
+        expect(session.getOption).not.toHaveBeenCalled();
+
+        releaseKey();
+        const [, , , , asciiMode, schema, status] = await Promise.all([key, ...operations]);
+        expect(session.actionCandidate).toHaveBeenCalledTimes(2);
+        expect(session.setOption).toHaveBeenCalledWith('ascii_mode', true);
+        expect(asciiMode).toBe(true);
+        expect(schema).toBe('aurora');
+        expect(status).toEqual({ schemaId: 'aurora' });
     });
 });
 
@@ -623,6 +826,115 @@ describe('InputView candidate lifecycle (regression: zombie candidates)', () => 
         await controller.handleInputViewVisibilityChanged(true);
         expect(sent.at(-1)).toEqual([]);
     });
+
+    it('publishes monotonic candidate snapshots without exposing mutable state', () => {
+        stubChrome();
+        const controller = new InputController();
+        const events: Array<{ sequence: number; streamId: string }> = [];
+        controller.addListener('candidatesBack', (_candidates, sequence, streamId) => {
+            events.push({ sequence, streamId });
+        });
+
+        const candidates = [{ candidate: '候选', ix: 3 }];
+        controller.sendCandidatesToInputView(candidates);
+        const snapshot = controller.getCandidateSnapshot();
+        candidates[0].candidate = 'mutated source';
+        snapshot.candidates[0].candidate = 'mutated snapshot';
+        const reread = controller.getCandidateSnapshot();
+
+        expect(events).toEqual([{ sequence: 1, streamId: reread.streamId }]);
+        expect(reread.sequence).toBe(1);
+        expect(reread.candidates).toEqual([{ candidate: '候选', ix: 3 }]);
+    });
+});
+
+describe('loading input buffer presentation', () => {
+    it('removes the loading candidate when buffered characters are deleted', async () => {
+        stubChrome();
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.inputViewVisible = true;
+        const sent: string[][] = [];
+        controller.addListener('candidatesBack', (cands: Array<{ candidate: string }>) => {
+            sent.push(cands.map((candidate) => candidate.candidate));
+        });
+
+        const releaseLoad = await controller.loadMutex.acquire();
+        try {
+            await controller.feedKey({
+                type: 'keydown', key: 'a', code: 'KeyA',
+                ctrlKey: false, altKey: false, shiftKey: false,
+            } as chrome.input.ime.KeyboardEvent);
+            expect(sent.at(-1)).toEqual(['loading_engine']);
+
+            await controller.feedKey({
+                type: 'keydown', key: 'Backspace', code: 'Backspace',
+                ctrlKey: false, altKey: false, shiftKey: false,
+            } as chrome.input.ime.KeyboardEvent);
+
+            expect(controller.inputCacheToString()).toBe('');
+            expect(controller.inputCache).toEqual([]);
+            expect(sent.at(-1)).toEqual([]);
+
+            const logAfterDelete = [...controller.inputCache];
+            const extraBackspaceHandled = await controller.feedKey({
+                type: 'keydown', key: 'Backspace', code: 'Backspace',
+                ctrlKey: false, altKey: false, shiftKey: false,
+            } as chrome.input.ime.KeyboardEvent);
+            expect(extraBackspaceHandled).toBe(false);
+            expect(controller.inputCache).toEqual(logAfterDelete);
+
+            // Once the effective buffer is empty, punctuation belongs to the
+            // application; historical entries must not make it look buffered.
+            const punctuationHandled = await controller.feedKey({
+                type: 'keydown', key: '.', code: 'Period',
+                ctrlKey: false, altKey: false, shiftKey: false,
+            } as chrome.input.ime.KeyboardEvent);
+            expect(punctuationHandled).toBe(false);
+            expect(controller.inputCache).toEqual(logAfterDelete);
+            expect(sent.at(-1)).toEqual([]);
+        } finally {
+            releaseLoad();
+        }
+    });
+
+    it('preserves the replay log semantics when the engine becomes ready', async () => {
+        stubChrome();
+        const controller = new InputController();
+        controller.inputCache = ['a', 'b', null, 'c'];
+        const processKey = vi.fn(async () => true);
+
+        await controller.flushInputCacheToSession({ processKey } as never);
+
+        expect(processKey.mock.calls).toEqual([
+            ['a'.charCodeAt(0), 0],
+            ['b'.charCodeAt(0), 0],
+            [0xff08, 0],
+            ['c'.charCodeAt(0), 0],
+        ]);
+        expect(controller.inputCache).toEqual([]);
+    });
+
+    it('drains keys that arrive while an earlier buffered key is replaying', async () => {
+        stubChrome();
+        const controller = new InputController();
+        controller.inputCache = ['a'];
+        const processed: number[] = [];
+        const session = {
+            processKey: vi.fn(async (code: number) => {
+                processed.push(code);
+                if (processed.length === 1) controller.inputCache.push('b');
+                return true;
+            }),
+        };
+
+        await controller.flushInputCacheToSession(session as never);
+
+        expect(processed).toEqual(['a'.charCodeAt(0), 'b'.charCodeAt(0)]);
+        expect(controller.inputCache).toEqual([]);
+    });
 });
 
 describe('InputView candidate lifecycle (regression: delete + stale fetch race)', () => {
@@ -711,7 +1023,237 @@ describe('InputView candidate lifecycle (regression: delete + stale fetch race)'
 
         // The stale loop must neither pollute the cache nor re-send.
         expect(controller.candidateCache).toEqual([]);
-        expect(sent).toEqual([]);
+        expect(sent).toEqual([[]]);
+    });
+
+    it('drops a stale context snapshot that resolves after the composition was cleared', async () => {
+        const { controller, state, sent } = deleteHarness();
+        let resolveOldContext!: (value: any) => void;
+        const oldContext = new Promise<any>((resolve) => { resolveOldContext = resolve; });
+        const liveSession = controller.session as any;
+        const originalGetContext = liveSession.getContext;
+        liveSession.getContext = vi.fn()
+            .mockReturnValueOnce(oldContext)
+            .mockImplementation(originalGetContext);
+
+        const staleRefresh = controller.refreshContext();
+        await Promise.resolve();
+        await controller.invalidateCandidateCache();
+        state.preedit = '';
+        state.words = [];
+        const freshRefresh = controller.refreshContext();
+        expect(sent.at(-1)).toEqual([]);
+
+        resolveOldContext({
+            composition: {
+                preedit: 'old', cursorPosition: 3,
+                selectionStart: 0, selectionEnd: 0, length: 3,
+            },
+            menu: {
+                pageSize: 5, pageNumber: 0, isLastPage: true,
+                highlightedCandidateIndex: 0,
+                candidates: [{ text: '旧', comment: '' }],
+            },
+            selectKeys: '', commitTextPreview: '', selectLabels: [],
+        });
+        await Promise.all([staleRefresh, freshRefresh]);
+
+        expect(sent.at(-1)).toEqual([]);
+        expect(controller.candidateCache).toEqual([]);
+    });
+
+    it('does not install an iterator that resolves after a newer empty composition', async () => {
+        const { controller, state, sent } = deleteHarness();
+        let resolveOldIterator!: (value: any) => void;
+        const oldIterator = new Promise<any>((resolve) => { resolveOldIterator = resolve; });
+        const liveSession = controller.session as any;
+        liveSession.iterateCandidates = vi.fn().mockReturnValueOnce(oldIterator);
+
+        const staleRefresh = controller.refreshContext();
+        // getContext resolves first; let refreshContext reach the delayed
+        // iterateCandidates call before superseding it.
+        await vi.waitFor(() => expect(liveSession.iterateCandidates).toHaveBeenCalledTimes(1));
+
+        await controller.invalidateCandidateCache();
+        state.preedit = '';
+        state.words = [];
+        const freshRefresh = controller.refreshContext();
+        expect(sent.at(-1)).toEqual([]);
+
+        const destroy = vi.fn();
+        resolveOldIterator({
+            advance: vi.fn(async () => { }),
+            current: vi.fn(async () => ({ index: 0, text: '旧', comment: '' })),
+            destroy,
+        });
+        await Promise.all([staleRefresh, freshRefresh]);
+
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(controller.candidateIterator).toBeNull();
+        expect(controller.candidateCache).toEqual([]);
+        expect(sent.at(-1)).toEqual([]);
+    });
+
+    it('drops a context snapshot from a previously focused field', async () => {
+        const { controller, sent } = deleteHarness();
+        controller.setContext({ contextID: 1 } as chrome.input.ime.InputContext);
+        let resolveOldContext!: (value: any) => void;
+        (controller.session as any).getContext = vi.fn(() =>
+            new Promise<any>((resolve) => { resolveOldContext = resolve; }));
+
+        const staleRefresh = controller.refreshContext();
+        await vi.waitFor(() => expect(resolveOldContext).toBeTypeOf('function'));
+        controller.setContext({ contextID: 2 } as chrome.input.ime.InputContext);
+        expect(sent.at(-1)).toEqual([]);
+        resolveOldContext({
+            composition: {
+                preedit: 'old', cursorPosition: 3,
+                selectionStart: 0, selectionEnd: 0, length: 3,
+            },
+            menu: {
+                pageSize: 5, pageNumber: 0, isLastPage: true,
+                highlightedCandidateIndex: 0,
+                candidates: [{ text: '旧', comment: '' }],
+            },
+            selectKeys: '', commitTextPreview: '', selectLabels: [],
+        });
+        await staleRefresh;
+
+        expect(controller.context?.contextID).toBe(2);
+        expect(controller.candidateCache).toEqual([]);
+        expect(sent.at(-1)).toEqual([]);
+    });
+
+    it('versions hide/show so an obsolete disconnect cannot refresh after reconnect', async () => {
+        const { controller, state, sent } = deleteHarness();
+        let releaseClear!: () => void;
+        const clearGate = new Promise<void>((resolve) => { releaseClear = resolve; });
+        const clearComposition = vi.fn(async () => {
+            await clearGate;
+            state.preedit = '';
+            state.words = [];
+        });
+        (controller.session as any).clearComposition = clearComposition;
+
+        const hiding = controller.handleInputViewVisibilityChanged(false);
+        await vi.waitFor(() => expect(clearComposition).toHaveBeenCalledTimes(1));
+        const showing = controller.handleInputViewVisibilityChanged(true);
+        expect(sent.at(-1)).toEqual([]);
+        releaseClear();
+        await Promise.all([hiding, showing]);
+
+        expect(controller.inputViewVisible).toBe(true);
+        expect(controller.candidateCache).toEqual([]);
+        expect(sent.at(-1)).toEqual([]);
+    });
+
+    it('serializes concurrent pagination loops for one iterator generation', async () => {
+        const { controller } = deleteHarness();
+        let releaseAdvance!: () => void;
+        const gate = new Promise<void>((resolve) => { releaseAdvance = resolve; });
+        let active = 0;
+        let maxActive = 0;
+        let calls = 0;
+        controller.candidateIterator = {
+            advance: async () => {
+                active++;
+                maxActive = Math.max(maxActive, active);
+                if (calls++ === 0) await gate;
+                active--;
+            },
+            current: async () => null,
+            destroy: async () => { },
+        } as never;
+
+        const first = controller.fetchMoreCandidates(1);
+        await Promise.resolve();
+        const second = controller.fetchMoreCandidates(1);
+        await Promise.resolve();
+        expect(maxActive).toBe(1);
+        releaseAdvance();
+        await Promise.all([first, second]);
+        expect(maxActive).toBe(1);
+    });
+});
+
+describe('rapid key processing order', () => {
+    it('serializes the real keydown/keyup burst so an older character cannot finish last', async () => {
+        stubChrome();
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        controller.engineId = 'engine-1';
+        controller.inputViewVisible = true;
+
+        let text = '';
+        let releaseFirst!: () => void;
+        const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+        const processed: Array<{ code: number; mask: number }> = [];
+        controller.session = {
+            processKey: async (code: number, mask: number) => {
+                processed.push({ code, mask });
+                if (processed.length === 1) await firstGate;
+                if ((mask & (1 << 30)) === 0) {
+                    if (code === 0xff08) text = text.slice(0, -1);
+                    else text += String.fromCharCode(code);
+                }
+                return true;
+            },
+            getContext: async () => ({
+                composition: {
+                    preedit: text, cursorPosition: text.length,
+                    selectionStart: 0, selectionEnd: 0, length: text.length,
+                },
+                menu: {
+                    pageSize: 5, pageNumber: 0, isLastPage: true,
+                    highlightedCandidateIndex: 0,
+                    candidates: text ? [{ text: '候选', comment: '' }] : [],
+                },
+                selectKeys: '', commitTextPreview: '', selectLabels: [],
+            }),
+            iterateCandidates: async () => {
+                let advanced = false;
+                return {
+                    advance: async () => { advanced = true; },
+                    current: async () => advanced && text
+                        ? { index: 0, text: '候选', comment: '' }
+                        : null,
+                    destroy: () => { },
+                };
+            },
+            getCommit: async () => null,
+        } as never;
+
+        const sent: string[][] = [];
+        controller.addListener('candidatesBack', (cands: Array<{ candidate: string }>) => {
+            sent.push(cands.map((candidate) => candidate.candidate));
+        });
+
+        const key = (type: 'keydown' | 'keyup', key: string, code: string) => controller.feedKey({
+            type, key, code, ctrlKey: false, altKey: false, shiftKey: false,
+        } as chrome.input.ime.KeyboardEvent) as Promise<boolean>;
+        const operations = [key('keydown', 'a', 'KeyA')];
+        await Promise.resolve();
+        operations.push(
+            key('keyup', 'a', 'KeyA'),
+            key('keydown', 'Backspace', 'Backspace'),
+            key('keyup', 'Backspace', 'Backspace'),
+        );
+        await Promise.resolve();
+
+        // The three later events are queued, not allowed to race the first.
+        expect(processed).toEqual([{ code: 'a'.charCodeAt(0), mask: 0 }]);
+        releaseFirst();
+        await Promise.all(operations);
+
+        expect(processed).toEqual([
+            { code: 'a'.charCodeAt(0), mask: 0 },
+            { code: 'a'.charCodeAt(0), mask: 1 << 30 },
+            { code: 0xff08, mask: 0 },
+            { code: 0xff08, mask: 1 << 30 },
+        ]);
+        expect(text).toBe('');
+        expect(sent.at(-1)).toEqual([]);
     });
 });
 

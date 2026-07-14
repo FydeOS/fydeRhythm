@@ -14,8 +14,10 @@ export class RimeCandidateIterator {
         this.engine = eng;
     }
 
-    destroy() {
-        this.wasmIterator.delete();
+    async destroy(): Promise<void> {
+        await this.engine.mutex.runExclusive(async () => {
+            this.wasmIterator.delete();
+        });
     }
 
     async advance() {
