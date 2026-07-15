@@ -1,3 +1,4 @@
+import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import {
     buildRawTableDb,
@@ -294,8 +295,8 @@ describe('parseDictPackSource', () => {
         expect(source.dictYaml).toContain("晭\tabgr\tab'gr");
     });
 
-    it('converts Sogou SCEL binary files into Rime dict yaml', () => {
-        const source = parseDictPackSourceBytes(
+    it('converts Sogou SCEL binary files into Rime dict yaml', async () => {
+        const source = await parseDictPackSourceBytes(
             'sample.scel',
             makeScelFixture(),
             new Set(),
@@ -308,8 +309,8 @@ describe('parseDictPackSource', () => {
         expect(source.dictYaml).toContain('测试\tce shi\t300');
     });
 
-    it('merges duplicate Sogou SCEL words and reports the merge count', () => {
-        const source = parseDictPackSourceBytes(
+    it('merges duplicate Sogou SCEL words and reports the merge count', async () => {
+        const source = await parseDictPackSourceBytes(
             'dup.scel',
             makeScelDuplicateFixture(),
             new Set(),
@@ -322,15 +323,15 @@ describe('parseDictPackSource', () => {
         expect(source.dictYaml).not.toContain('你好\tni hao\t500');
     });
 
-    it('ignores trailing non-entry data in Sogou SCEL files', () => {
-        const source = parseDictPackSourceBytes('sample.scel', makeScelFixture(true), new Set());
+    it('ignores trailing non-entry data in Sogou SCEL files', async () => {
+        const source = await parseDictPackSourceBytes('sample.scel', makeScelFixture(true), new Set());
 
         expect(source.entryCount).toBe(2);
         expect(source.dictYaml).toContain('你好\tni hao\t500');
     });
 
-    it('keeps Sogou SCEL mixed word codes intact for schema-based routing', () => {
-        const source = parseDictPackSourceBytes('mixed.scel', makeScelMixedFixture(), new Set());
+    it('keeps Sogou SCEL mixed word codes intact for schema-based routing', async () => {
+        const source = await parseDictPackSourceBytes('mixed.scel', makeScelMixedFixture(), new Set());
 
         expect(source.entryCount).toBe(2);
         expect(source.dictYaml).toContain('zig基金会\tz i g ji jin hui\t600');
@@ -339,6 +340,191 @@ describe('parseDictPackSource', () => {
             { text: 'zig基金会', code: 'z i g ji jin hui', weight: 600 },
             { text: '阿福app', code: 'a fu a p p', weight: 500 },
         ]);
+    });
+
+    it('reads scel frequencies as uint32 and caps implausible values', async () => {
+        const source = await parseDictPackSourceBytes('weights.scel', makeScelWeightFixture(), new Set());
+
+        expect(source.entries).toEqual([
+            // Frequencies above 65535 must survive (they were truncated when
+            // the parser read only a uint16).
+            { text: '你好', code: 'ni hao', weight: 279900 },
+            // Values beyond any real Sogou frequency are capped so they
+            // cannot outrank everyday vocabulary.
+            { text: '你', code: 'ni', weight: 10_000_000 },
+            // Minimal files with a 2-byte extension block still work.
+            { text: '好', code: 'hao', weight: 321 },
+        ]);
+    });
+
+    it('decodes GBK-encoded text imports', async () => {
+        // '你好\tni hao\t500\n' in GBK (你 = C4E3, 好 = BAC3) — invalid as
+        // UTF-8, so the decoder must fall back to GBK.
+        const gbk = new Uint8Array([
+            0xc4, 0xe3, 0xba, 0xc3,
+            ...[...'\tni hao\t500\n'].map(c => c.charCodeAt(0)),
+        ]);
+        const source = await parseDictPackSourceBytes('gbk-words.txt', gbk, new Set());
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 500 }]);
+    });
+
+    it('decodes UTF-16LE text imports with a BOM', async () => {
+        const text = '你好\tni hao\t500\n测试\tce shi\t300\n';
+        const bytes = new Uint8Array(2 + text.length * 2);
+        bytes[0] = 0xff;
+        bytes[1] = 0xfe;
+        bytes.set(encodeUtf16Le(text), 2);
+        const source = await parseDictPackSourceBytes('qq-export.txt', bytes, new Set());
+
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 500 },
+            { text: '测试', code: 'ce shi', weight: 300 },
+        ]);
+    });
+
+    it('strips a UTF-8 BOM from text imports', async () => {
+        const bytes = new Uint8Array([
+            0xef, 0xbb, 0xbf,
+            ...new TextEncoder().encode('你好\tni hao\t500\n'),
+        ]);
+        const source = await parseDictPackSourceBytes('bom.txt', bytes, new Set());
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 500 }]);
+    });
+
+    it('decodes UTF-16BE text imports with a BOM', async () => {
+        const text = '你好\tni hao\t500\n';
+        const bytes = new Uint8Array(2 + text.length * 2);
+        bytes[0] = 0xfe;
+        bytes[1] = 0xff;
+        for (let i = 0; i < text.length; i++) {
+            bytes[2 + i * 2] = text.charCodeAt(i) >> 8;
+            bytes[2 + i * 2 + 1] = text.charCodeAt(i) & 0xff;
+        }
+        const source = await parseDictPackSourceBytes('be.txt', bytes, new Set());
+
+        expect(source.entries).toEqual([{ text: '你好', code: 'ni hao', weight: 500 }]);
+    });
+
+    it('reports zero entries for an empty text import', async () => {
+        const source = await parseDictPackSourceBytes('empty.txt', new Uint8Array(0), new Set());
+
+        expect(source.entryCount).toBe(0);
+    });
+
+    it('rejects truncated SCEL files', async () => {
+        await expect(parseDictPackSourceBytes('tiny.scel', new Uint8Array(16), new Set()))
+            .rejects.toThrow('file is too small');
+    });
+
+    it('rejects truncated qpyd files', async () => {
+        await expect(parseDictPackSourceBytes('tiny.qpyd', new Uint8Array(16), new Set()))
+            .rejects.toThrow('file is too small');
+    });
+
+    it('keeps emoji entries intact through the text import path', async () => {
+        const bytes = new TextEncoder().encode('🍎手机\tping guo shou ji\t500\n');
+        const source = await parseDictPackSourceBytes('emoji.txt', bytes, new Set());
+
+        expect(source.entries).toEqual([{ text: '🍎手机', code: 'ping guo shou ji', weight: 500 }]);
+    });
+
+    it('flattens scel weights when every word shares one value', async () => {
+        const source = await parseDictPackSourceBytes(
+            'flat.scel', makeScelCustomWeightFixture([777, 777]), new Set());
+
+        // A constant field carries no ordering information, so the neutral
+        // default applies instead of the (possibly inflated) constant.
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 100 },
+            { text: '测试', code: 'ce shi', weight: 100 },
+        ]);
+    });
+
+    it('flattens scel weights when most values are implausibly large', async () => {
+        const source = await parseDictPackSourceBytes(
+            'garbage.scel', makeScelCustomWeightFixture([4_000_000_000, 3_000_000_000]), new Set());
+
+        // With the majority of values beyond any real rank/frequency the
+        // whole field is untrustworthy — clamping each value would pin most
+        // of the pack at the cap instead.
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 100 },
+            { text: '测试', code: 'ce shi', weight: 100 },
+        ]);
+    });
+
+    it('keeps distinct plausible scel weights untouched', async () => {
+        const source = await parseDictPackSourceBytes(
+            'ranks.scel', makeScelCustomWeightFixture([2, 1]), new Set());
+
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 2 },
+            { text: '测试', code: 'ce shi', weight: 1 },
+        ]);
+    });
+
+    it('maps beyond-table pinyin ids to ASCII letters', async () => {
+        const source = await parseDictPackSourceBytes('letters.scel', makeScelBeyondTableFixture(), new Set());
+
+        // Table ids run 1–4, so id 5 = 'a', id 22 = 'r'.
+        expect(source.entries).toEqual([
+            { text: 'a测试r', code: 'a ce shi r', weight: 700 },
+        ]);
+    });
+
+    it('routes .qcel files through the SCEL parser', async () => {
+        const source = await parseDictPackSourceBytes('sample.qcel', makeScelFixture(), new Set());
+
+        expect(source.packName).toBe('dict_pack_sample');
+        expect(source.entryCount).toBe(2);
+        expect(source.dictYaml).toContain('你好\tni hao\t500');
+    });
+
+    it('converts Baidu bdict binary files into Rime dict yaml', async () => {
+        const source = await parseDictPackSourceBytes('sample.bdict', makeBdictFixture(), new Set());
+
+        expect(source.packName).toBe('dict_pack_sample');
+        expect(source.entries).toContainEqual({ text: '你好', code: 'ni hao', weight: 500 });
+        // Frequency 0 falls back to the default weight.
+        expect(source.entries).toContainEqual({ text: 'QQ', code: 'qq', weight: 100 });
+        // Format-3 entry with explicit code text.
+        expect(source.entries).toContainEqual({ text: '词组', code: 'abc', weight: 200 });
+        // 0xFF initial marks a literal ASCII letter inside a Chinese word.
+        expect(source.entries).toContainEqual({ text: 'a股', code: 'a gu', weight: 400 });
+        expect(source.entryCount).toBe(4);
+    });
+
+    it('accepts the mobile .bcd extension for Baidu dictionaries', async () => {
+        const source = await parseDictPackSourceBytes('mobile.bcd', makeBdictFixture(), new Set());
+
+        expect(source.packName).toBe('dict_pack_mobile');
+        expect(source.entryCount).toBe(4);
+    });
+
+    it('rejects Baidu dictionaries without any entries', async () => {
+        await expect(parseDictPackSourceBytes('empty.bdict', new Uint8Array(0x400), new Set()))
+            .rejects.toThrow('no entries found');
+    });
+
+    it('converts QQ qpyd binary files into Rime dict yaml', async () => {
+        const source = await parseDictPackSourceBytes('sample.qpyd', await makeQpydFixture(), new Set());
+
+        expect(source.packName).toBe('dict_pack_sample');
+        expect(source.entryCount).toBe(2);
+        // qpyd carries no frequency; every entry gets the default weight.
+        expect(source.entries).toEqual([
+            { text: '你好', code: 'ni hao', weight: 100 },
+            { text: '测试', code: 'ce shi', weight: 100 },
+        ]);
+    });
+
+    it('rejects qpyd files with a corrupt payload', async () => {
+        const broken = await makeQpydFixture();
+        broken[0x60] = 0x00; // destroy the zlib header
+        await expect(parseDictPackSourceBytes('broken.qpyd', broken, new Set()))
+            .rejects.toThrow('could not decompress');
     });
 
     it('builds raw table db entries with literal continuous codes', () => {
@@ -489,6 +675,110 @@ function makeScelMixedFixture(): Uint8Array {
     return bytes;
 }
 
+function makeScelCustomWeightFixture(weights: [number, number]): Uint8Array {
+    const bytes = new Uint8Array(0x2700);
+    let pinyinOffset = 0x1544;
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 1, 'ni');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 2, 'hao');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 3, 'ce');
+    let wordOffset = writePinyinEntry(bytes, pinyinOffset, 4, 'shi');
+
+    wordOffset = writeWordGroup(bytes, wordOffset, [1, 2], [{ word: '你好', weight: weights[0] }]);
+    writeWordGroup(bytes, wordOffset, [3, 4], [{ word: '测试', weight: weights[1] }]);
+    return bytes;
+}
+
+function makeScelWeightFixture(): Uint8Array {
+    const bytes = new Uint8Array(0x2700);
+    let pinyinOffset = 0x1544;
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 1, 'ni');
+    let o = writePinyinEntry(bytes, pinyinOffset, 2, 'hao');
+
+    o = writeWordGroup(bytes, o, [1, 2], [{ word: '你好', weight: 279900 }]);
+    o = writeWordGroup(bytes, o, [1], [{ word: '你', weight: 50_000_000 }]);
+
+    // A word with a legacy 2-byte extension holding a uint16 weight.
+    writeUint16Le(bytes, o, 1);
+    writeUint16Le(bytes, o + 2, 2);
+    writeUint16Le(bytes, o + 4, 2); // pinyin ids: [hao]
+    o += 6;
+    const word = encodeUtf16Le('好');
+    writeUint16Le(bytes, o, word.length);
+    bytes.set(word, o + 2);
+    o += 2 + word.length;
+    writeUint16Le(bytes, o, 2);
+    writeUint16Le(bytes, o + 2, 321);
+    return bytes;
+}
+
+function makeScelBeyondTableFixture(): Uint8Array {
+    const bytes = new Uint8Array(0x2700);
+    let pinyinOffset = 0x1544;
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 1, 'ni');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 2, 'hao');
+    pinyinOffset = writePinyinEntry(bytes, pinyinOffset, 3, 'ce');
+    const wordOffset = writePinyinEntry(bytes, pinyinOffset, 4, 'shi');
+
+    // Ids past the table encode letters: max id is 4, so 5 = 'a', 22 = 'r'.
+    writeWordGroup(bytes, wordOffset, [5, 3, 4, 22], [{ word: 'a测试r', weight: 700 }]);
+    return bytes;
+}
+
+function makeBdictFixture(): Uint8Array {
+    const bytes = new Uint8Array(0x400);
+    writeUint32Le(bytes, 0x70, 4);
+    let o = 0x350;
+    // Format 1: 你好 = ni (n=11, i=29) + hao (h=5, ao=13), frequency 500.
+    writeUint16Le(bytes, o, 2); writeUint16Le(bytes, o + 2, 500); o += 4;
+    bytes.set([11, 29, 5, 13], o); o += 4;
+    bytes.set(encodeUtf16Le('你好'), o); o += 4;
+    // Format 2: pure-ASCII word, frequency 0.
+    writeUint16Le(bytes, o, 2); writeUint16Le(bytes, o + 2, 0); o += 4;
+    bytes.set([0x51, 0x51], o); o += 2; // "QQ"
+    // Format 3: explicit code text "abc" for 词组, frequency 200.
+    writeUint16Le(bytes, o, 3); writeUint16Le(bytes, o + 2, 200); o += 4;
+    writeUint16Le(bytes, o, 0); writeUint16Le(bytes, o + 2, 2); o += 4;
+    bytes.set(encodeUtf16Le('abc'), o); o += 6;
+    bytes.set(encodeUtf16Le('词组'), o); o += 4;
+    // Format 1 with a 0xFF literal-ASCII marker: a股 = a + gu (g=4, u=31).
+    writeUint16Le(bytes, o, 2); writeUint16Le(bytes, o + 2, 400); o += 4;
+    bytes.set([0xff, 0x61, 4, 31], o); o += 4;
+    bytes.set(encodeUtf16Le('a股'), o); o += 4;
+    return bytes;
+}
+
+async function makeQpydFixture(): Promise<Uint8Array> {
+    const entries = [
+        { code: "ni'hao", word: '你好' },
+        { code: "ce'shi", word: '测试' },
+    ];
+    const index = new Uint8Array(entries.length * 10);
+    const dataParts: number[] = [];
+    let position = index.length;
+    entries.forEach((entry, i) => {
+        const codeBytes = [...entry.code].map(c => c.charCodeAt(0));
+        const wordBytes = encodeUtf16Le(entry.word);
+        index[i * 10] = codeBytes.length;
+        index[i * 10 + 1] = wordBytes.length;
+        writeUint32Le(index, i * 10 + 6, position);
+        dataParts.push(...codeBytes, ...wordBytes);
+        position += codeBytes.length + wordBytes.length;
+    });
+    const compressed = new Uint8Array(deflateSync(Buffer.from([...index, ...dataParts])));
+    const bytes = new Uint8Array(0x60 + compressed.length);
+    writeUint32Le(bytes, 0x38, 0x60);
+    writeUint32Le(bytes, 0x44, entries.length);
+    bytes.set(compressed, 0x60);
+    return bytes;
+}
+
+function writeUint32Le(bytes: Uint8Array, offset: number, value: number): void {
+    bytes[offset] = value & 0xff;
+    bytes[offset + 1] = (value >>> 8) & 0xff;
+    bytes[offset + 2] = (value >>> 16) & 0xff;
+    bytes[offset + 3] = (value >>> 24) & 0xff;
+}
+
 function writePinyinEntry(bytes: Uint8Array, offset: number, id: number, pinyin: string): number {
     const encoded = encodeUtf16Le(pinyin);
     writeUint16Le(bytes, offset, id);
@@ -515,9 +805,10 @@ function writeWordGroup(
         writeUint16Le(bytes, offset, encodedWord.length);
         bytes.set(encodedWord, offset + 2);
         offset += 2 + encodedWord.length;
-        writeUint16Le(bytes, offset, 2);
-        writeUint16Le(bytes, offset + 2, weight);
-        offset += 4;
+        // 10-byte extension with a uint32 frequency, as in real files.
+        writeUint16Le(bytes, offset, 10);
+        writeUint32Le(bytes, offset + 2, weight);
+        offset += 12;
     }
     return offset;
 }

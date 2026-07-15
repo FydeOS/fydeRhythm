@@ -1,11 +1,10 @@
 import { parse } from 'yaml';
+import { DEFAULT_DICT_ENTRY_WEIGHT, RawDictEntry, decodeDictText, readUint32Le } from './dict-formats/binary';
+import { parseBdictEntries } from './dict-formats/bdict';
+import { parseQpydEntries } from './dict-formats/qpyd';
 
 export const DICT_PACKS_MANIFEST_FILENAME = 'dict-packs.json';
 export const DICT_PACK_ID_PREFIX = 'dict_pack_';
-
-// Fallback weight for entries that carry no usable frequency (weight-less TSV
-// rows, or Sogou SCEL words without a frequency field).
-const DEFAULT_DICT_ENTRY_WEIGHT = 100;
 
 export interface DictPackMetadata {
     id: string;
@@ -35,8 +34,9 @@ export interface DictPackSource {
     entryCount: number;
     entries?: DictPackEntry[];
     // Rows merged away because they repeated an earlier (text, code) pair.
-    // Only set for formats we parse entry-by-entry (TSV, SCEL); dict.yaml
-    // sources pass through verbatim and never report duplicates.
+    // Only set for formats we parse entry-by-entry (TSV and the binary
+    // lexicon formats); dict.yaml sources pass through verbatim and never
+    // report duplicates.
     duplicateCount?: number;
 }
 
@@ -70,21 +70,67 @@ export function parseDictPackSource(
     return parseTsvSource(fileName, text, existingPackNames, existingDisplayNames);
 }
 
-export function parseDictPackSourceBytes(
+export async function parseDictPackSourceBytes(
     fileName: string,
     bytes: Uint8Array,
     existingPackNames: Set<string>,
     existingDisplayNames: Map<string, string> = new Map(),
-): DictPackSource {
-    if (fileName.toLowerCase().endsWith('.scel')) {
+): Promise<DictPackSource> {
+    const lowerName = fileName.toLowerCase();
+    // .qcel (QQ拼音 6.0+) shares the Sogou SCEL layout.
+    if (lowerName.endsWith('.scel') || lowerName.endsWith('.qcel')) {
         return parseScelSource(fileName, bytes, existingPackNames, existingDisplayNames);
+    }
+    if (lowerName.endsWith('.bdict') || lowerName.endsWith('.bcd')) {
+        return buildSourceFromBinaryEntries(
+            fileName, parseBdictEntries(bytes), existingPackNames, existingDisplayNames);
+    }
+    if (lowerName.endsWith('.qpyd')) {
+        return buildSourceFromBinaryEntries(
+            fileName, await parseQpydEntries(bytes), existingPackNames, existingDisplayNames);
     }
     return parseDictPackSource(
         fileName,
-        new TextDecoder().decode(bytes),
+        decodeDictText(bytes),
         existingPackNames,
         existingDisplayNames,
     );
+}
+
+function buildSourceFromBinaryEntries(
+    fileName: string,
+    rawEntries: RawDictEntry[],
+    existingPackNames: Set<string>,
+    existingDisplayNames: Map<string, string>,
+): DictPackSource {
+    const displayName = displayNameFromFileName(fileName);
+    const packName = resolvePackName(displayName, existingPackNames, existingDisplayNames);
+
+    // Same duplicate policy as the TSV/SCEL paths: merge repeated
+    // (text, code) pairs keeping the highest weight.
+    const entryMap = new Map<string, DictPackEntry>();
+    let acceptedCount = 0;
+    for (const raw of rawEntries) {
+        const text = sanitizeDictText(raw.text);
+        const code = sanitizeDictText(raw.code);
+        if (!text || !code) continue;
+        acceptedCount++;
+        const key = `${text}\t${code}`;
+        const existing = entryMap.get(key);
+        if (!existing || existing.weight < raw.weight) {
+            entryMap.set(key, { text, code, weight: raw.weight });
+        }
+    }
+
+    const entries = [...entryMap.values()];
+    return {
+        packName,
+        dictYaml: buildDictPackYaml(packName, entries),
+        displayName,
+        entryCount: entries.length,
+        entries,
+        duplicateCount: acceptedCount - entries.length,
+    };
 }
 
 function parseDictYamlSource(
@@ -180,6 +226,12 @@ interface ScelEntry {
 const SCEL_PINYIN_OFFSET = 0x1540;
 const UTF16LE_DECODER = new TextDecoder('utf-16le');
 
+// Real Sogou/QQ frequencies stay well below this. On librime's absolute
+// scale (weight 1e8 ≈ the most common word in the language) the cap keeps a
+// corrupt or hostile uint32 from pinning imported words above everyday
+// vocabulary, while preserving relative order for genuine values.
+const MAX_SCEL_ENTRY_WEIGHT = 10_000_000;
+
 function parseScelSource(
     fileName: string,
     bytes: Uint8Array,
@@ -194,6 +246,7 @@ function parseScelSource(
     const packName = resolvePackName(displayName, existingPackNames, existingDisplayNames);
     const { pinyinTable, wordOffset } = readScelPinyinTable(bytes);
     const { entries, duplicateCount } = readScelEntries(bytes, pinyinTable, wordOffset);
+    sanitizeScelWeights(entries);
     const dictEntries: DictPackEntry[] = [...entries.values()]
         .map(({ word, code, weight }) => ({ text: word, code, weight }));
 
@@ -234,6 +287,7 @@ function readScelEntries(
     let acceptedWords = 0;
     const done = () => ({ entries: result, duplicateCount: acceptedWords - result.size });
     let offset = wordOffset;
+    const maxPinyinId = Math.max(...pinyinTable.keys());
 
     while (offset + 4 <= bytes.length) {
         const homophoneCount = readUint16Le(bytes, offset);
@@ -248,7 +302,7 @@ function readScelEntries(
         const code: string[] = [];
         for (let i = 0; i < pinyinTableLength / 2; i++) {
             const id = readUint16Le(bytes, offset);
-            const syllable = pinyinTable.get(id);
+            const syllable = pinyinTable.get(id) ?? asciiLetterForPinyinId(id, maxPinyinId);
             if (!syllable) {
                 if (result.size > 0) return done();
                 throw new Error(`Invalid Sogou SCEL file: unknown pinyin id ${id}`);
@@ -278,8 +332,17 @@ function readScelEntries(
                 throw new Error('Invalid Sogou SCEL file: malformed word metadata');
             }
 
-            const rawWeight = extraLength >= 2 ? readUint16Le(bytes, offset) : DEFAULT_DICT_ENTRY_WEIGHT;
-            const weight = Math.max(rawWeight, 1);
+            // The first 4 bytes of the extension block hold the word's
+            // frequency as a uint32 (values above 65535 are common in
+            // official Sogou dicts); tolerate short blocks from minimal or
+            // hand-made files.
+            let rawWeight = DEFAULT_DICT_ENTRY_WEIGHT;
+            if (extraLength >= 4) {
+                rawWeight = readUint32Le(bytes, offset);
+            } else if (extraLength >= 2) {
+                rawWeight = readUint16Le(bytes, offset);
+            }
+            const weight = Math.min(Math.max(rawWeight, 1), MAX_SCEL_ENTRY_WEIGHT);
             offset += extraLength;
 
             const codeString = code.join(' ');
@@ -294,6 +357,40 @@ function readScelEntries(
     }
 
     return done();
+}
+
+// The extension field is trusted only as a relative ordering between the
+// pack's words (official dicts store a frequency rank there). Two degenerate
+// shapes carry no usable signal and fall back to the neutral default weight:
+// every word sharing a single value (no ordering info — and a large constant
+// would uniformly inflate the whole pack), or a majority of values beyond any
+// real rank/frequency (the field is not credible for this file, so per-value
+// clamping alone would pin most of the pack at the cap).
+function sanitizeScelWeights(entries: Map<string, ScelEntry>): void {
+    if (entries.size < 2) return;
+    let min = Infinity;
+    let max = -Infinity;
+    let cappedCount = 0;
+    for (const entry of entries.values()) {
+        min = Math.min(min, entry.weight);
+        max = Math.max(max, entry.weight);
+        if (entry.weight >= MAX_SCEL_ENTRY_WEIGHT) cappedCount++;
+    }
+    const allEqual = min === max;
+    const mostlyImplausible = cappedCount * 2 > entries.size;
+    if (!allEqual && !mostlyImplausible) return;
+    for (const entry of entries.values()) {
+        entry.weight = DEFAULT_DICT_ENTRY_WEIGHT;
+    }
+}
+
+// Pinyin ids past the end of the pinyin table encode ASCII letters
+// (maxId + 1 = 'a', maxId + 2 = 'b', …) — that is how Latin characters
+// inside words are stored, in both Sogou .scel and QQ .qcel files.
+function asciiLetterForPinyinId(id: number, maxPinyinId: number): string | undefined {
+    const letterIndex = id - maxPinyinId - 1;
+    if (letterIndex < 0 || letterIndex >= 26) return undefined;
+    return String.fromCharCode(0x61 + letterIndex);
 }
 
 function readUint16Le(bytes: Uint8Array, offset: number): number {
@@ -403,7 +500,7 @@ function sanitizeTableCell(value: string): string {
 
 export function displayNameFromFileName(fileName: string): string {
     const base = fileName.split(/[\\/]/).pop() ?? fileName;
-    return base.replace(/\.(dict\.yaml|txt|tsv|scel)$/i, '').trim() || 'Dict Pack';
+    return base.replace(/\.(dict\.yaml|txt|tsv|scel|qcel|qpyd|bdict|bcd)$/i, '').trim() || 'Dict Pack';
 }
 
 function uniquePackName(base: string, existing: Set<string>): string {
@@ -539,7 +636,10 @@ function injectRawTableIntoSchema(schemaConfig: Record<string, unknown>, tableNa
         db_class: 'stabledb',
         enable_completion: true,
         enable_sentence: false,
-        initial_quality: 0.5,
+        // table_translator adds +0.5 for user_dict-backed entries; offset it so
+        // raw-table matches rank near mid-frequency words instead of above
+        // every candidate from the main translator (quality scale: top word ~1.0).
+        initial_quality: -0.45,
         comment_format: ['xform/^.+$//'],
     };
 }

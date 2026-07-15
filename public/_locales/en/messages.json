@@ -193,7 +193,7 @@
         "message": "Dictionary Packs"
     },
     "dict_pack_hint": {
-        "message": "Import a .txt, .tsv or .dict.yaml file to compile a dictionary pack. Unlike word packs, compiled packs support prefix matching and proper weight-based ranking."
+        "message": "Import a .txt, .tsv or .dict.yaml file, or a Sogou (.scel), Baidu (.bdict/.bcd) or QQ Pinyin (.qpyd/.qcel) lexicon to compile a dictionary pack. Unlike word packs, compiled packs support prefix matching and proper weight-based ranking."
     },
     "dict_pack_import_button": {
         "message": "Import Dict Pack"

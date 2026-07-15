@@ -490,7 +490,7 @@ function OptionsPage() {
             const manifest = await readDictPackManifest(imeSettings.schema);
             const existingPackNames = new Set(manifest.packs.map(p => p.packName));
             const existingDisplayNames = new Map(manifest.packs.map(p => [p.name.trim().normalize('NFC'), p.packName]));
-            const source = parseDictPackSourceBytes(file.name, bytes, existingPackNames, existingDisplayNames);
+            const source = await parseDictPackSourceBytes(file.name, bytes, existingPackNames, existingDisplayNames);
             if (source.entryCount === 0) {
                 setDictPackAlert({ severity: 'error', text: $$("dict_pack_empty") });
                 return;
@@ -1793,7 +1793,7 @@ function OptionsPage() {
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <input
                                 type="file"
-                                accept=".txt,.tsv,.yaml,.dict.yaml,.scel"
+                                accept=".txt,.tsv,.yaml,.dict.yaml,.scel,.qcel,.qpyd,.bdict,.bcd"
                                 id="dict-pack-import-input"
                                 style={{ display: 'none' }}
                                 onChange={async (e) => {
