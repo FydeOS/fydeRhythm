@@ -135,6 +135,10 @@ function AppearanceToggle() {
 
 function OptionsPage() {
     const [engineStatus, setEngineStatus] = useState({ loading: false, loaded: false, currentSchema: "" as string });
+    // Status notifications can arrive in a burst around a reload. Only the
+    // newest request may update the badge; otherwise a slow, stale "Starting"
+    // response can overwrite the terminal "Ready" response.
+    const engineStatusRequestId = useRef(0);
     const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
     enum SettingsDirtyStatus {
         NotDirty = 0,
@@ -182,8 +186,15 @@ function OptionsPage() {
     // chrome.storage.local.get
 
     async function updateRimeStatus() {
-        const result = await sendMessage("GetEngineStatus");
-        setEngineStatus(result);
+        const requestId = ++engineStatusRequestId.current;
+        try {
+            const result = await sendMessage("GetEngineStatus");
+            if (requestId === engineStatusRequestId.current) {
+                setEngineStatus(result);
+            }
+        } catch (ex) {
+            console.error("Error while refreshing RIME status", ex);
+        }
     }
 
     async function loadSettings() {
@@ -285,8 +296,17 @@ function OptionsPage() {
         await chrome.storage.sync.set({ settings: imeSettings });
         if (!engineStatus.loading) {
             setSettingsDirty(SettingsDirtyStatus.Reloading);
-            await sendMessage("ReloadRime");
-            setSettingsDirty(SettingsDirtyStatus.NotDirty);
+            try {
+                await sendMessage("ReloadRime");
+            } catch (ex) {
+                console.error("Error while reloading RIME", ex);
+            } finally {
+                // A dead/restarting service worker can reject the message.
+                // Reloading is transient UI state and must not survive either
+                // success or failure of that request.
+                setSettingsDirty(SettingsDirtyStatus.NotDirty);
+                void updateRimeStatus();
+            }
         }
     }
 
@@ -385,6 +405,14 @@ function OptionsPage() {
         kana: $$("layout_kana"),
         hangul: $$("layout_hangul"),
     };
+    const schemaKeysNames: Record<SchemaKeys, string> = {
+        latin: $$("layout_letters"),
+        zhuyin: layoutNames.zhuyin,
+        kana: layoutNames.kana,
+        hangul: layoutNames.hangul,
+    };
+
+    const showsInputView = hasInputView();
 
     const arrangement = resolveKeyboardLayout(imeSettings);
     const activeSchemaName = currentSchemaInfo()?.name;
@@ -403,14 +431,6 @@ function OptionsPage() {
         changeSettings({ schema: id, ...(nextEnabled ? { enabledSchemas: nextEnabled } : {}) });
     }
 
-    const schemaKeysNames: Record<SchemaKeys, string> = {
-        latin: $$("layout_letters"),
-        zhuyin: layoutNames.zhuyin,
-        kana: layoutNames.kana,
-        hangul: layoutNames.hangul,
-    };
-
-    const showsInputView = hasInputView();
     let engineStatusString: string = $$("rime_engine_not_started");
     let engineColor = "error.main";
     if (engineStatus.loading) {
