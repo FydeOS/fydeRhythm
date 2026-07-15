@@ -151,46 +151,87 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
     onBack: () => void;
     onBackspace: () => void;
 }) {
-    const [category, setCategory] = useState<string>('recents');
-    const [recents, setRecents] = useState<string[]>([]);
+    const [active, setActive] = useState<string>(kEmojiCategories[0].id);
+    // Recents as they were when the panel opened. The section does NOT reorder
+    // while the panel is up — a live reorder above the viewport would yank the
+    // scroll position around under the user's finger.
+    const [shelf, setShelf] = useState<string[]>([]);
     const [tones, setTones] = useState<{ def: EmojiDef; anchor: DOMRect; pointerId: number } | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    const sectionRefs = useRef(new Map<string, HTMLElement>());
+    const recentsRef = useRef<string[]>([]);
+    const spyRaf = useRef(false);
 
     useEffect(() => {
         void loadRecents().then((r) => {
-            setRecents(r);
-            if (r.length === 0) setCategory(kEmojiCategories[0].id);
+            recentsRef.current = r;
+            setShelf(r);
+            if (r.length > 0) setActive('recents');
         });
     }, []);
 
     const insert = (emoji: string) => {
         onInsert(emoji);
-        setRecents((prev) => {
-            const next = [emoji, ...prev.filter((x) => x !== emoji)].slice(0, kMaxRecents);
-            saveRecents(next);
-            return next;
+        recentsRef.current = [emoji, ...recentsRef.current.filter((x) => x !== emoji)].slice(0, kMaxRecents);
+        saveRecents(recentsRef.current);
+    };
+
+    // One continuous scroll across every category; the tabs are scroll-spies.
+    const sections: Array<{ id: string; label: string; emoji: EmojiDef[] }> = [
+        ...(shelf.length > 0 ? [{ id: 'recents', label: t('vk_recent_emoji'), emoji: shelf.map((char) => ({ char })) }] : []),
+        ...kEmojiCategories.map((c) => ({ id: c.id, label: t(`vk_emoji_${c.id}`), emoji: c.emoji })),
+    ];
+
+    const pick = (id: string) => {
+        const el = sectionRefs.current.get(id);
+        const grid = gridRef.current;
+        if (!el || !grid) return;
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        grid.scrollTo({ top: el.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
+        setActive(id);
+    };
+
+    // The active tab follows the scroll: the last section whose top has passed
+    // the sticky-header line. rAF-coalesced — scroll fires per frame anyway.
+    const spy = () => {
+        if (spyRaf.current) return;
+        spyRaf.current = true;
+        requestAnimationFrame(() => {
+            spyRaf.current = false;
+            const grid = gridRef.current;
+            if (!grid) return;
+            let current = sections[0]?.id;
+            for (const s of sections) {
+                const el = sectionRefs.current.get(s.id);
+                if (el && el.offsetTop <= grid.scrollTop + 40) current = s.id;
+            }
+            if (current) setActive(current);
         });
     };
 
-    const pick = (id: string) => {
-        setCategory(id);
-        gridRef.current?.scrollTo({ top: 0 });
-    };
-
-    const active: EmojiDef[] = category === 'recents'
-        ? recents.map((char) => ({ char }))
-        : (kEmojiCategories.find((c) => c.id === category) ?? kEmojiCategories[0]).emoji;
-
     return (
         <div className="kb-emoji">
-            <div className="kb-emoji-grid" ref={gridRef}>
-                {active.map((def) => (
-                    <EmojiCell
-                        key={def.char}
-                        def={def}
-                        onInsert={insert}
-                        onOpenTones={(d, anchor, pid) => setTones({ def: d, anchor, pointerId: pid })}
-                    />
+            <div className="kb-emoji-grid" ref={gridRef} onScroll={spy}>
+                {sections.map((s) => (
+                    <section
+                        key={s.id}
+                        ref={(el) => {
+                            if (el) sectionRefs.current.set(s.id, el);
+                            else sectionRefs.current.delete(s.id);
+                        }}
+                    >
+                        <div className="kb-emoji-head">{s.label}</div>
+                        <div className="kb-emoji-section-grid">
+                            {s.emoji.map((def) => (
+                                <EmojiCell
+                                    key={def.char}
+                                    def={def}
+                                    onInsert={insert}
+                                    onOpenTones={(d, anchor, pid) => setTones({ def: d, anchor, pointerId: pid })}
+                                />
+                            ))}
+                        </div>
+                    </section>
                 ))}
             </div>
             <div className="kb-emoji-bottom">
@@ -198,17 +239,19 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
                     ABC
                 </button>
                 <div className="kb-emoji-tabs">
-                    <button
-                        className={`tab${category === 'recents' ? ' active' : ''}`}
-                        aria-label={t('vk_recent_emoji')}
-                        onClick={() => pick('recents')}
-                    >
-                        <ScheduleIcon />
-                    </button>
+                    {shelf.length > 0 && (
+                        <button
+                            className={`tab${active === 'recents' ? ' active' : ''}`}
+                            aria-label={t('vk_recent_emoji')}
+                            onClick={() => pick('recents')}
+                        >
+                            <ScheduleIcon />
+                        </button>
+                    )}
                     {kEmojiCategories.map((c) => (
                         <button
                             key={c.id}
-                            className={`tab${category === c.id ? ' active' : ''}`}
+                            className={`tab${active === c.id ? ' active' : ''}`}
                             aria-label={t(`vk_emoji_${c.id}`)}
                             onClick={() => pick(c.id)}
                         >
