@@ -568,10 +568,15 @@ export class RealHost implements VkHost {
                 // which re-sends state + candidates on connect.
                 port = null;
                 if (closed) return;
-                console.warn('inputview: background port disconnected, reconnecting');
+                console.log('inputview: background port disconnected, reconnecting');
                 setTimeout(() => {
                     if (closed) return;
-                    open();
+                    try {
+                        open();
+                    } catch {
+                        // context invalidated by extension reload
+                        return;
+                    }
                     post({ kind: 'visibility', visible: !document.hidden });
                 }, 250);
             });
