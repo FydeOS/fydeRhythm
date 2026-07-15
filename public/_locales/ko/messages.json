@@ -303,8 +303,14 @@
     "vk_resize_keyboard": {
         "message": "키보드 크기 조절"
     },
-    "vk_swap_side": {
-        "message": "반대쪽으로 이동"
+    "vk_pin_left": {
+        "message": "왼쪽 하단에 고정"
+    },
+    "vk_pin_right": {
+        "message": "오른쪽 하단에 고정"
+    },
+    "vk_exit_onehand": {
+        "message": "한 손 모드 종료"
     },
     "vk_key_symbols": {
         "message": "기호"

@@ -303,8 +303,14 @@
     "vk_resize_keyboard": {
         "message": "キーボードのサイズ変更"
     },
-    "vk_swap_side": {
-        "message": "反対側へ移動"
+    "vk_pin_left": {
+        "message": "左下に固定"
+    },
+    "vk_pin_right": {
+        "message": "右下に固定"
+    },
+    "vk_exit_onehand": {
+        "message": "片手モードを終了"
     },
     "vk_key_symbols": {
         "message": "記号"

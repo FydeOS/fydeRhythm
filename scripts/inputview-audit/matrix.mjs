@@ -10,6 +10,11 @@ export const screens = [
     { name: 'chromebook', width: 1366, height: 768, dsf: 1 },
     { name: 'tablet', width: 1280, height: 800, dsf: 2 },
     { name: 'wide', width: 2560, height: 1600, dsf: 1 },
+    // The shapes the docked-height guards exist for (geometryFor): a portrait
+    // tablet, a phone, and a short landscape window.
+    { name: 'portrait', width: 800, height: 1280, dsf: 2 },
+    { name: 'phone', width: 412, height: 915, dsf: 2.6 },
+    { name: 'short', width: 1024, height: 500, dsf: 1 },
 ];
 
 // Full placement prefs: geometryFor() reads mode, scale and side, and run.mjs
@@ -35,9 +40,26 @@ export const states = [
     { name: 'qwerty', rows: 4 },
     { name: 'colemak', query: '?layout=colemak', rows: 4 },
     { name: 'dvorak', query: '?layout=dvorak', rows: 4 },
-    // 5-row layouts: the one-hand card grows a row for these.
+    // 5-row layout: the one-hand card grows a row for it.
     { name: 'zhuyin', query: '?layout=zhuyin', rows: 5 },
-    { name: 'kana', query: '?layout=kana', rows: 5 },
+    // 12-key kana is self-contained: four rows, no shared bottom row.
+    { name: 'kana', query: '?layout=kana', rows: 4 },
+    // Kana behavior against the mock's engine model (a–z appends, one
+    // Backspace removes one char — the same contract the real engine keeps):
+    // an up-flick on あ types its う petal; 小゛゜ replaces は's romaji with
+    // ば's, then ば's with ぱ's (backspace-and-respell).
+    { name: 'kana-flick', query: '?layout=kana', rows: 4, steps: [
+        { glyph: 'あ', move: [0, -40], expectComposition: 'u' },
+    ] },
+    { name: 'kana-modify', query: '?layout=kana', rows: 4, steps: [
+        { glyph: 'は', expectComposition: 'ha' },
+        { glyph: '小゛゜', expectComposition: 'ba' },
+        { glyph: '小゛゜', expectComposition: 'pa' },
+    ] },
+    // Mid-flick the press preview shows the petal being picked.
+    { name: 'kana-flick-preview', query: '?layout=kana', rows: 4, steps: [
+        { glyph: 'か', move: [0, -40], release: false, expect: '.kb-preview' },
+    ] },
     { name: 'hangul', query: '?layout=hangul', rows: 4 },
     { name: 'symbols', rows: 4, steps: [{ glyph: '?123', expect: '.kb-key' }] },
     { name: 'symbols-2', rows: 4, steps: [{ glyph: '?123' }, { glyph: '=\\<', expect: '.kb-key' }] },
@@ -58,8 +80,17 @@ export const states = [
     // up when the checks run.
     { name: 'alt-bubble', rows: 4, steps: [{ glyph: 'a', hold: 700, release: false, expect: '.kb-bubble' }] },
     { name: 'schema-menu', rows: 4, steps: [{ sel: '.kb-key[aria-label="中英切换"]', hold: 700, expect: '.kb-menu' }] },
-    { name: 'placement-menu', rows: 4, steps: [{ sel: '.kb-key[aria-label="收起键盘"]', hold: 700, expect: '.kb-menu' }] },
-    { name: 'emoji', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(2)', expect: '.kb-emoji-tabs' }] },
+    // The hide control lives in the toolbar now (the bottom row's slot went to
+    // Enter); its long-press still opens the placement menu.
+    { name: 'placement-menu', rows: 4, steps: [{ sel: '.icon-btn[aria-label="收起键盘"]', hold: 700, expect: '.kb-menu' }] },
+    // Inserting one emoji seeds the recents shelf, and reopening the panel
+    // renders it — the only tab with an SVG icon, invisible on a cold panel.
+    { name: 'emoji', rows: 4, steps: [
+        { sel: '.kb-bar .icon-btn:nth-child(2)', expect: '.kb-emoji-tabs' },
+        { sel: '.kb-emoji-cell', expect: '.kb-emoji-section-grid' },
+        { sel: '.kb-emoji-side', expect: '.kb-key[aria-label="Shift"]' },
+        { sel: '.kb-bar .icon-btn:nth-child(2)', expect: '.kb-emoji-tabs .tab svg' },
+    ] },
     { name: 'clipboard', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-tile' }] },
     { name: 'clipboard-loading', query: '?clipboard=loading', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-spinner' }] },
     { name: 'clipboard-empty', query: '?clipboard=empty', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-retry' }] },

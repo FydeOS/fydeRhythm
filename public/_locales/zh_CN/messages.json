@@ -303,8 +303,14 @@
     "vk_resize_keyboard": {
         "message": "调整键盘大小"
     },
-    "vk_swap_side": {
-        "message": "移到另一侧"
+    "vk_pin_left": {
+        "message": "固定到左下角"
+    },
+    "vk_pin_right": {
+        "message": "固定到右下角"
+    },
+    "vk_exit_onehand": {
+        "message": "退出单手模式"
     },
     "vk_key_symbols": {
         "message": "符号键盘"

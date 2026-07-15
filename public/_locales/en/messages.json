@@ -303,8 +303,14 @@
     "vk_resize_keyboard": {
         "message": "Resize keyboard"
     },
-    "vk_swap_side": {
-        "message": "Move to other side"
+    "vk_pin_left": {
+        "message": "Pin to left corner"
+    },
+    "vk_pin_right": {
+        "message": "Pin to right corner"
+    },
+    "vk_exit_onehand": {
+        "message": "Exit one-handed mode"
     },
     "vk_key_symbols": {
         "message": "Symbols"

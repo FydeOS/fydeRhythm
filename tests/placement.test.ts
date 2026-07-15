@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { geometryFor, kDefaultPlacement, normalizePlacement, type Placement } from '../entrypoints/inputview/chrome-shim';
+import { dockedHeight, geometryFor, kDefaultPlacement, normalizePlacement, type Placement } from '../entrypoints/inputview/chrome-shim';
 
 // A typical FydeOS tablet in landscape.
 const screen = { width: 1280, height: 800 };
@@ -57,6 +57,31 @@ describe('geometryFor', () => {
             .toEqual({ floating: false, draggable: false, width: 1280, height: 372 });
     });
 
+    it('guards the docked height at the screen-shape extremes', () => {
+        // Every shipping screen resolves exactly as before the guards…
+        expect(dockedHeight({ width: 1366, height: 768 })).toBe(372);
+        expect(dockedHeight({ width: 1280, height: 800 })).toBe(372);
+        expect(dockedHeight({ width: 1080, height: 720 })).toBe(372);
+        expect(dockedHeight({ width: 2560, height: 1600 })).toBe(440);
+        // …a short landscape window keeps ≥48% of itself…
+        expect(dockedHeight({ width: 1024, height: 500 })).toBe(260);
+        // …portrait follows the width instead of the height…
+        expect(dockedHeight({ width: 800, height: 1280 })).toBe(336);
+        // …and a portrait phone lands on the 280 floor.
+        expect(dockedHeight({ width: 412, height: 915 })).toBe(280);
+    });
+
+    it('floors the floating width on phone screens, keeping the docked aspect', () => {
+        const phone = { width: 412, height: 915 };
+        const g = geometryFor(placement({ mode: 'floating', scale: 0.55 }), phone, 4);
+        // 0.55 × 412 would be a 227px keyboard; the effective scale rises to
+        // keep the board at the shared 320px width floor.
+        expect(g.width).toBe(320);
+        expect(g.height).toBeGreaterThanOrEqual(217);
+        // Wide screens are untouched by the floor.
+        expect(geometryFor(placement({ mode: 'floating', scale: 0.55 }), screen, 4).width).toBe(704);
+    });
+
     it('scales the docked keyboard when floating', () => {
         const float = geometryFor(placement({ mode: 'floating', scale: 0.85, left: 40, top: 300 }), screen);
         expect(float).toMatchObject({ floating: true, draggable: true, width: 1088, height: 316, left: 40, top: 300 });
@@ -67,7 +92,7 @@ describe('geometryFor', () => {
     // it: the rows are what is left over, and a 5-row layout came out at 21px
     // per key. The card refuses to go below the height its rows need.
     it('floors the floating card at the height its rows need', () => {
-        const rowsOf = (g: { height: number }, rows: number) => (g.height - 28 - 34 - 5) / rows;
+        const rowsOf = (g: { height: number }, rows: number) => (g.height - 22 - 34 - 5) / rows;
         for (const rows of [4, 5]) {
             const min = geometryFor(placement({ mode: 'floating', scale: 0.55 }), screen, rows);
             // Uniform scaling would have given 205px; the floor overrides it.
@@ -101,14 +126,14 @@ describe('geometryFor', () => {
             // Narrow enough for a thumb to sweep across, and far narrower than
             // the smallest floating keyboard (0.4 × 1280 = 512).
             expect(width).toBe(420);
-            expect(height).toBe(274);
-            // Keys taller than wide, at phone metrics: the frame is 11.5 key
+            expect(height).toBe(310);
+            // Keys taller than wide, at phone metrics: the frame is 10 key
             // columns across, and a row is ~1.4× that pitch. Mirrors the CSS in
             // md3.css (--kb-edge, --kb-bar-height, .kb-onehand-bar).
-            const pitch = (width - 2 * 4) / 11.5;
-            const rowHeight = (height - 34 - 36 - 4) / 4;
-            expect(pitch).toBeCloseTo(35.8, 1);
-            expect(rowHeight).toBe(50);
+            const pitch = (width - 2 * 4) / 10;
+            const rowHeight = (height - 34 - 36 - 2 * 4) / 4;
+            expect(pitch).toBeCloseTo(41.2, 1);
+            expect(rowHeight).toBe(58);
             expect(rowHeight).toBeGreaterThan(pitch);
         });
 
@@ -118,9 +143,9 @@ describe('geometryFor', () => {
             // key is the same height in every layout.
             const four = geometryFor(placement({ mode: 'onehand' }), screen, 4);
             const five = geometryFor(placement({ mode: 'onehand' }), screen, 5);
-            const rowHeight = (g: { height: number }, rows: number) => (g.height - 34 - 36 - 4) / rows;
-            expect(five.height).toBe(324);
-            expect(five.height - four.height).toBe(50);
+            const rowHeight = (g: { height: number }, rows: number) => (g.height - 34 - 36 - 2 * 4) / rows;
+            expect(five.height).toBe(368);
+            expect(five.height - four.height).toBe(58);
             expect(rowHeight(five, 5)).toBe(rowHeight(four, 4));
             expect(five.width).toBe(four.width);
             // Still corner-pinned, just taller — so it rides up from the bottom.

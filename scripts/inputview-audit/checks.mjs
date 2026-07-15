@@ -138,7 +138,10 @@ export function inspectKeyboard(expected) {
         const name = key.getAttribute('aria-label') || key.textContent.trim();
         minW = Math.min(minW, k.width);
         minH = Math.min(minH, k.height);
-        if (k.height < kMinKeyHeight) smallKeys++;
+        // A held key is mid-press (scale .98), so its rect is feedback, not
+        // the target — the finger aimed at the resting key. States that keep
+        // a pointer down (flick preview, alt bubble) must not trip the floor.
+        if (k.height < kMinKeyHeight && !key.classList.contains('pressed')) smallKeys++;
 
         if (k.left < card.left - 1 || k.right > card.right + 1 || k.top < card.top - 1 || k.bottom > card.bottom + 1) {
             bad(`key "${name}" escapes the card`);
@@ -303,8 +306,21 @@ export async function inspectPress() {
     }
 
     const p = rect(preview);
-    if (p.width < k.width * 1.15 || p.height < k.height * 1.15) {
-        findings.push(`press preview (${p.width.toFixed(0)}x${p.height.toFixed(0)}) is barely larger than the key (${k.width.toFixed(0)}x${k.height.toFixed(0)}) — it reads as the key, not a preview`);
+
+    // The preview's job is to show the letter your finger is covering. It is
+    // NOT a fixed multiple of the key — a finger is one size and a key is not,
+    // so the glyph grows to a legible size and stops. What must always hold is
+    // that it never prints the letter SMALLER than the key already does: the
+    // magnification is capped in absolute px, and the docked board grows to
+    // 440px on a tall screen, taking its own glyphs past that cap.
+    const keyGlyph = parseFloat(getComputedStyle(key).fontSize);
+    const previewGlyph = parseFloat(getComputedStyle(preview).fontSize);
+    if (previewGlyph < keyGlyph - 0.5) {
+        findings.push(`press preview prints "${label}" at ${previewGlyph.toFixed(0)}px — SMALLER than the ${keyGlyph.toFixed(0)}px on the key it is magnifying`);
+    }
+    // And it has to read as a thing over the key, not as the key twitching.
+    if (p.width < k.width * 1.05) {
+        findings.push(`press preview (${p.width.toFixed(0)}px wide) is no wider than the key (${k.width.toFixed(0)}px) — it reads as the key, not a preview`);
     }
     if (p.left < -0.5 || p.top < -0.5 || p.right > window.innerWidth + 0.5 || p.bottom > window.innerHeight + 0.5) {
         findings.push('press preview is cut off by the keyboard window');
@@ -404,7 +420,11 @@ export async function matchedWhilePressed(selectors) {
 //   glyph   — match a key by its glyph (the key's textContent includes the hint)
 //   sel     — any selector
 //   hold    — ms to hold the pointer down, for long-press surfaces
+//   move    — [dx, dy] pointer travel before release (flick / caret drag)
 //   release — false leaves the pointer down so the popover stays up
+//   expectComposition — the mock composition the step must leave behind; this
+//     is the behavioral check for gesture → strokes → engine-model contracts
+//     (flick petals, 小゛゜'s backspace-and-respell).
 export async function applyStep(step) {
     const targets = [...document.querySelectorAll(step.sel ?? '.kb-key')];
     const el = step.glyph
@@ -416,12 +436,28 @@ export async function applyStep(step) {
     const opts = { bubbles: true, pointerId: 1, isPrimary: true, button: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
     el.dispatchEvent(new PointerEvent('pointerdown', opts));
     if (step.hold) await new Promise((res) => setTimeout(res, step.hold));
+    if (step.move) {
+        el.dispatchEvent(new PointerEvent('pointermove', {
+            ...opts,
+            clientX: opts.clientX + step.move[0],
+            clientY: opts.clientY + step.move[1],
+        }));
+    }
     if (step.release !== false) {
-        el.dispatchEvent(new PointerEvent('pointerup', opts));
+        const at = step.move
+            ? { ...opts, clientX: opts.clientX + step.move[0], clientY: opts.clientY + step.move[1] }
+            : opts;
+        el.dispatchEvent(new PointerEvent('pointerup', at));
         // Some controls (the candidate bar's buttons) are click-driven, and an
         // untrusted PointerEvent does NOT synthesize a click — without this the
         // step would tap the right element and do nothing at all.
         el.click();
+    }
+    if (step.expectComposition !== undefined) {
+        const got = window.__mockComposition ?? '';
+        if (got !== step.expectComposition) {
+            return `composition is "${got}" after the step, expected "${step.expectComposition}"`;
+        }
     }
     return null;
 }

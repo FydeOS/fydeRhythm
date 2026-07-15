@@ -46,7 +46,7 @@ export const kMetrics: Metrics = {
     cellPad: 3.5,
     barMin: 34,
     barMax: 52,
-    handleHeight: 28,
+    handleHeight: 22,
     resizeWidth: 56,
     minKeyHeight: 32,
     onehand: {

@@ -16,14 +16,20 @@ export type LayerId = 'main' | 'sym' | 'sym2';
 export type KeyAction =
     // Inject a keystroke (letters, digits, punctuation, Backspace, Enter, …)
     | { type: 'stroke'; stroke: KeyStroke }
-    // Inject a keystroke sequence (kana keys type their romaji spelling)
-    | { type: 'strokes'; strokes: KeyStroke[] }
+    // Inject a keystroke sequence (kana keys type their romaji spelling).
+    // `kana` names the glyph the sequence spells, so 小゛゜ can find and
+    // transform the last typed kana.
+    | { type: 'strokes'; strokes: KeyStroke[]; kana?: string }
     // Commit text directly, bypassing the engine (emoji, glyphs with no key mapping)
     | { type: 'commit'; text: string }
     | { type: 'shift' }
     | { type: 'layer'; layer: LayerId }
     | { type: 'toggleAscii' }
     | { type: 'hide' }
+    // Open the emoji panel (the 12-key kana board's ☺ key).
+    | { type: 'emoji' }
+    // 小゛゜: cycle the last typed kana through its small/゛/゜ variants.
+    | { type: 'kanaModify' }
     // On a numeric field, swap between the numberpad and the letter keyboard.
     | { type: 'numericLetters'; on: boolean }
     | { type: 'none' };
@@ -31,6 +37,15 @@ export type KeyAction =
 export interface AltDef {
     label: string;
     action: KeyAction;
+}
+
+// Flick variants for a 12-key cell: slide off the key in a direction and
+// release to type that variant instead of the key's own label.
+export interface FlickDef {
+    up?: AltDef;
+    down?: AltDef;
+    left?: AltDef;
+    right?: AltDef;
 }
 
 export interface KeyDef {
@@ -45,6 +60,9 @@ export interface KeyDef {
     hint?: string;
     // Long-press bubble content. The first item is highlighted by default.
     alts?: AltDef[];
+    // Flick variants (12-key kana). Coexists with alts: movement flicks,
+    // a still hold opens the bubble.
+    flick?: FlickDef;
     // Flex weight within the row; default 1.
     width?: number;
     // Visual role (function keys are tinted, enter is filled, spacer is blank).
@@ -56,6 +74,12 @@ export interface KeyDef {
 export interface KeyboardLayout {
     id: string;
     rows: KeyDef[][];
+    // Unit basis of the rows (default kFrameUnits). The shared bottom row is
+    // scaled to it, so its fractions hold on the wider grids.
+    units?: number;
+    // The layout carries its own space/enter/toggles (12-key kana) — App must
+    // not append the shared bottom row.
+    selfContained?: boolean;
 }
 
 export function stroke(key: string, code: string, shiftKey?: boolean): KeyAction {

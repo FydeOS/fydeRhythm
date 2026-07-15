@@ -1,10 +1,10 @@
 import { backspaceKey, shiftKey, stroke, type KeyboardLayout, type KeyDef } from './types';
-import { enterKey } from './frame';
 
-// 한글 2-set (두벌식). Keys show jamo but inject the underlying Latin
-// keystroke; a hangul schema in the Rime engine composes syllables from them,
-// as with a physical keyboard. Shift produces the double consonants and
-// ㅒ/ㅖ, injected as shifted strokes.
+// 한글 2-set (두벌식) on the shared frame — the Keyline spec's Dubeolsik map
+// (§02). Keys show jamo but inject the underlying Latin keystroke; a hangul
+// schema in the Rime engine composes syllables from them, as with a physical
+// keyboard. Shift produces the double consonants and ㅒ/ㅖ, injected as
+// shifted strokes.
 
 function ko(label: string, key: string, shiftLabel?: string): KeyDef {
     const code = `Key${key.toUpperCase()}`;
@@ -16,6 +16,10 @@ function ko(label: string, key: string, shiftLabel?: string): KeyDef {
             ? { shiftLabel, shiftAction: stroke(key.toUpperCase(), code, true) }
             : {}),
     };
+}
+
+function spacer(id: string, width: number): KeyDef {
+    return { id, label: ' ', kind: 'spacer', action: { type: 'none' }, width };
 }
 
 export const hangulLayout: KeyboardLayout = {
@@ -32,10 +36,9 @@ export const hangulLayout: KeyboardLayout = {
             ko('ㅑ', 'i'),
             ko('ㅐ', 'o', 'ㅒ'),
             ko('ㅔ', 'p', 'ㅖ'),
-            { ...backspaceKey, width: 1.5 },
         ],
         [
-            { id: 'ko-sp2', label: ' ', kind: 'spacer', action: { type: 'none' }, width: 0.4 },
+            spacer('ko-sp2l', 0.5),
             ko('ㅁ', 'a'),
             ko('ㄴ', 's'),
             ko('ㅇ', 'd'),
@@ -45,7 +48,7 @@ export const hangulLayout: KeyboardLayout = {
             ko('ㅓ', 'j'),
             ko('ㅏ', 'k'),
             ko('ㅣ', 'l'),
-            { ...enterKey, width: 2.1 },
+            spacer('ko-sp2r', 0.5),
         ],
         [
             shiftKey,
@@ -56,7 +59,7 @@ export const hangulLayout: KeyboardLayout = {
             ko('ㅠ', 'b'),
             ko('ㅜ', 'n'),
             ko('ㅡ', 'm'),
-            { id: 'ko-sp3', label: ' ', kind: 'spacer', action: { type: 'none' }, width: 3 },
+            backspaceKey,
         ],
     ],
 };

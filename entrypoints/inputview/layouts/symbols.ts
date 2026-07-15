@@ -1,9 +1,10 @@
 import { backspaceKey, charKey, type KeyboardLayout, type KeyDef } from './types';
-import { commaKey, enterKey, kFrameUnits, periodKey } from './frame';
+import { kFrameUnits } from './frame';
 
-// Symbol layers on the same physical frame as the letter layouts: Backspace
-// stays top-right, Enter middle-right, the page toggle bottom-left — so
-// switching layers never moves the anchors under the user's fingers.
+// Symbol layers on the same frame as the letter layouts: the page toggle and
+// Backspace anchor the corners of row 3 exactly where Shift and Backspace sit
+// on the letter frame, so switching layers never moves the anchors under the
+// user's fingers. Row content follows the Keyline spec's symbols map (§02).
 
 const toSym2: KeyDef = {
     id: 'to-sym2',
@@ -25,23 +26,21 @@ function spacer(id: string, width: number): KeyDef {
     return { id, label: ' ', kind: 'spacer', action: { type: 'none' }, width };
 }
 
-function frameRows(
-    id: string,
-    row1: KeyDef[],
-    row2: KeyDef[],
-    row3head: KeyDef,
-    row3: KeyDef[],
-    ascii: boolean,
-): KeyboardLayout {
-    const r1 = [...row1, { ...backspaceKey, width: kFrameUnits - row1.length }];
-    const r2 = [spacer(`${id}-sp2`, 0.4), ...row2, { ...enterKey, width: kFrameUnits - row2.length - 0.4 }];
-    const r3 = [row3head, ...row3, commaKey(ascii), periodKey(ascii)];
-    const used = r3.reduce((s, k) => s + (k.width ?? 1), 0);
-    if (kFrameUnits - used > 0.05) r3.push(spacer(`${id}-sp3`, kFrameUnits - used));
-    return { id, rows: [r1, r2, r3] };
+function frameRows(id: string, row1: KeyDef[], row2: KeyDef[], row3head: KeyDef, row3: KeyDef[]): KeyboardLayout {
+    const pad = (kFrameUnits - row2.length) / 2;
+    const r2 = pad > 0.05
+        ? [spacer(`${id}-sp2l`, pad), ...row2, spacer(`${id}-sp2r`, pad)]
+        : row2;
+    const keyWidth = (kFrameUnits - 3) / row3.length;
+    const r3 = [
+        row3head,
+        ...row3.map((k) => (keyWidth === 1 ? k : { ...k, width: keyWidth })),
+        { ...backspaceKey, width: 1.5 },
+    ];
+    return { id, rows: [row1, r2, r3] };
 }
 
-export function symLayout(ascii: boolean): KeyboardLayout {
+export function symLayout(): KeyboardLayout {
     return frameRows(
         'sym',
         [
@@ -59,13 +58,14 @@ export function symLayout(ascii: boolean): KeyboardLayout {
         [
             charKey('@'),
             charKey('#', ['№']),
-            charKey('$', ['¢', '€', '£', '¥']),
-            charKey('%', ['‰']),
-            charKey('&'),
+            charKey('￥', ['$', '¢', '€', '£']),
+            charKey('&', ['%', '‰']),
+            charKey('_'),
             charKey('-', ['–', '—', '·']),
             charKey('+', ['±']),
             charKey('(', ['<', '{', '[']),
             charKey(')', ['>', '}', ']']),
+            charKey('/', ['\\', '÷']),
         ],
         toSym2,
         [
@@ -76,12 +76,12 @@ export function symLayout(ascii: boolean): KeyboardLayout {
             charKey(';'),
             charKey('!', ['¡']),
             charKey('?', ['¿']),
+            charKey('~'),
         ],
-        ascii,
     );
 }
 
-export function sym2Layout(ascii: boolean): KeyboardLayout {
+export function sym2Layout(): KeyboardLayout {
     return frameRows(
         'sym2',
         [
@@ -117,6 +117,5 @@ export function sym2Layout(ascii: boolean): KeyboardLayout {
             charKey(']'),
             charKey('\\'),
         ],
-        ascii,
     );
 }

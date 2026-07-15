@@ -1,6 +1,6 @@
 import type { LatinLayoutId, LayoutId, ScriptId } from '@/lib/shared-types';
 import { stroke, type KeyboardLayout, type KeyDef, type LayerId } from './types';
-import { buildLatinLayout, commaKey, frameHasPunctuation, periodKey, type LatinFrameSpec } from './frame';
+import { buildLatinLayout, commaKey, enterKey, kFrameUnits, periodKey, type LatinFrameSpec } from './frame';
 import { qwertySpec } from './qwerty';
 import { colemakSpec } from './colemak';
 import { dvorakSpec } from './dvorak';
@@ -23,37 +23,29 @@ const staticLayouts: Partial<Record<LayoutId, KeyboardLayout>> = {
     hangul: hangulLayout,
 };
 
-// Latin layouts are built on the shared physical frame per ASCII mode (the
-// ，。/,. pair differs); non-Latin layouts are static data. Unknown ids fall
-// back to QWERTY so a bad binding still yields a usable keyboard.
+// Latin layouts are built per ASCII mode (Dvorak's punctuation caps differ);
+// non-Latin layouts are static data. Unknown ids fall back to QWERTY so a bad
+// binding still yields a usable keyboard.
 export function getLayout(id: LayoutId, ascii: boolean): KeyboardLayout {
     const spec = latinSpecs[id as LatinLayoutId];
     if (spec) return buildLatinLayout(spec, ascii);
     return staticLayouts[id] ?? buildLatinLayout(qwertySpec, ascii);
 }
 
-export function getLayerLayout(layer: 'sym' | 'sym2', ascii: boolean): KeyboardLayout {
-    return layer === 'sym' ? symLayout(ascii) : sym2Layout(ascii);
-}
-
-// Whether the active layout hosts ，。 on its own row 3; when it doesn't
-// (10-letter Dvorak rows, 注音/かな/한글), the bottom row hosts them.
-export function layoutHostsPunctuation(id: LayoutId): boolean {
-    const spec = latinSpecs[id as LatinLayoutId];
-    return spec ? frameHasPunctuation(spec) : false;
+export function getLayerLayout(layer: 'sym' | 'sym2'): KeyboardLayout {
+    return layer === 'sym' ? symLayout() : sym2Layout();
 }
 
 // Every layout that can appear on screen, in both ASCII modes — the
 // layout-validation tests iterate this, so new layouts get structural checks
 // for free.
 export function allLayouts(): KeyboardLayout[] {
-    const result: KeyboardLayout[] = [];
-    for (const spec of Object.values(latinSpecs)) {
-        result.push(buildLatinLayout(spec, false), buildLatinLayout(spec, true));
-    }
-    result.push(...Object.values(staticLayouts) as KeyboardLayout[]);
-    result.push(symLayout(false), symLayout(true), sym2Layout(false), sym2Layout(true));
-    return result;
+    return [
+        ...Object.values(latinSpecs).flatMap((spec) => [buildLatinLayout(spec, false), buildLatinLayout(spec, true)]),
+        ...Object.values(staticLayouts) as KeyboardLayout[],
+        symLayout(),
+        sym2Layout(),
+    ];
 }
 
 export interface BottomRowContext {
@@ -62,12 +54,13 @@ export interface BottomRowContext {
     asciiMode: boolean;
     // Painted on the space bar.
     spaceLabel: string;
-    // Whether the active layout already hosts ，。 on row 3.
-    layoutHasPunctuation: boolean;
     // Writing system of the active schema — decides the language badge on
     // the ASCII toggle. NOT derivable from the layout: romaji-driven Japanese
     // schemas use a qwerty layout but must still show あ/A.
     script: ScriptId;
+    // Unit basis of the layout above (KeyboardLayout.units); the row's widths
+    // are scaled to it so the spec's fractions hold on the wider grids.
+    units?: number;
 }
 
 // ASCII-toggle labels per script: shows the CURRENT mode.
@@ -82,20 +75,22 @@ function asciiToggleLabel(script: ScriptId, asciiMode: boolean): string {
     }
 }
 
-// The shared bottom row. Slots are fixed across layouts and layers:
-// [layer toggle][中/英][space][(，。ⁱᶠ ⁿᵉᵉᵈᵉᵈ)][hide]. Enter is NOT here —
-// it is anchored at the frame's middle right like a physical keyboard.
+// The shared bottom row, the Keyline spec's fractions (§02):
+// [layer toggle 1u][中/英 1u][，1u][space 4u][。1u][Enter 2u].
+// Two amendments to the spec's drawing: the layer toggle sits in its ☺ slot
+// (emoji is one tap away in the toolbar — a board with no symbols access is
+// unusable), and there is no hide key (the toolbar's trailing button hides).
 export function bottomRow(ctx: BottomRowContext): KeyDef[] {
     const layerToggle: KeyDef = ctx.layer === 'main'
-        ? { id: 'to-sym', label: '?123', kind: 'function', action: { type: 'layer', layer: 'sym' }, width: 2 }
-        : { id: 'to-main', label: 'ABC', kind: 'function', action: { type: 'layer', layer: 'main' }, width: 2 };
+        ? { id: 'to-sym', label: '?123', kind: 'function', action: { type: 'layer', layer: 'sym' }, width: 1 }
+        : { id: 'to-main', label: 'ABC', kind: 'function', action: { type: 'layer', layer: 'main' }, width: 1 };
 
     const asciiToggle: KeyDef = {
         id: 'ascii-toggle',
         label: asciiToggleLabel(ctx.script, ctx.asciiMode),
         kind: 'function',
         action: { type: 'toggleAscii' },
-        width: 1.5,
+        width: 1,
     };
 
     const space: KeyDef = {
@@ -103,21 +98,17 @@ export function bottomRow(ctx: BottomRowContext): KeyDef[] {
         label: ctx.spaceLabel,
         kind: 'space',
         action: stroke(' ', 'Space'),
-        width: ctx.layoutHasPunctuation ? 6 : 4,
+        width: 4,
     };
 
-    const hide: KeyDef = {
-        id: 'hide',
-        label: '⌄',
-        kind: 'function',
-        action: { type: 'hide' },
-        width: 2,
-    };
-
-    const row = [layerToggle, asciiToggle, space];
-    if (!ctx.layoutHasPunctuation) {
-        row.push(commaKey(ctx.asciiMode), periodKey(ctx.asciiMode));
-    }
-    row.push(hide);
-    return row;
+    const row = [
+        layerToggle,
+        asciiToggle,
+        commaKey(ctx.asciiMode),
+        space,
+        periodKey(ctx.asciiMode),
+        { ...enterKey, width: 2 },
+    ];
+    const scale = (ctx.units ?? kFrameUnits) / kFrameUnits;
+    return scale === 1 ? row : row.map((k) => ({ ...k, width: (k.width ?? 1) * scale }));
 }

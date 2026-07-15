@@ -75,14 +75,13 @@ describe('layout data', () => {
         });
     }
 
-    it('latin frame anchors never move across layouts (物理框架)', () => {
+    it('frame anchors never move across layouts (Keyline grid map)', () => {
         for (const id of ['qwerty', 'colemak', 'dvorak'] as const) {
             for (const ascii of [false, true]) {
                 const layout = getLayout(id, ascii);
-                const [r1, r2, r3] = layout.rows;
-                expect(r1[r1.length - 1].id, `${id}: Backspace anchors row1 right`).toBe('Backspace');
-                expect(r2[r2.length - 1].id, `${id}: Enter anchors row2 right`).toBe('Enter');
+                const [, , r3] = layout.rows;
                 expect(r3[0].id, `${id}: Shift anchors row3 left`).toBe('Shift');
+                expect(r3[r3.length - 1].id, `${id}: Backspace anchors row3 right`).toBe('Backspace');
                 for (const row of layout.rows) {
                     expect(rowUnits(row), `${id}: row must total ${kFrameUnits} units`).toBeCloseTo(kFrameUnits, 5);
                 }
@@ -90,34 +89,48 @@ describe('layout data', () => {
         }
     });
 
-    it('letter cells are all 1 unit wide (positions stable across layouts)', () => {
-        for (const id of ['qwerty', 'colemak', 'dvorak'] as const) {
-            const layout = getLayout(id, false);
+    it('every layout squares its rows to one unit basis', () => {
+        for (const layout of allLayouts()) {
+            const units = layout.units ?? kFrameUnits;
             for (const row of layout.rows) {
-                for (const key of row) {
-                    if (key.action.type === 'stroke' && key.action.stroke.key.length === 1 && !key.kind) {
-                        expect(key.width ?? 1, `${id}/${key.id}: letter cell must be 1u`).toBe(1);
-                    }
-                }
+                expect(rowUnits(row), `${layout.id}: row must total ${units} units`).toBeCloseTo(units, 5);
             }
         }
     });
 
-    it('bottom row is valid in every context and totals the frame width', () => {
+    it('letter cells share a width per row (positions stable across layouts)', () => {
+        for (const id of ['qwerty', 'colemak', 'dvorak'] as const) {
+            const layout = getLayout(id, false);
+            layout.rows.forEach((row, i) => {
+                const letters = row.filter((k) => k.action.type === 'stroke' && k.action.stroke.key.length === 1 && !k.kind);
+                // Row 1 keeps the 1-unit letter column; rows 2/3 share what the
+                // margins and anchors leave (1u for 9/7 letters, 0.9u for
+                // Dvorak's ten, 7/9u for its bottom nine).
+                const want = i === 0 ? 1 : i === 1 ? (kFrameUnits - 1) / letters.length : (kFrameUnits - 3) / letters.length;
+                for (const key of letters) {
+                    expect(key.width ?? 1, `${id}/${key.id}: letter cell width`).toBeCloseTo(want, 5);
+                }
+            });
+        }
+    });
+
+    it('bottom row is valid in every context and scales to the layout basis', () => {
         for (const layer of ['main', 'sym', 'sym2'] as const) {
             for (const asciiMode of [false, true]) {
-                for (const layoutHasPunctuation of [false, true]) {
-                    const row = bottomRow({ layer, asciiMode, spaceLabel: '极光拼音', layoutHasPunctuation, script: 'zh' });
-                    checkKeys([row], `bottom(${layer},ascii=${asciiMode},punct=${layoutHasPunctuation})`);
-                    expect(rowUnits(row)).toBeCloseTo(kFrameUnits, 5);
-                }
+                const row = bottomRow({ layer, asciiMode, spaceLabel: '极光拼音', script: 'zh' });
+                checkKeys([row], `bottom(${layer},ascii=${asciiMode})`);
+                expect(rowUnits(row)).toBeCloseTo(kFrameUnits, 5);
+                expect(row[row.length - 1].id, 'Enter anchors the bottom row right').toBe('Enter');
             }
         }
+        // The wider grids get the same row scaled to their basis.
+        const zhuyin = bottomRow({ layer: 'main', asciiMode: false, spaceLabel: 's', script: 'zh', units: 12 });
+        expect(rowUnits(zhuyin)).toBeCloseTo(12, 5);
     });
 
     it('ASCII toggle badge follows the schema script (中/英, あ/A, 한/A)', () => {
         const badge = (script: 'zh' | 'ja' | 'ko', asciiMode: boolean) =>
-            bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', layoutHasPunctuation: true, script })
+            bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script })
                 .find((k) => k.id === 'ascii-toggle')?.label;
         expect(badge('zh', false)).toBe('中');
         expect(badge('zh', true)).toBe('英');
@@ -128,20 +141,28 @@ describe('layout data', () => {
     });
 
     it('punctuation follows ASCII mode and sends the plain keystroke', () => {
-        const zh = getLayout('qwerty', false).rows.flat().find((k) => k.id === 'Comma');
-        const en = getLayout('qwerty', true).rows.flat().find((k) => k.id === 'Comma');
+        const bottom = (asciiMode: boolean) =>
+            bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script: 'zh' });
+        const zh = bottom(false).find((k) => k.id === 'Comma');
+        const en = bottom(true).find((k) => k.id === 'Comma');
         expect(zh?.label).toBe('，');
         expect(en?.label).toBe(',');
         // Both send the same plain keystroke — the engine picks the width.
         expect(zh?.action.type === 'stroke' && zh.action.stroke.key).toBe(',');
-        // Dvorak's full rows push ，。 to the bottom row instead.
-        expect(getLayout('dvorak', false).rows.flat().find((k) => k.id === 'Comma')).toBeUndefined();
-        const dvorakBottom = bottomRow({ layer: 'main', asciiMode: false, spaceLabel: 's', layoutHasPunctuation: false, script: 'zh' });
-        expect(dvorakBottom.find((k) => k.id === 'Comma')?.label).toBe('，');
+        // ，。 live only on the bottom row; the letter frame never hosts them.
+        expect(getLayout('qwerty', false).rows.flat().find((k) => k.id === 'Comma')).toBeUndefined();
+        // Dvorak's row-1 punctuation cells follow ASCII mode the same way,
+        // keeping the physical stroke under the CJK cap.
+        const dv = (ascii: boolean) => getLayout('dvorak', ascii).rows[0];
+        expect(dv(false).map((k) => k.label).slice(0, 3)).toEqual(['、', '，', '。']);
+        expect(dv(true).map((k) => k.label).slice(0, 3)).toEqual(["'", ',', '.']);
+        const cap = dv(false)[0];
+        // The 、 cap sends backslash — where Rime's punctuator puts 顿号.
+        expect(cap.action.type === 'stroke' && cap.action.stroke.key).toBe('\\');
     });
 });
 
-describe('kana layout', () => {
+describe('kana layout (12-key)', () => {
     it('keys type romaji stroke sequences the jap_poly schema understands', async () => {
         const { kanaLayout } = await import('../entrypoints/inputview/layouts/kana');
         const romajiOf = (action: KeyAction) =>
@@ -153,10 +174,11 @@ describe('kana layout', () => {
                 for (const alt of key.alts ?? []) byLabel.set(alt.label, alt.action);
             }
         }
-        // jap_poly base spellings (kunrei): し=si, つ=tu, ふ=hu; っ/small use x.
+        // jap_poly base spellings (kunrei): し=si, つ=tu, ふ=hu. Flick petals
+        // are mirrored into alts, so byLabel covers the whole board.
         for (const [kana, romaji] of [
             ['あ', 'a'], ['し', 'si'], ['つ', 'tu'], ['ふ', 'hu'], ['ん', 'n'],
-            ['を', 'wo'], ['ー', '-'], ['っ', 'xtu'], ['ゃ', 'xya'], ['が', 'ga'], ['ぱ', 'pa'],
+            ['を', 'wo'], ['ー', '-'], ['ゆ', 'yu'], ['ろ', 'ro'],
         ] as const) {
             expect(romajiOf(byLabel.get(kana)!), `${kana} must type "${romaji}"`).toBe(romaji);
         }
@@ -166,6 +188,31 @@ describe('kana layout', () => {
             if (romaji !== null) {
                 expect(/^[a-z-]+$/.test(romaji), `${label}: '${romaji}' outside a–z/-`).toBe(true);
             }
+        }
+    });
+
+    it('小゛゜ cycles small/dakuten variants with jap_poly spellings', async () => {
+        const { kanaModifyNext } = await import('../entrypoints/inputview/layouts/kana');
+        expect(kanaModifyNext('つ')).toEqual({ kana: 'っ', romaji: 'xtu' });
+        expect(kanaModifyNext('っ')).toEqual({ kana: 'づ', romaji: 'du' });
+        expect(kanaModifyNext('づ')).toEqual({ kana: 'つ', romaji: 'tu' });
+        expect(kanaModifyNext('は')).toEqual({ kana: 'ば', romaji: 'ba' });
+        expect(kanaModifyNext('ば')).toEqual({ kana: 'ぱ', romaji: 'pa' });
+        expect(kanaModifyNext('や')).toEqual({ kana: 'ゃ', romaji: 'xya' });
+        expect(kanaModifyNext('ん')).toBeNull();
+        // Every variant a cycle can produce must have a spelling, and every
+        // cycle must wrap back to its base.
+        for (const start of ['あ', 'う', 'か', 'さ', 'た', 'は', 'や', 'わ']) {
+            let cur = start;
+            let steps = 0;
+            do {
+                const next = kanaModifyNext(cur);
+                expect(next, `${cur} must be in a cycle`).not.toBeNull();
+                expect(next!.romaji, `${cur} → ${next!.kana}`).toMatch(/^[a-z-]+$/);
+                cur = next!.kana;
+                steps++;
+            } while (cur !== start && steps < 5);
+            expect(cur, `${start} cycle must wrap back`).toBe(start);
         }
     });
 });

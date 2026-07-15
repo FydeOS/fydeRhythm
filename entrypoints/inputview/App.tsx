@@ -12,8 +12,9 @@ import {
     type Placement,
 } from './chrome-shim';
 import { t } from './i18n';
-import { bottomRow, getLayerLayout, getLayout, layoutHostsPunctuation, numpadLayout } from './layouts';
-import type { AltDef, KeyAction, KeyDef, LayerId } from './layouts/types';
+import { bottomRow, getLayerLayout, getLayout, numpadLayout } from './layouts';
+import { kanaModifyNext } from './layouts/kana';
+import { codeForChar, type AltDef, type KeyAction, type KeyDef, type LayerId } from './layouts/types';
 import { Key, type ShiftState } from './components/Key';
 import { AltBubble } from './components/AltBubble';
 import { CandidateBar } from './components/CandidateBar';
@@ -21,7 +22,7 @@ import { ExpandedPanel } from './components/ExpandedPanel';
 import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
 import { EmojiPanel } from './components/EmojiPanel';
 import { ClipboardPanel } from './components/ClipboardPanel';
-import { ChevronLeftIcon, ChevronRightIcon, ResizeGripIcon } from './components/icons';
+import { ChevronLeftIcon, ChevronRightIcon, ExpandKeyboardIcon, ResizeGripIcon } from './components/icons';
 import { acceptCandidatePacket, type CandidateOrder } from './candidate-order';
 import { tapShift, typeWithShift } from './shift-state';
 import type { ClipboardHistoryItem, ClipboardReadResult } from './clipboard';
@@ -106,6 +107,9 @@ export default function App() {
     const resizeRaf = useRef(false);
     const loadedSignaled = useRef(false);
     const lastShiftTap = useRef(0);
+    // The last kana typed and the length of its romaji, so 小゛゜ can replace
+    // it in the composition. Anything else typed or picked resets it.
+    const lastKana = useRef<{ kana: string; len: number } | null>(null);
     // Candidate count when the last load-more was posted; avoids re-posting for
     // the same tail while the engine is still iterating.
     const loadMoreMark = useRef(-1);
@@ -160,7 +164,9 @@ export default function App() {
         // a rotation.)
         const resetContainer = () => {
             if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
-            return host.setupContainer(geom());
+            const next = geom();
+            appliedRef.current = JSON.stringify(next);
+            return host.setupContainer(next);
         };
 
         const onVisibility = () => {
@@ -198,6 +204,19 @@ export default function App() {
         const onOrientation = () => void resetContainer();
         window.screen.orientation?.addEventListener('change', onOrientation);
 
+        // screen.* can be stale when the orientation event fires; resize fires
+        // after the OS actually resized. Dedup ends our own resizeTo echo.
+        const onResize = () => {
+            if (!placementLoadedRef.current || resizeStart.current || document.hidden) return;
+            if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
+            const next = geom();
+            const key = JSON.stringify(next);
+            if (key === appliedRef.current) return;
+            appliedRef.current = key;
+            void host.setupContainer(next);
+        };
+        window.addEventListener('resize', onResize);
+
         // Never leave the keyboard blank: if no state arrives (background dead
         // or stuck), fall back to plain QWERTY. A later real state overwrites.
         const fallback = window.setTimeout(() => setVk((prev) => prev ?? kFallbackState), kFallbackStateMs);
@@ -206,6 +225,7 @@ export default function App() {
             window.clearTimeout(fallback);
             document.removeEventListener('visibilitychange', onVisibility);
             window.screen.orientation?.removeEventListener('change', onOrientation);
+            window.removeEventListener('resize', onResize);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -220,13 +240,13 @@ export default function App() {
         const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
         const layout = numpad || (layer === 'main'
             ? getLayout(activeLayoutId, vk.asciiMode)
-            : getLayerLayout(layer, vk.asciiMode));
+            : getLayerLayout(layer));
         let bottom = bottomRow({
             layer,
             asciiMode: vk.asciiMode,
             spaceLabel: vk.schemaName,
-            layoutHasPunctuation: layoutHostsPunctuation(activeLayoutId),
             script: vk.script,
+            units: layout.units,
         });
         // On the letters view of a numeric field, the ?123 key returns to the pad.
         if (vk.numericField && numericLetters && layer === 'main') {
@@ -234,7 +254,8 @@ export default function App() {
                 ? { id: 'to-numpad', label: '123', kind: 'function', action: { type: 'numericLetters', on: false }, width: k.width } as KeyDef
                 : k);
         }
-        const rows: KeyDef[][] = numpad ? numpad.rows : [...layout.rows, bottom];
+        // Self-contained layouts (12-key kana) carry their own space/enter row.
+        const rows: KeyDef[][] = numpad || layout.selfContained ? layout.rows : [...layout.rows, bottom];
         return { gridId: numpad ? numpad.id : layout.id, rows };
     }, [vk, layer, numericLetters]);
 
@@ -314,6 +335,9 @@ export default function App() {
 
     const performAction = (action: KeyAction) => {
         dismissClipboard();
+        // 小゛゜ transforms the kana the previous action typed; every other
+        // action starts a new one (or invalidates the tracking entirely).
+        if (action.type !== 'kanaModify') lastKana.current = null;
         const finishTyping = () => {
             const next = typeWithShift({ mode: shift, lastTap: lastShiftTap.current });
             lastShiftTap.current = next.lastTap;
@@ -326,7 +350,27 @@ export default function App() {
                 break;
             case 'strokes':
                 for (const s of action.strokes) host.typeStroke(layoutStroke(s));
+                if (action.kana) lastKana.current = { kana: action.kana, len: action.strokes.length };
                 finishTyping();
+                break;
+            case 'kanaModify': {
+                // Replace the last kana's romaji in the composition with its
+                // next small/゛/゜ variant (は→ば→ぱ, つ→っ→づ, …).
+                const last = lastKana.current;
+                const next = last && kanaModifyNext(last.kana);
+                if (last && next) {
+                    for (let i = 0; i < last.len; i++) {
+                        host.typeStroke({ key: 'Backspace', code: 'Backspace' });
+                    }
+                    for (const c of next.romaji) {
+                        host.typeStroke(layoutStroke({ key: c, code: codeForChar(c) }));
+                    }
+                    lastKana.current = { kana: next.kana, len: next.romaji.length };
+                }
+                break;
+            }
+            case 'emoji':
+                setPanel('emoji');
                 break;
             case 'commit':
                 host.insertText(action.text);
@@ -370,6 +414,7 @@ export default function App() {
 
     const selectCandidate = (index: number) => {
         setPopover(null);
+        lastKana.current = null;
         post({ kind: 'selectCandidate', index });
     };
 
@@ -417,11 +462,11 @@ export default function App() {
         host.writePlacement(placement());
     };
 
-    // Swap the one-hand keyboard to the other bottom corner — the frequent
-    // gesture (you switch hands far more often than you switch modes), so it
-    // gets a permanent button rather than a trip through the menu.
-    const swapSide = () => {
-        const next: OneHandSide = sideRef.current === 'left' ? 'right' : 'left';
+    // Pin the one-hand keyboard to a bottom corner — the frequent gesture (you
+    // switch hands far more often than you switch modes), so it gets permanent
+    // buttons rather than a trip through the menu.
+    const pinSide = (next: OneHandSide) => {
+        if (next === sideRef.current) return;
         sideRef.current = next;
         setSide(next);
         host.writePlacement(placement());
@@ -470,11 +515,11 @@ export default function App() {
         return <div className="kb-root" />;
     }
 
-    // The card is the window on device; in the mock tab the inline size is what
-    // makes a floating/one-hand keyboard render at its true size.
-    const card = mode === 'docked'
-        ? undefined
-        : geometryFor({ mode, scale: floatingScale, side }, window.screen, rows || kOneHandRows);
+    // The card is the window on device; only the mock tab, which has no OS
+    // window to size it, needs the inline size.
+    const card = host.mock && mode !== 'docked'
+        ? geometryFor({ mode, scale: floatingScale, side }, window.screen, rows || kOneHandRows)
+        : undefined;
     const cardStyle = card ? { width: card.width, height: card.height } : undefined;
 
     return (
@@ -500,21 +545,6 @@ export default function App() {
                     </button>
                 </div>
             )}
-            {mode === 'onehand' && (
-                // The one-hand card can't be dragged, so its top bar carries the
-                // side swap instead of a grabber. The button sits on the pinned
-                // side (under the thumb already holding that edge) and its arrow
-                // points across, to the corner the keyboard will jump to.
-                <div className={`kb-onehand-bar ${side}`}>
-                    <button
-                        className="icon-btn"
-                        aria-label={t('vk_swap_side')}
-                        onClick={swapSide}
-                    >
-                        {side === 'left' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-                    </button>
-                </div>
-            )}
             {/* Announce candidate updates for screen readers (ChromeVox). */}
             <div aria-live="polite" className="sr-only">
                 {candidates.length > 0 ? t('vk_candidates_announce', String(candidates.length)) : ''}
@@ -530,6 +560,7 @@ export default function App() {
                 onClipboard={openClipboard}
                 activeTool={panel ?? undefined}
                 onHide={() => { dismissClipboard(); host.hideKeyboard(); }}
+                onModeMenu={(anchor) => { dismissClipboard(); setPopover({ type: 'kbmode', anchor }); }}
                 onSchemaMenu={openSchemaMenu}
             />
             <div className="kb-keys">
@@ -577,12 +608,22 @@ export default function App() {
                                                     onAction={performAction}
                                                     onOpenBubble={openBubble}
                                                     onLongPressMenu={
-                                                        def.id === 'ascii-toggle' ? (_def, anchor) => openSchemaMenu(anchor)
-                                                            : def.id === 'hide' ? (_def, anchor) => {
-                                                                dismissClipboard();
-                                                                setPopover({ type: 'kbmode', anchor });
-                                                            }
-                                                                : undefined
+                                                        // Schema switcher: long-press 中/英 (the toolbar
+                                                        // globe is the other path). Space long-press arms
+                                                        // cursor mode instead — Gboard convention, Alex's
+                                                        // call over the spec's §11 switcher.
+                                                        def.id === 'ascii-toggle'
+                                                            ? (_def, anchor) => openSchemaMenu(anchor)
+                                                            : undefined
+                                                    }
+                                                    onCaretDrag={
+                                                        // Spec §11 cursor control — off while composing:
+                                                        // arrows navigate candidates in some schemas.
+                                                        def.id === 'Space' && candidates.length === 0
+                                                            ? (dir) => host.typeStroke(dir > 0
+                                                                ? { key: 'ArrowRight', code: 'ArrowRight' }
+                                                                : { key: 'ArrowLeft', code: 'ArrowLeft' })
+                                                            : undefined
                                                     }
                                                 />
                                             </div>
@@ -603,6 +644,22 @@ export default function App() {
                     />
                 )}
             </div>
+            {mode === 'onehand' && (
+                // Spec control bar, under the keys where the working thumb
+                // already is: ‹ › pin the card to a bottom corner, ⤢ expands
+                // back to the docked keyboard.
+                <div className="kb-onehand-bar">
+                    <button className="icon-btn" aria-label={t('vk_pin_left')} onClick={() => pinSide('left')}>
+                        <ChevronLeftIcon />
+                    </button>
+                    <button className="icon-btn" aria-label={t('vk_exit_onehand')} onClick={() => setKeyboardMode('docked')}>
+                        <ExpandKeyboardIcon />
+                    </button>
+                    <button className="icon-btn" aria-label={t('vk_pin_right')} onClick={() => pinSide('right')}>
+                        <ChevronRightIcon />
+                    </button>
+                </div>
+            )}
             {popover?.type === 'bubble' && (
                 <AltBubble
                     alts={popover.alts}

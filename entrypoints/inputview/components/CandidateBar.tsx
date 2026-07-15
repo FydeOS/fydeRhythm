@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import type { InputViewCandidate } from '@/lib/shared-types';
 import { t } from '../i18n';
-import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, KeyboardHideIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
 
 export interface CandidateBarProps {
     candidates: InputViewCandidate[];
@@ -14,11 +14,57 @@ export interface CandidateBarProps {
     onClipboard: () => void;
     activeTool?: 'emoji' | 'clipboard';
     onHide: () => void;
+    // Opens the placement menu anchored at the hide button (its long-press).
+    onModeMenu: (anchor: DOMRect) => void;
     // Opens the schema menu anchored at the globe button.
     onSchemaMenu: (anchor: DOMRect) => void;
 }
 
 const kLongPressMs = 500;
+
+// The toolbar's trailing button: tap hides the keyboard, long-press opens the
+// placement menu — the pairing the bottom row's hide key used to carry before
+// the spec's grid reclaimed its slot for Enter.
+function HideButton({ onHide, onModeMenu }: { onHide: () => void; onModeMenu: (anchor: DOMRect) => void }) {
+    const ref = useRef<HTMLButtonElement>(null);
+    const timer = useRef<number | null>(null);
+    const longPressed = useRef(false);
+
+    const clear = () => {
+        if (timer.current !== null) {
+            window.clearTimeout(timer.current);
+            timer.current = null;
+        }
+    };
+
+    return (
+        <button
+            ref={ref}
+            className="icon-btn"
+            aria-label={t('vk_key_hide')}
+            aria-haspopup="menu"
+            onPointerDown={() => {
+                longPressed.current = false;
+                clear();
+                timer.current = window.setTimeout(() => {
+                    timer.current = null;
+                    longPressed.current = true;
+                    const anchor = ref.current?.getBoundingClientRect();
+                    if (anchor) onModeMenu(anchor);
+                }, kLongPressMs);
+            }}
+            onPointerUp={() => {
+                clear();
+                if (!longPressed.current) onHide();
+            }}
+            onPointerCancel={clear}
+            onPointerLeave={clear}
+            onContextMenu={(e) => e.preventDefault()}
+        >
+            <KeyboardHideIcon />
+        </button>
+    );
+}
 
 // One candidate chip with tap-to-select and long-press-to-delete.
 export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
@@ -98,6 +144,7 @@ export function CandidateBar(props: CandidateBarProps) {
                         <LanguageIcon />
                     </button>
                     <div className="spring" />
+                    <HideButton onHide={props.onHide} onModeMenu={props.onModeMenu} />
                 </div>
             </div>
         );

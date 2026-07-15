@@ -56,16 +56,18 @@ function minFloatingHeight(rows: number): number {
 // ribbon (a full screen width over ~372px), so no scale factor yields keys a
 // thumb can work — narrow enough to reach across and the rows collapse to
 // ~30px. This mode reflows to phone proportions instead: the frame is
-// kFrameUnits key columns across, so the pitch is width/11.5, and rows are
-// 1.4x the pitch tall — keys taller than wide, the shape thumbs actually type
-// on. At the 420px cap that lands on a ~36px pitch and ~45px keys, i.e. the
-// metrics of a phone keyboard.
+// kFrameUnits key columns across, so the pitch is width/kFrameUnits, and rows
+// are 1.4x the pitch tall — keys taller than wide, the shape thumbs actually
+// type on. At the 420px cap that lands on a ~41px pitch and ~52px keys, i.e.
+// the metrics of a phone keyboard.
 //
 // It is corner-anchored on purpose and cannot be dragged: the thumb sweeps an
 // arc pivoted at the hand gripping the edge, so a keyboard adrift in the
 // middle of the screen is worse one-handed than one glued to the corner.
+// Smallest board width that still yields finger-sized keys on the 10-unit
+// frame; shared by the one-hand card and the floating width floor.
+const kMinBoardWidth = 320;
 const kOneHandWidthFraction = 0.36;
-const kOneHandWidthMin = 320;
 const kOneHandWidthMax = 420;
 // Latin/hangul layouts are 4 rows; zhuyin and kana are 5. The card grows a row
 // rather than dividing a fixed height by more rows — squeezing 5 rows into the
@@ -104,10 +106,21 @@ export interface Placement {
 export const kDefaultPlacement: Placement = { mode: 'docked', scale: kFloatingDefaultScale, side: 'right' };
 
 // Docked keyboard height. The legacy keyboard was a fixed 372px and users are
-// calibrated to it, so that is the floor; larger screens scale up to 42% of
-// screen height, capped. (Earlier cuts at 260/300px read visibly too short.)
+// calibrated to it, so that is the anchor; larger screens scale up to 42% of
+// screen height, capped at 440. (Earlier cuts at 260/300px read visibly too
+// short.) Two guards keep the anchor sane at the extremes — every screen we
+// currently ship on resolves unchanged:
+//   ≤52% of screen height, or a landscape-phone window is swallowed by the
+//     372 anchor;
+//   ≤42% of screen width (with a 280px floor for phones), or portrait pairs
+//     a tall board with skinny keys.
 export function dockedHeight(screen: ScreenSize): number {
-    return Math.max(372, Math.min(Math.round(screen.height * 0.42), 440));
+    return Math.round(Math.min(
+        Math.max(372, screen.height * 0.42),
+        screen.height * 0.52,
+        Math.max(280, screen.width * 0.42),
+        440,
+    ));
 }
 
 // The card size and placement for a given mode. Pure: the caller passes the
@@ -120,20 +133,26 @@ export function geometryFor(p: Placement, screen: ScreenSize, rows: number = kOn
         return { floating: false, draggable: false, width: screen.width, height: dockedHeight(screen) };
     }
     if (p.mode === 'floating') {
+        // Width floor for phone-class screens (0.55 of a 412px screen is a
+        // 227px keyboard). Raising the EFFECTIVE scale rather than the width
+        // alone keeps the aspect matched to docked.
+        const scale = Math.min(1, Math.max(p.scale, kMinBoardWidth / screen.width));
         return {
             floating: true,
             draggable: true,
-            width: Math.round(screen.width * p.scale),
-            height: Math.max(Math.round(dockedHeight(screen) * p.scale), minFloatingHeight(rows)),
+            width: Math.round(screen.width * scale),
+            height: Math.max(Math.round(dockedHeight(screen) * scale), minFloatingHeight(rows)),
             left: p.left,
             top: p.top,
         };
     }
     const width = Math.round(
-        Math.min(kOneHandWidthMax, Math.max(kOneHandWidthMin, screen.width * kOneHandWidthFraction)));
+        Math.min(kOneHandWidthMax, Math.max(kMinBoardWidth, screen.width * kOneHandWidthFraction)));
     const one = kMetrics.onehand;
     const rowHeight = Math.round(((width - 2 * one.edge) / kFrameUnits) * kOneHandRowAspect);
-    const height = rowHeight * rows + one.bar + one.controlBar + one.edge;
+    // 2x edge: the card is padded on top as well as bottom (spec redline:
+    // content box is inset by --kb-edge on all sides).
+    const height = rowHeight * rows + one.bar + one.controlBar + 2 * one.edge;
     return {
         floating: true,
         draggable: false,
@@ -177,6 +196,8 @@ const Modifier = {
 
 // Mapping from W3C code to ui::KeyEvent keyCode for non-alphanumeric keys.
 const nonAlphaNumericKeycodes: Record<string, number> = {
+    ArrowLeft: 0x25,
+    ArrowRight: 0x27,
     Backquote: 0xC0,
     Backslash: 0xDC,
     Backspace: 0x08,
@@ -612,19 +633,27 @@ class MockHost implements VkHost {
         });
     }
 
+    // Mirrored to the page so the audit can assert what a gesture actually
+    // typed — the mock's composition follows the same rules the mechanisms
+    // assume of the engine (a–z appends, one Backspace removes one char).
+    private setComposition(next: string): void {
+        this.composition = next;
+        (window as { __mockComposition?: string }).__mockComposition = next;
+    }
+
     typeStroke(s: KeyStroke): void {
         console.log('[mock] typeStroke', s);
         if (this.asciiMode) return;
         if (/^[a-z]$/.test(s.key)) {
-            this.composition += s.key;
+            this.setComposition(this.composition + s.key);
             this.candidateTotal = 21;
             this.postCandidates();
         } else if (s.code === 'Backspace' && this.composition.length > 0) {
-            this.composition = this.composition.slice(0, -1);
+            this.setComposition(this.composition.slice(0, -1));
             this.candidateTotal = this.composition.length > 0 ? 21 : 0;
             this.postCandidates();
         } else if (s.code === 'Enter' || s.code === 'Space') {
-            this.composition = '';
+            this.setComposition('');
             this.candidateTotal = 0;
             this.postCandidates();
         }
@@ -689,14 +718,14 @@ class MockHost implements VkHost {
             switch (msg.kind) {
                 case 'setAsciiMode':
                     this.asciiMode = msg.asciiMode;
-                    this.composition = '';
+                    this.setComposition('');
                     this.candidateTotal = 0;
                     this.postState();
                     this.postCandidates();
                     break;
                 case 'selectCandidate':
                 case 'deleteCandidate':
-                    this.composition = '';
+                    this.setComposition('');
                     this.candidateTotal = 0;
                     this.postCandidates();
                     break;
