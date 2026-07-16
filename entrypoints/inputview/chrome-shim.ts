@@ -208,7 +208,7 @@ const nonAlphaNumericKeycodes: Record<string, number> = {
     Minus: 0xBD,
     Equal: 0xBB,
     Period: 0xBE,
-    Quote: 0xBF,
+    Quote: 0xDE,
     Semicolon: 0xBA,
     Slash: 0xBF,
     Space: 0x20,
@@ -541,17 +541,60 @@ export class RealHost implements VkHost {
     connect(onMessage: (msg: BackgroundToInputView) => void): (msg: InputViewToBackground) => void {
         let port: chrome.runtime.Port | null = null;
         let closed = false;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        const pending: InputViewToBackground[] = [];
+
+        const queue = (msg: InputViewToBackground) => {
+            // Visibility is current state, not an action. Keep only its newest
+            // value while disconnected so reconnect does not replay stale UI
+            // lifecycle transitions.
+            if (msg.kind === 'visibility') {
+                const old = pending.findIndex(item => item.kind === 'visibility');
+                if (old >= 0) pending.splice(old, 1);
+            }
+            pending.push(msg);
+        };
+
+        const scheduleReconnect = () => {
+            if (closed || reconnectTimer !== null) return;
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                open();
+            }, 250);
+        };
+
+        const markDisconnected = (connectedPort: chrome.runtime.Port | null) => {
+            if (connectedPort && port !== connectedPort) return;
+            port = null;
+            if (closed) return;
+            queue({ kind: 'visibility', visible: !document.hidden });
+            scheduleReconnect();
+        };
 
         const post = (msg: InputViewToBackground) => {
+            if (!port) {
+                queue(msg);
+                scheduleReconnect();
+                return;
+            }
+            const connectedPort = port;
             try {
-                port?.postMessage(msg);
+                connectedPort.postMessage(msg);
             } catch {
-                console.warn('inputview: port not connected, dropping message', msg.kind);
+                markDisconnected(connectedPort);
+                queue(msg);
             }
         };
 
         const open = () => {
-            const connectedPort = chrome.runtime.connect(undefined, { name: kInputViewPortName });
+            if (closed || port) return;
+            let connectedPort: chrome.runtime.Port;
+            try {
+                connectedPort = chrome.runtime.connect(undefined, { name: kInputViewPortName });
+            } catch {
+                markDisconnected(null);
+                return;
+            }
             port = connectedPort;
             connectedPort.onMessage.addListener((raw) => {
                 // A queued packet from a disconnected port must not enter the
@@ -566,23 +609,30 @@ export class RealHost implements VkHost {
                 // this port. Without reconnecting, the keyboard freezes on its
                 // last candidate list forever. Reconnecting wakes the worker,
                 // which re-sends state + candidates on connect.
-                port = null;
-                if (closed) return;
                 console.log('inputview: background port disconnected, reconnecting');
-                setTimeout(() => {
-                    if (closed) return;
-                    try {
-                        open();
-                    } catch {
-                        // context invalidated by extension reload
-                        return;
-                    }
-                    post({ kind: 'visibility', visible: !document.hidden });
-                }, 250);
+                markDisconnected(connectedPort);
             });
+
+            while (port === connectedPort && pending.length > 0) {
+                const msg = pending[0];
+                try {
+                    connectedPort.postMessage(msg);
+                    pending.shift();
+                } catch {
+                    markDisconnected(connectedPort);
+                }
+            }
         };
 
-        window.addEventListener('pagehide', () => { closed = true; });
+        window.addEventListener('pagehide', () => {
+            closed = true;
+            port = null;
+            pending.length = 0;
+            if (reconnectTimer !== null) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+        });
         open();
         return post;
     }

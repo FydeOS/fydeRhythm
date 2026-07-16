@@ -193,21 +193,24 @@ export class InputController extends EventEmitter {
         packName: string,
         packDictYaml: string
     ): Promise<{ ok: boolean; warnings: string[] }> {
-        if (!this.engine) throw new Error("Engine not loaded");
-        const fs = await getFs();
-        const schemaYamlBuffer = await fs.readWholeFile(
-            `/root/${schemaId}/build/${schemaId}.schema.yaml`
-        );
-        const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
-        const schemaConfig = parse(schemaYaml);
-        const baseDictionary: string =
-            (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
-        return await this.engine.compileDictionaryPack({
-            schemaId,
-            schemaConfigYaml: schemaYaml,
-            baseDictionary,
-            packName,
-            packDictYaml,
+        return await this.sessionMutex.runExclusive(async () => {
+            const engine = this.engine;
+            if (!engine) throw new Error("Engine not loaded");
+            const fs = await getFs();
+            const schemaYamlBuffer = await fs.readWholeFile(
+                `/root/${schemaId}/build/${schemaId}.schema.yaml`
+            );
+            const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
+            const schemaConfig = parse(schemaYaml);
+            const baseDictionary: string =
+                (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
+            return await engine.compileDictionaryPack({
+                schemaId,
+                schemaConfigYaml: schemaYaml,
+                baseDictionary,
+                packName,
+                packDictYaml,
+            });
         });
     }
 
@@ -216,19 +219,22 @@ export class InputController extends EventEmitter {
         packName: string,
         packDictYaml: string
     ): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
-        if (!this.engine) throw new Error("Engine not loaded");
-        const fs = await getFs();
-        const schemaYamlBuffer = await fs.readWholeFile(
-            `/root/${schemaId}/build/${schemaId}.schema.yaml`
-        );
-        const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
-        const schemaConfig = parse(schemaYaml);
-        const baseDictionary: string =
-            (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
-        return await this.engine.collectValidDictionaryEntries({
-            baseDictionary,
-            packName,
-            packDictYaml,
+        return await this.sessionMutex.runExclusive(async () => {
+            const engine = this.engine;
+            if (!engine) throw new Error("Engine not loaded");
+            const fs = await getFs();
+            const schemaYamlBuffer = await fs.readWholeFile(
+                `/root/${schemaId}/build/${schemaId}.schema.yaml`
+            );
+            const schemaYaml = new TextDecoder().decode(schemaYamlBuffer);
+            const schemaConfig = parse(schemaYaml);
+            const baseDictionary: string =
+                (schemaConfig?.translator?.dictionary as string | undefined) ?? schemaId;
+            return await engine.collectValidDictionaryEntries({
+                baseDictionary,
+                packName,
+                packDictYaml,
+            });
         });
     }
 

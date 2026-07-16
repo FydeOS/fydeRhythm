@@ -183,11 +183,45 @@ describe('inputview port message handling', () => {
 
         port.emitMessage({ kind: 'selectCandidate' });
         port.emitMessage({ kind: 'selectCandidate', index: 'not-a-number' });
+        port.emitMessage({ kind: 'selectCandidate', index: Infinity });
+        port.emitMessage({ kind: 'selectCandidate', index: 1.5 });
+        port.emitMessage({ kind: 'selectCandidate', index: -1 });
+        port.emitMessage({ kind: 'deleteCandidate', index: Number.NaN });
         port.emitMessage(null);
         port.emitMessage('bogus');
         await flush();
 
         expect(mocks.controller.selectCandidate).not.toHaveBeenCalled();
+        expect(mocks.controller.deleteCandidate).not.toHaveBeenCalled();
+    });
+
+    it('ignores non-finite, fractional, and non-positive pagination counts', async () => {
+        const { port } = await bootBackground();
+
+        port.emitMessage({ kind: 'loadMoreCandidates', count: Infinity });
+        port.emitMessage({ kind: 'loadMoreCandidates', count: Number.NaN });
+        port.emitMessage({ kind: 'loadMoreCandidates', count: 1.5 });
+        port.emitMessage({ kind: 'loadMoreCandidates', count: 0 });
+        port.emitMessage({ kind: 'loadMoreCandidates', count: -1 });
+        await flush();
+
+        expect(mocks.controller.fetchMoreCandidates).not.toHaveBeenCalled();
+    });
+
+    it('does not persist or reload an empty schema id', async () => {
+        const { port } = await bootBackground();
+        const chromeStub = globalThis.chrome as never as {
+            storage: { sync: { set: ReturnType<typeof vi.fn> } };
+        };
+        chromeStub.storage.sync.set.mockClear();
+        mocks.controller.loadRime.mockClear();
+
+        port.emitMessage({ kind: 'switchSchema', schemaId: '' });
+        port.emitMessage({ kind: 'switchSchema', schemaId: '   ' });
+        await flush();
+
+        expect(chromeStub.storage.sync.set).not.toHaveBeenCalled();
+        expect(mocks.controller.loadRime).not.toHaveBeenCalled();
     });
 
     it('visibility and language toggles survive controller rejections', async () => {

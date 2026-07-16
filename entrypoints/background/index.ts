@@ -185,14 +185,32 @@ export async function refineInputViewState(
 
 // On connect: post the fast snapshot immediately so the keyboard paints, then
 // the refined one if it differs.
+const inputViewStateRequestIds = new WeakMap<(msg: BackgroundToInputView) => void, number>();
+
+function beginInputViewStateRequest(postToPort: (msg: BackgroundToInputView) => void): number {
+  const requestId = (inputViewStateRequestIds.get(postToPort) ?? 0) + 1;
+  inputViewStateRequestIds.set(postToPort, requestId);
+  return requestId;
+}
+
+function isCurrentInputViewStateRequest(
+  postToPort: (msg: BackgroundToInputView) => void,
+  requestId: number,
+): boolean {
+  return inputViewStateRequestIds.get(postToPort) === requestId;
+}
+
 export async function postInputViewState(
   controller: InputController | undefined,
   postToPort: (msg: BackgroundToInputView) => void,
 ): Promise<void> {
+  const requestId = beginInputViewStateRequest(postToPort);
   const fast = await buildFastInputViewState(controller);
+  if (!isCurrentInputViewStateRequest(postToPort, requestId)) return;
   postToPort({ kind: "state", state: fast });
   const refined = await refineInputViewState(controller, fast);
-  if (JSON.stringify(refined) !== JSON.stringify(fast)) {
+  if (isCurrentInputViewStateRequest(postToPort, requestId)
+    && JSON.stringify(refined) !== JSON.stringify(fast)) {
     postToPort({ kind: "state", state: refined });
   }
 }
@@ -203,8 +221,12 @@ export async function postRefinedInputViewState(
   controller: InputController | undefined,
   postToPort: (msg: BackgroundToInputView) => void,
 ): Promise<void> {
+  const requestId = beginInputViewStateRequest(postToPort);
   const fast = await buildFastInputViewState(controller);
-  postToPort({ kind: "state", state: await refineInputViewState(controller, fast) });
+  const refined = await refineInputViewState(controller, fast);
+  if (isCurrentInputViewStateRequest(postToPort, requestId)) {
+    postToPort({ kind: "state", state: refined });
+  }
 }
 
 async function postSchemaList(
@@ -517,22 +539,22 @@ export default defineBackground({
                 .catch((error: unknown) => reportInputViewError("setAsciiMode", error));
               break;
             case "selectCandidate":
-              if (typeof msg.index !== "number") break;
+              if (!Number.isSafeInteger(msg.index) || msg.index < 0) break;
               void self.controller.selectCandidate(msg.index, false)
                 .catch((error: unknown) => reportInputViewError("selectCandidate", error));
               break;
             case "deleteCandidate":
-              if (typeof msg.index !== "number") break;
+              if (!Number.isSafeInteger(msg.index) || msg.index < 0) break;
               void self.controller.deleteCandidate(msg.index, false)
                 .catch((error: unknown) => reportInputViewError("deleteCandidate", error));
               break;
             case "loadMoreCandidates":
-              if (typeof msg.count !== "number") break;
+              if (!Number.isSafeInteger(msg.count) || msg.count <= 0) break;
               void self.controller.fetchMoreCandidates(msg.count)
                 .catch((error: unknown) => reportInputViewError("loadMoreCandidates", error));
               break;
             case "switchSchema":
-              if (typeof msg.schemaId !== "string") break;
+              if (typeof msg.schemaId !== "string" || msg.schemaId.trim().length === 0) break;
               void activateSchema(msg.schemaId)
                 .catch((error: unknown) => reportInputViewError("switchSchema", error));
               break;

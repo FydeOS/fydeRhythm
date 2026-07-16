@@ -62,6 +62,88 @@ describe('InputView background-port reconnect', () => {
         expect(replacement.postMessage).toHaveBeenCalledWith({ kind: 'visibility', visible: true });
     });
 
+    it('queues user messages posted while the background port is reconnecting', async () => {
+        vi.useFakeTimers();
+        const first = fakePort();
+        const replacement = fakePort();
+        const connect = vi.fn()
+            .mockReturnValueOnce(first)
+            .mockReturnValueOnce(replacement);
+        vi.stubGlobal('window', {
+            addEventListener: vi.fn(),
+            innerWidth: 1000,
+            innerHeight: 400,
+            screen: { width: 1000, height: 800 },
+        });
+        vi.stubGlobal('document', { hidden: false });
+        vi.stubGlobal('chrome', { runtime: { connect, lastError: null }, storage: { local: {} } });
+        const host = new RealHost({ setHitTestBounds: vi.fn() } as never);
+        const post = host.connect(vi.fn());
+
+        first.onDisconnect.emit();
+        post({ kind: 'switchSchema', schemaId: 'schema_b' });
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(replacement.postMessage).toHaveBeenCalledWith({
+            kind: 'switchSchema',
+            schemaId: 'schema_b',
+        });
+    });
+
+    it('reconnects and retries a message when the current port throws', async () => {
+        vi.useFakeTimers();
+        const first = fakePort();
+        first.postMessage.mockImplementation(() => { throw new Error('port closed'); });
+        const replacement = fakePort();
+        const connect = vi.fn()
+            .mockReturnValueOnce(first)
+            .mockReturnValueOnce(replacement);
+        vi.stubGlobal('window', {
+            addEventListener: vi.fn(),
+            innerWidth: 1000,
+            innerHeight: 400,
+            screen: { width: 1000, height: 800 },
+        });
+        vi.stubGlobal('document', { hidden: false });
+        vi.stubGlobal('chrome', { runtime: { connect, lastError: null }, storage: { local: {} } });
+        const host = new RealHost({ setHitTestBounds: vi.fn() } as never);
+        const post = host.connect(vi.fn());
+
+        post({ kind: 'setAsciiMode', asciiMode: true });
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(connect).toHaveBeenCalledTimes(2);
+        expect(replacement.postMessage).toHaveBeenCalledWith({
+            kind: 'setAsciiMode',
+            asciiMode: true,
+        });
+    });
+
+    it('contains runtime.connect failures and retries without crashing the page', async () => {
+        vi.useFakeTimers();
+        const replacement = fakePort();
+        const connect = vi.fn()
+            .mockImplementationOnce(() => { throw new Error('Extension context invalidated'); })
+            .mockReturnValueOnce(replacement);
+        vi.stubGlobal('window', {
+            addEventListener: vi.fn(),
+            innerWidth: 1000,
+            innerHeight: 400,
+            screen: { width: 1000, height: 800 },
+        });
+        vi.stubGlobal('document', { hidden: false });
+        vi.stubGlobal('chrome', { runtime: { connect, lastError: null }, storage: { local: {} } });
+        const host = new RealHost({ setHitTestBounds: vi.fn() } as never);
+        let post!: ReturnType<RealHost['connect']>;
+
+        expect(() => { post = host.connect(vi.fn()); }).not.toThrow();
+        post({ kind: 'getSchemaList' });
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(connect).toHaveBeenCalledTimes(2);
+        expect(replacement.postMessage).toHaveBeenCalledWith({ kind: 'getSchemaList' });
+    });
+
     it('gives every mock candidate update an increasing protocol sequence', async () => {
         vi.useFakeTimers();
         vi.stubGlobal('chrome', { i18n: { getMessage: (key: string) => key } });

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { parse } from 'yaml'
+import { Mutex } from 'async-mutex';
 import { ThemeProvider, useColorScheme } from '@mui/material/styles';
 
 import theme from "./theme"
@@ -200,6 +201,8 @@ function OptionsPage() {
 
     const [dictPacks, setDictPacks] = useState<DictPackMetadata[]>([]);
     const [dictPackImporting, setDictPackImporting] = useState(false);
+    const [dictPackManifestMutex] = useState(() => new Mutex());
+    const dictPackLoadRequestId = useRef(0);
     // severity 'error': the import failed; 'warning': it succeeded but some
     // entries were merged or skipped — never render partial success as an error.
     const [dictPackAlert, setDictPackAlert] = useState<{ severity: 'error' | 'warning'; text: string } | null>(null);
@@ -298,7 +301,6 @@ function OptionsPage() {
         loadSettings();
         loadSchemaList();
         loadLocalSchemaList();
-        loadDictPacks(kDefaultSettings.schema);
 
         const listener = (m: { rimeStatusChanged?: boolean }) => {
             if (m.rimeStatusChanged) {
@@ -440,12 +442,34 @@ function OptionsPage() {
         await fs.writeWholeFile(dictPacksManifestPath(schemaId), encodeDictPackManifest(manifest));
     }
 
+    async function mutateDictPackManifest<T>(schemaId: string, operation: () => Promise<T>): Promise<T> {
+        // Web Locks coordinate separate Options tabs. The local mutex is also
+        // required for test/non-browser environments without navigator.locks.
+        if (typeof navigator !== 'undefined' && navigator.locks) {
+            return await navigator.locks.request(
+                `fyde-rhythm:dict-pack-manifest:${schemaId}`,
+                operation,
+            );
+        }
+        return await dictPackManifestMutex.runExclusive(operation);
+    }
+
+    function publishMutatedDictPacks(packs: DictPackMetadata[]) {
+        // A manifest read that started before this mutation must not repaint
+        // the UI with its stale snapshot when it eventually completes.
+        dictPackLoadRequestId.current++;
+        setDictPacks(packs);
+    }
+
     async function loadDictPacks(schemaId: string) {
+        const requestId = ++dictPackLoadRequestId.current;
         try {
             const manifest = await readDictPackManifest(schemaId);
+            if (requestId !== dictPackLoadRequestId.current) return;
             setDictPacks(manifest.packs);
             setDictPackAlert(null);
         } catch (ex) {
+            if (requestId !== dictPackLoadRequestId.current) return;
             setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
             setDictPacks([]);
         }
@@ -522,12 +546,15 @@ function OptionsPage() {
                     compiledEntryCount: source.entryCount,
                     rawEntryCount: 0,
                 });
-                await sendMessage("ReloadRime");
             } catch (ex) {
                 await deleteIfExists(dictPackArtifactPath(imeSettings.schema, source.packName));
                 await cleanupSharedYaml(source.packName);
                 throw ex;
             }
+            // The manifest and compiled artifact are now a consistent durable
+            // install. A transient worker/reload failure must not delete one
+            // side and leave the other behind; a later reload can activate it.
+            await sendMessage("ReloadRime");
             showDictPackImportNotice(source, compileWarnings);
             return;
         }
@@ -626,37 +653,44 @@ function OptionsPage() {
         rawEntryCount: number;
         rawTableName?: string;
     }) {
-        const manifest = await readDictPackManifest(imeSettings.schema);
-        const now = Date.now();
-        const existingIndex = manifest.packs.findIndex(p => p.packName === req.packName);
-        const existing = existingIndex >= 0 ? manifest.packs[existingIndex] : undefined;
-        if (existing?.rawTableName && existing.rawTableName !== req.rawTableName) {
-            await deleteIfExists(dictPackRawTablePath(imeSettings.schema, existing.rawTableName));
-        }
-        if (existing && req.compiledEntryCount === 0 && (existing.compiledEntryCount ?? existing.entryCount) > 0) {
-            await deleteIfExists(dictPackArtifactPath(imeSettings.schema, existing.packName));
-            await cleanupSharedYaml(existing.packName);
-        }
-        const entry: DictPackMetadata = {
-            id: req.packName,
-            name: req.displayName,
-            packName: req.packName,
-            baseDictionary: imeSettings.schema,
-            entryCount: req.entryCount,
-            compiledEntryCount: req.compiledEntryCount,
-            rawEntryCount: req.rawEntryCount,
-            rawTableName: req.rawTableName,
-            enabled: true,
-            installedAt: existingIndex >= 0 ? manifest.packs[existingIndex].installedAt : now,
-            updatedAt: now,
-            source: 'user',
-        };
-        const packs = existingIndex >= 0
-            ? manifest.packs.map((p, i) => i === existingIndex ? entry : p)
-            : [...manifest.packs, entry];
-        const nextManifest: DictPackManifest = { version: 1, packs };
-        await writeDictPackManifest(imeSettings.schema, nextManifest);
-        setDictPacks(nextManifest.packs);
+        const schemaId = imeSettings.schema;
+        await mutateDictPackManifest(schemaId, async () => {
+            const manifest = await readDictPackManifest(schemaId);
+            const now = Date.now();
+            const existingIndex = manifest.packs.findIndex(p => p.packName === req.packName);
+            const existing = existingIndex >= 0 ? manifest.packs[existingIndex] : undefined;
+            const entry: DictPackMetadata = {
+                id: req.packName,
+                name: req.displayName,
+                packName: req.packName,
+                baseDictionary: schemaId,
+                entryCount: req.entryCount,
+                compiledEntryCount: req.compiledEntryCount,
+                rawEntryCount: req.rawEntryCount,
+                rawTableName: req.rawTableName,
+                enabled: true,
+                installedAt: existingIndex >= 0 ? manifest.packs[existingIndex].installedAt : now,
+                updatedAt: now,
+                source: 'user',
+            };
+            const packs = existingIndex >= 0
+                ? manifest.packs.map((p, i) => i === existingIndex ? entry : p)
+                : [...manifest.packs, entry];
+            const nextManifest: DictPackManifest = { version: 1, packs };
+            await writeDictPackManifest(schemaId, nextManifest);
+            publishMutatedDictPacks(nextManifest.packs);
+
+            // Once the manifest no longer references obsolete files, cleanup
+            // can fail harmlessly without corrupting the installed metadata.
+            if (existing?.rawTableName && existing.rawTableName !== req.rawTableName) {
+                await deleteIfExists(dictPackRawTablePath(schemaId, existing.rawTableName));
+            }
+            if (existing && req.compiledEntryCount === 0
+                && (existing.compiledEntryCount ?? existing.entryCount) > 0) {
+                await deleteIfExists(dictPackArtifactPath(schemaId, existing.packName));
+                await cleanupSharedYaml(existing.packName);
+            }
+        });
     }
 
     async function deleteIfExists(path: string) {
@@ -673,13 +707,16 @@ function OptionsPage() {
     async function toggleDictPackEnabled(id: string, enabled: boolean) {
         setDictPackAlert(null);
         try {
-            const manifest = await readDictPackManifest(imeSettings.schema);
-            const nextManifest: DictPackManifest = {
-                version: 1,
-                packs: manifest.packs.map(p => p.id === id ? { ...p, enabled, updatedAt: Date.now() } : p),
-            };
-            await writeDictPackManifest(imeSettings.schema, nextManifest);
-            setDictPacks(nextManifest.packs);
+            const schemaId = imeSettings.schema;
+            await mutateDictPackManifest(schemaId, async () => {
+                const manifest = await readDictPackManifest(schemaId);
+                const nextManifest: DictPackManifest = {
+                    version: 1,
+                    packs: manifest.packs.map(p => p.id === id ? { ...p, enabled, updatedAt: Date.now() } : p),
+                };
+                await writeDictPackManifest(schemaId, nextManifest);
+                publishMutatedDictPacks(nextManifest.packs);
+            });
             await sendMessage("ReloadRime");
         } catch (ex) {
             setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
@@ -689,21 +726,24 @@ function OptionsPage() {
     async function removeDictPack(id: string) {
         setDictPackAlert(null);
         try {
-            const manifest = await readDictPackManifest(imeSettings.schema);
-            const pack = manifest.packs.find(p => p.id === id);
-            const nextManifest: DictPackManifest = {
-                version: 1,
-                packs: manifest.packs.filter(p => p.id !== id),
-            };
-            if (pack) {
-                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, pack.packName));
-                await deleteIfExists(`/root/${imeSettings.schema}/shared/${pack.packName}.dict.yaml`);
-                if (pack.rawTableName) {
-                    await deleteIfExists(dictPackRawTablePath(imeSettings.schema, pack.rawTableName));
+            const schemaId = imeSettings.schema;
+            await mutateDictPackManifest(schemaId, async () => {
+                const manifest = await readDictPackManifest(schemaId);
+                const pack = manifest.packs.find(p => p.id === id);
+                const nextManifest: DictPackManifest = {
+                    version: 1,
+                    packs: manifest.packs.filter(p => p.id !== id),
+                };
+                await writeDictPackManifest(schemaId, nextManifest);
+                publishMutatedDictPacks(nextManifest.packs);
+                if (pack) {
+                    await deleteIfExists(dictPackArtifactPath(schemaId, pack.packName));
+                    await deleteIfExists(`/root/${schemaId}/shared/${pack.packName}.dict.yaml`);
+                    if (pack.rawTableName) {
+                        await deleteIfExists(dictPackRawTablePath(schemaId, pack.rawTableName));
+                    }
                 }
-            }
-            await writeDictPackManifest(imeSettings.schema, nextManifest);
-            setDictPacks(nextManifest.packs);
+            });
             await sendMessage("ReloadRime");
         } catch (ex) {
             setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
