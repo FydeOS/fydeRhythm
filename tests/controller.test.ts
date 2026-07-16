@@ -1349,6 +1349,14 @@ describe('physical-key Latin layout remap', () => {
         expect(fed).toEqual(['s'.charCodeAt(0)]); // raw stroke for the engine's own mapping
     });
 
+    it('remaps Latin-code HNC but preserves raw QWERTY positions for Korean 2-set', () => {
+        const hnc = remapHarness({ schema: 'hangeul_hnc', keyboardLayout: 'colemak' }).controller;
+        expect(hnc.remapLayouts()).toEqual({ composing: 'colemak', ascii: 'colemak' });
+
+        const twoSet = remapHarness({ schema: 'hangeul2set', keyboardLayout: 'colemak' }).controller;
+        expect(twoSet.remapLayouts()).toEqual({ composing: 'qwerty', ascii: 'colemak' });
+    });
+
     it('leaves modifier shortcuts on US positions', async () => {
         const { controller, fed, commits } = remapHarness({ keyboardLayout: 'dvorak' });
         await controller.feedKey({ ...keyS, ctrlKey: true, key: 's' } as never);
@@ -1358,4 +1366,3 @@ describe('physical-key Latin layout remap', () => {
         expect(commits).toEqual([]);
     });
 });
-

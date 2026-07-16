@@ -55,6 +55,12 @@ describe('schema key sets (a fact about the schema, not a preference)', () => {
         expect(guessSchemaKeys('jap_poly', 'Poly 日文输入法')).toBe('kana');
         expect(guessSchemaKeys('hangeul2set')).toBe('hangul');
         expect(guessSchemaKeys('hangul_2set')).toBe('hangul');
+        expect(guessSchemaKeys('custom', '표준 두벌식')).toBe('hangul');
+        // Korean schemas that accept romanized or shape codes must keep
+        // letter key caps instead of inheriting the standard 2-set board.
+        expect(guessSchemaKeys('hangeul_hnc')).toBeUndefined();
+        expect(guessSchemaKeys('hangeul')).toBeUndefined();
+        expect(guessSchemaKeys('korean_hanja')).toBeUndefined();
         // Latin-typed schemas paint letters.
         expect(guessSchemaKeys('aurora_pinyin', '极光拼音')).toBeUndefined();
         expect(guessSchemaKeys('wubi98')).toBeUndefined();
@@ -66,6 +72,35 @@ describe('schema key sets (a fact about the schema, not a preference)', () => {
             { schemaKeys: { my_bopomofo_fork: 'latin' } }, 'my_bopomofo_fork')).toBeUndefined();
         expect(resolveSchemaKeys({ schemaKeys: { mystery: 'kana' } }, 'mystery')).toBe('kana');
         expect(resolveSchemaKeys({}, 'terra_zhuyin')).toBe('zhuyin');
+    });
+
+    it('assigns every current catalog schema a compatible key set', async () => {
+        const { resolveSchemaKeys } = await import('../lib/utils');
+        const expected = {
+            aurora_pinyin: 'latin',
+            rime_ice: 'latin',
+            double_pinyin_flypy: 'latin',
+            double_pinyin_mspy: 'latin',
+            double_pinyin: 'latin',
+            wubi86_jidian: 'latin',
+            cangjie5: 'latin',
+            cangjie3: 'latin',
+            luna_pinyin: 'latin',
+            stroke: 'latin',
+            wubi98_dz: 'latin',
+            wubi98_ci: 'latin',
+            bopomofo: 'zhuyin',
+            jyut6ping3: 'latin',
+            jap_poly: 'kana',
+            korean_hanja: 'latin',
+            hangeul2set: 'hangul',
+            hangeul_hnc: 'latin',
+            hangeul: 'latin',
+        } as const;
+
+        for (const [schemaId, keySet] of Object.entries(expected)) {
+            expect(resolveSchemaKeys({}, schemaId) ?? 'latin', schemaId).toBe(keySet);
+        }
     });
 });
 

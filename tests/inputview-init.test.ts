@@ -141,6 +141,22 @@ describe('buildFastInputViewState', () => {
         expect(state.latinLayout).toBe('colemak');
     });
 
+    it('draws HNC with letter keys but keeps Korean mode, and 2-set with Hangul keys', async () => {
+        const hnc = await buildFastInputViewState(fakeController(null, {
+            schema: 'hangeul_hnc',
+            keyboardLayout: 'qwerty',
+        }) as never);
+        expect(hnc.layout).toBe('qwerty');
+        expect(hnc.script).toBe('ko');
+
+        const twoSet = await buildFastInputViewState(fakeController(null, {
+            schema: 'hangeul2set',
+            keyboardLayout: 'qwerty',
+        }) as never);
+        expect(twoSet.layout).toBe('hangul');
+        expect(twoSet.script).toBe('ko');
+    });
+
     it('migrates a pre-unification profile on read, even with no storage', async () => {
         const controller = fakeController(null, {
             schema: 'aurora_pinyin',

@@ -126,7 +126,10 @@ export function guessSchemaKeys(schemaId: string, schemaName?: string): ScriptLa
     if (/zhuyin|bopomofo|注音/.test(haystack)) return "zhuyin";
     // "jap" catches the store's jap_poly, whose id lacks the full word.
     if (/kana|japan|jap|nihon|日本|日文|假名|かな/.test(haystack)) return "kana";
-    if (/hangul|hangeul|korean|谚文|한글/.test(haystack)) return "hangul";
+    // The Hangul key caps are specifically the standard 2-set (Dubeolsik)
+    // arrangement. A Korean language name alone is not enough: HNC, Korean
+    // Hanja and Hangul shape-code schemas all paint Latin mnemonic codes.
+    if (/2[\s_-]*set|dubeolsik|du[\s_-]*beol[\s_-]*sik|두벌식/.test(haystack)) return "hangul";
     return undefined;
 }
 
