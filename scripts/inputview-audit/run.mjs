@@ -165,7 +165,7 @@ async function main() {
 
     // The keyboard's own geometry function, from source.
     const report0 = [];
-    const { geometryFor } = await server.ssrLoadModule('/entrypoints/inputview/chrome-shim.ts');
+    const { geometryFor } = await server.ssrLoadModule('/entrypoints/inputview/placement.ts');
     const { applyMetrics, kMetrics } = await server.ssrLoadModule('/entrypoints/inputview/metrics.ts');
     const publishedVars = [];
     applyMetrics({ style: { setProperty: (name) => publishedVars.push(name) } });

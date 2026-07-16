@@ -1,5 +1,5 @@
 import React from 'react';
-import type { KeyboardMode } from '../chrome-shim';
+import type { KeyboardMode } from '../placement';
 import { t } from '../i18n';
 import { fitMenuToViewport } from '../popover-geometry';
 

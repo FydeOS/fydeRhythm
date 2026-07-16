@@ -1,7 +1,8 @@
 import { parse } from 'yaml';
-import { DEFAULT_DICT_ENTRY_WEIGHT, RawDictEntry, decodeDictText, readUint32Le } from './dict-formats/binary';
+import { DEFAULT_DICT_ENTRY_WEIGHT, type RawDictEntry, decodeDictText } from './dict-formats/binary';
 import { parseBdictEntries } from './dict-formats/bdict';
 import { parseQpydEntries } from './dict-formats/qpyd';
+import { parseScelEntries } from './dict-formats/scel';
 
 export const DICT_PACKS_MANIFEST_FILENAME = 'dict-packs.json';
 export const DICT_PACK_ID_PREFIX = 'dict_pack_';
@@ -133,6 +134,10 @@ function buildSourceFromBinaryEntries(
     };
 }
 
+function sanitizeDictText(text: string): string {
+    return text.replace(/[\t\r\n]/g, '').trim();
+}
+
 function parseDictYamlSource(
     fileName: string,
     text: string,
@@ -217,199 +222,25 @@ function parseTsvSource(
     };
 }
 
-interface ScelEntry {
-    word: string;
-    code: string;
-    weight: number;
-}
-
-const SCEL_PINYIN_OFFSET = 0x1540;
-const UTF16LE_DECODER = new TextDecoder('utf-16le');
-
-// Real Sogou/QQ frequencies stay well below this. On librime's absolute
-// scale (weight 1e8 ≈ the most common word in the language) the cap keeps a
-// corrupt or hostile uint32 from pinning imported words above everyday
-// vocabulary, while preserving relative order for genuine values.
-const MAX_SCEL_ENTRY_WEIGHT = 10_000_000;
-
 function parseScelSource(
     fileName: string,
     bytes: Uint8Array,
     existingPackNames: Set<string>,
     existingDisplayNames: Map<string, string>,
 ): DictPackSource {
-    if (bytes.length <= SCEL_PINYIN_OFFSET + 4) {
-        throw new Error('Invalid Sogou SCEL file: file is too small');
-    }
-
     const displayName = displayNameFromFileName(fileName);
     const packName = resolvePackName(displayName, existingPackNames, existingDisplayNames);
-    const { pinyinTable, wordOffset } = readScelPinyinTable(bytes);
-    const { entries, duplicateCount } = readScelEntries(bytes, pinyinTable, wordOffset);
-    sanitizeScelWeights(entries);
-    const dictEntries: DictPackEntry[] = [...entries.values()]
-        .map(({ word, code, weight }) => ({ text: word, code, weight }));
-
-    const dictYaml = buildDictPackYaml(packName, dictEntries);
-
-    return { packName, dictYaml, displayName, entryCount: entries.size, entries: dictEntries, duplicateCount };
+    const { entries, duplicateCount } = parseScelEntries(bytes);
+    return {
+        packName,
+        dictYaml: buildDictPackYaml(packName, entries),
+        displayName,
+        entryCount: entries.length,
+        entries,
+        duplicateCount,
+    };
 }
 
-function readScelPinyinTable(bytes: Uint8Array): { pinyinTable: Map<number, string>; wordOffset: number } {
-    const result = new Map<number, string>();
-    let offset = SCEL_PINYIN_OFFSET + 4;
-    while (offset + 4 <= bytes.length) {
-        const entryStart = offset;
-        const id = readUint16Le(bytes, entryStart);
-        const length = readUint16Le(bytes, entryStart + 2);
-        const textStart = entryStart + 4;
-        if (length === 0 || length % 2 !== 0 || textStart + length > bytes.length) break;
-
-        const pinyin = readUtf16Le(bytes, textStart, length);
-        if (!/^[A-Za-z]+$/.test(pinyin)) break;
-
-        result.set(id, pinyin.toLowerCase());
-        offset = textStart + length;
-    }
-
-    if (result.size === 0) {
-        throw new Error('Invalid Sogou SCEL file: no pinyin table found');
-    }
-    return { pinyinTable: result, wordOffset: offset };
-}
-
-function readScelEntries(
-    bytes: Uint8Array,
-    pinyinTable: Map<number, string>,
-    wordOffset: number,
-): { entries: Map<string, ScelEntry>; duplicateCount: number } {
-    const result = new Map<string, ScelEntry>();
-    let acceptedWords = 0;
-    const done = () => ({ entries: result, duplicateCount: acceptedWords - result.size });
-    let offset = wordOffset;
-    const maxPinyinId = Math.max(...pinyinTable.keys());
-
-    while (offset + 4 <= bytes.length) {
-        const homophoneCount = readUint16Le(bytes, offset);
-        const pinyinTableLength = readUint16Le(bytes, offset + 2);
-        offset += 4;
-        if (homophoneCount === 0 || pinyinTableLength === 0) break;
-        if (pinyinTableLength % 2 !== 0 || offset + pinyinTableLength > bytes.length) {
-            if (result.size > 0) break;
-            throw new Error('Invalid Sogou SCEL file: malformed pinyin index block');
-        }
-
-        const code: string[] = [];
-        for (let i = 0; i < pinyinTableLength / 2; i++) {
-            const id = readUint16Le(bytes, offset);
-            const syllable = pinyinTable.get(id) ?? asciiLetterForPinyinId(id, maxPinyinId);
-            if (!syllable) {
-                if (result.size > 0) return done();
-                throw new Error(`Invalid Sogou SCEL file: unknown pinyin id ${id}`);
-            }
-            code.push(syllable);
-            offset += 2;
-        }
-        for (let i = 0; i < homophoneCount; i++) {
-            if (offset + 4 > bytes.length) {
-                if (result.size > 0) return done();
-                throw new Error('Invalid Sogou SCEL file: truncated word block');
-            }
-            const wordLength = readUint16Le(bytes, offset);
-            offset += 2;
-            if (wordLength === 0 || offset + wordLength + 2 > bytes.length) {
-                if (result.size > 0) return done();
-                throw new Error('Invalid Sogou SCEL file: malformed word entry');
-            }
-
-            const word = sanitizeDictText(readUtf16Le(bytes, offset, wordLength));
-            offset += wordLength;
-
-            const extraLength = readUint16Le(bytes, offset);
-            offset += 2;
-            if (offset + extraLength > bytes.length) {
-                if (result.size > 0) return done();
-                throw new Error('Invalid Sogou SCEL file: malformed word metadata');
-            }
-
-            // The first 4 bytes of the extension block hold the word's
-            // frequency as a uint32 (values above 65535 are common in
-            // official Sogou dicts); tolerate short blocks from minimal or
-            // hand-made files.
-            let rawWeight = DEFAULT_DICT_ENTRY_WEIGHT;
-            if (extraLength >= 4) {
-                rawWeight = readUint32Le(bytes, offset);
-            } else if (extraLength >= 2) {
-                rawWeight = readUint16Le(bytes, offset);
-            }
-            const weight = Math.min(Math.max(rawWeight, 1), MAX_SCEL_ENTRY_WEIGHT);
-            offset += extraLength;
-
-            const codeString = code.join(' ');
-            if (!word || !codeString) continue;
-            acceptedWords++;
-            const key = `${word}\t${codeString}`;
-            const existing = result.get(key);
-            if (!existing || existing.weight < weight) {
-                result.set(key, { word, code: codeString, weight });
-            }
-        }
-    }
-
-    return done();
-}
-
-// The extension field is trusted only as a relative ordering between the
-// pack's words (official dicts store a frequency rank there). Two degenerate
-// shapes carry no usable signal and fall back to the neutral default weight:
-// every word sharing a single value (no ordering info — and a large constant
-// would uniformly inflate the whole pack), or a majority of values beyond any
-// real rank/frequency (the field is not credible for this file, so per-value
-// clamping alone would pin most of the pack at the cap).
-function sanitizeScelWeights(entries: Map<string, ScelEntry>): void {
-    if (entries.size < 2) return;
-    let min = Infinity;
-    let max = -Infinity;
-    let cappedCount = 0;
-    for (const entry of entries.values()) {
-        min = Math.min(min, entry.weight);
-        max = Math.max(max, entry.weight);
-        if (entry.weight >= MAX_SCEL_ENTRY_WEIGHT) cappedCount++;
-    }
-    const allEqual = min === max;
-    const mostlyImplausible = cappedCount * 2 > entries.size;
-    if (!allEqual && !mostlyImplausible) return;
-    for (const entry of entries.values()) {
-        entry.weight = DEFAULT_DICT_ENTRY_WEIGHT;
-    }
-}
-
-// Pinyin ids past the end of the pinyin table encode ASCII letters
-// (maxId + 1 = 'a', maxId + 2 = 'b', …) — that is how Latin characters
-// inside words are stored, in both Sogou .scel and QQ .qcel files.
-function asciiLetterForPinyinId(id: number, maxPinyinId: number): string | undefined {
-    const letterIndex = id - maxPinyinId - 1;
-    if (letterIndex < 0 || letterIndex >= 26) return undefined;
-    return String.fromCharCode(0x61 + letterIndex);
-}
-
-function readUint16Le(bytes: Uint8Array, offset: number): number {
-    if (offset + 2 > bytes.length) {
-        throw new Error('Invalid Sogou SCEL file: unexpected end of file');
-    }
-    return bytes[offset] | (bytes[offset + 1] << 8);
-}
-
-function readUtf16Le(bytes: Uint8Array, offset: number, length: number): string {
-    return UTF16LE_DECODER
-        .decode(bytes.subarray(offset, offset + length))
-        .replace(/\0+$/g, '')
-        .trim();
-}
-
-function sanitizeDictText(text: string): string {
-    return text.replace(/[\t\r\n]/g, '').trim();
-}
 
 function countEntries(dictYaml: string): number {
     const bodyStart = dictYaml.indexOf('\n...');

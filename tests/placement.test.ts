@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dockedHeight, geometryFor, kDefaultPlacement, normalizePlacement, type Placement } from '../entrypoints/inputview/chrome-shim';
+import { dockedHeight, geometryFor, kDefaultPlacement, normalizePlacement, type Placement } from '../entrypoints/inputview/placement';
 
 // A typical FydeOS tablet in landscape.
 const screen = { width: 1280, height: 800 };

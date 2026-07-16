@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import _ from "lodash";
 import { parse } from 'yaml'
-import { Mutex } from 'async-mutex';
 import { ThemeProvider, useColorScheme } from '@mui/material/styles';
 
 import theme from "./theme"
@@ -9,59 +8,39 @@ import styles from "./styles.module.less";
 import "./global.css";
 
 import IconButton from "@mui/material/IconButton";
-import Radio from "@mui/material/Radio";
 import FormControl from "@mui/material/FormControl";
-import TextField from "@mui/material/TextField";
 import Switch from "@mui/material/Switch";
 import Snackbar from "@mui/material/Snackbar";
 import Button from "@mui/material/Button";
-import CircularProgress from "@mui/material/CircularProgress";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
-import Tooltip from "@mui/material/Tooltip";
 
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightnessOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import Animation from "./utils/animation";
 import FileEditorButton from "./fileEditor";
 import RimeLogDisplay from "./rimeLogDisplay";
 import { $$, getFs, type ImeSettings, kDefaultSettings, type SchemaSwitchKey, formatSchemaSwitchKey, interpretRecordingKey, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type SchemaKeys } from "@/lib/utils";
-import { kLatinLayoutIds, kScriptLayoutIds, type LatinLayoutId, type LayoutId } from "@/lib/shared-types";
+import { kLatinLayoutIds, type LatinLayoutId, type LayoutId } from "@/lib/shared-types";
 import { hasInputView } from "@/lib/platform";
 import { SegmentedPill } from "./SegmentedPill";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
 import Divider from "@mui/material/Divider";
 import { detectSchemaInZip, importSchemaFromZip } from "@/lib/import-schema";
 import { getInstalledSchemaIds } from "@/lib/schema-install";
 import { sendMessage } from "@/lib/messaging";
-import {
-    decodeDictPackManifest,
-    buildDictPackYaml,
-    buildRawTableDb,
-    dictPackArtifactPath,
-    dictPacksManifestPath,
-    dictPackRawTablePath,
-    encodeDictPackManifest,
-    parseDictPackSourceBytes,
-    summarizeDictPackWarnings,
-    type DictPackEntry,
-    type DictPackManifest,
-    type DictPackMetadata,
-    type DictPackSource,
-} from "@/lib/dict-packs";
 import Link from "@mui/material/Link";
+import { DictionaryPacks } from './DictionaryPacks';
+import { installRemoteSchema } from './schema-installer';
+import { SchemaSection } from './SchemaSection';
+import type { SchemaDescription, SchemaListFile } from './schema-types';
 
 const kFuzzyMap = [
     {
@@ -90,35 +69,11 @@ const kFuzzyMap = [
     }
 ];
 
-interface SchemaDescription {
-    id: string;
-    name: string;
-    description: string;
-    website: string;
-    user?: boolean;
-    realName?: string;
-    extra_data?: boolean;
-    fuzzy_pinyin?: boolean;
-}
-
-interface SchemaListFile {
-    schemas: SchemaDescription[];
-}
-
 interface ConverterResponse {
     status: string;
     message?: string;
     schema_id: string;
     repo: string;
-}
-
-type OpenCcDict =
-    | { type: 'ocd2' | 'text'; file: string }
-    | { type: 'group'; dicts: OpenCcDict[] };
-
-interface OpenCcConfig {
-    segmentation?: { dict?: OpenCcDict };
-    conversion_chain?: Array<{ dict?: OpenCcDict }>;
 }
 
 const kRepoUrl = "https://fydeos-update.oss-cn-beijing.aliyuncs.com/fyderhythm";
@@ -186,7 +141,6 @@ function OptionsPage() {
 
     const [localSchemaList, setLocalSchemaList] = useState<string[]>([]);
 
-    const kTotalProgress = 100;
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [downloadSchemaId, setDownloadSchemaId] = useState<string | null>(null);
 
@@ -198,14 +152,6 @@ function OptionsPage() {
     // is still playing, visibly shrinking it. Data is cleared in onExited.
     const [removeCandidate, setRemoveCandidate] = useState<SchemaDescription | null>(null);
     const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-
-    const [dictPacks, setDictPacks] = useState<DictPackMetadata[]>([]);
-    const [dictPackImporting, setDictPackImporting] = useState(false);
-    const [dictPackManifestMutex] = useState(() => new Mutex());
-    const dictPackLoadRequestId = useRef(0);
-    // severity 'error': the import failed; 'warning': it succeeded but some
-    // entries were merged or skipped — never render partial success as an error.
-    const [dictPackAlert, setDictPackAlert] = useState<{ severity: 'error' | 'warning'; text: string } | null>(null);
 
     const fydeosUserDefinedSchema = "fydeosUserDefinedSchema";
 
@@ -331,11 +277,6 @@ function OptionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settingsDirty]);
 
-    useEffect(() => {
-        loadDictPacks(imeSettings.schema);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [imeSettings.schema]);
-
     async function loadRime() {
         await chrome.storage.sync.set({ settings: imeSettings });
         if (!engineStatus.loading) {
@@ -421,332 +362,6 @@ function OptionsPage() {
             changeSettings({ algebraList: _.uniq([...imeSettings.algebraList, val]) });
         } else {
             changeSettings({ algebraList: imeSettings.algebraList.filter(a => a != val) });
-        }
-    }
-
-    async function readDictPackManifest(schemaId: string): Promise<DictPackManifest> {
-        const fs = await getFs();
-        const manifestPath = dictPacksManifestPath(schemaId);
-        if (await fs.readEntryRaw(manifestPath)) {
-            try {
-                return decodeDictPackManifest(await fs.readWholeFile(manifestPath));
-            } catch {
-                // fall through to empty
-            }
-        }
-        return { version: 1, packs: [] };
-    }
-
-    async function writeDictPackManifest(schemaId: string, manifest: DictPackManifest) {
-        const fs = await getFs();
-        await fs.writeWholeFile(dictPacksManifestPath(schemaId), encodeDictPackManifest(manifest));
-    }
-
-    async function mutateDictPackManifest<T>(schemaId: string, operation: () => Promise<T>): Promise<T> {
-        // Web Locks coordinate separate Options tabs. The local mutex is also
-        // required for test/non-browser environments without navigator.locks.
-        if (typeof navigator !== 'undefined' && navigator.locks) {
-            return await navigator.locks.request(
-                `fyde-rhythm:dict-pack-manifest:${schemaId}`,
-                operation,
-            );
-        }
-        return await dictPackManifestMutex.runExclusive(operation);
-    }
-
-    function publishMutatedDictPacks(packs: DictPackMetadata[]) {
-        // A manifest read that started before this mutation must not repaint
-        // the UI with its stale snapshot when it eventually completes.
-        dictPackLoadRequestId.current++;
-        setDictPacks(packs);
-    }
-
-    async function loadDictPacks(schemaId: string) {
-        const requestId = ++dictPackLoadRequestId.current;
-        try {
-            const manifest = await readDictPackManifest(schemaId);
-            if (requestId !== dictPackLoadRequestId.current) return;
-            setDictPacks(manifest.packs);
-            setDictPackAlert(null);
-        } catch (ex) {
-            if (requestId !== dictPackLoadRequestId.current) return;
-            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
-            setDictPacks([]);
-        }
-    }
-
-    function dictPackWarningLines(warnings: string[]): string[] {
-        const { shown, hiddenCount } = summarizeDictPackWarnings(warnings);
-        const lines = [...shown];
-        if (hiddenCount > 0) {
-            lines.push($$("dict_pack_more_warnings", String(hiddenCount)));
-        }
-        return lines;
-    }
-
-    function showDictPackFailure(prefix: string, warnings: string[]) {
-        if (warnings.length > 0) {
-            console.error("Dict pack import failed:", warnings);
-        }
-        setDictPackAlert({ severity: 'error', text: prefix + dictPackWarningLines(warnings).join('\n') });
-    }
-
-    // Shown after a *successful* install: merged duplicates and compiler
-    // warnings are informational, so they get warning styling, not error.
-    function showDictPackImportNotice(source: DictPackSource, warnings: string[]) {
-        const lines: string[] = [];
-        if ((source.duplicateCount ?? 0) > 0) {
-            lines.push($$("dict_pack_duplicates_merged", String(source.duplicateCount)));
-        }
-        if (warnings.length > 0) {
-            console.warn("Dict pack import warnings:", warnings);
-            lines.push($$("dict_pack_import_warning_summary", String(warnings.length)));
-            lines.push(...dictPackWarningLines(warnings));
-        }
-        setDictPackAlert(lines.length > 0 ? { severity: 'warning', text: lines.join('\n') } : null);
-    }
-
-    async function importDictPack(file: File) {
-        setDictPackAlert(null);
-        setDictPackImporting(true);
-        try {
-            const bytes = new Uint8Array(await file.arrayBuffer());
-            const manifest = await readDictPackManifest(imeSettings.schema);
-            const existingPackNames = new Set(manifest.packs.map(p => p.packName));
-            const existingDisplayNames = new Map(manifest.packs.map(p => [p.name.trim().normalize('NFC'), p.packName]));
-            const source = await parseDictPackSourceBytes(file.name, bytes, existingPackNames, existingDisplayNames);
-            if (source.entryCount === 0) {
-                setDictPackAlert({ severity: 'error', text: $$("dict_pack_empty") });
-                return;
-            }
-            await installDictPackSource(source);
-        } catch (ex) {
-            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
-        } finally {
-            setDictPackImporting(false);
-        }
-    }
-
-    async function cleanupSharedYaml(packName: string) {
-        try {
-            const fs = await getFs();
-            await fs.delPath(`/root/${imeSettings.schema}/shared/${packName}.dict.yaml`);
-        } catch { /* file may not have been written */ }
-    }
-
-    async function installDictPackSource(source: DictPackSource) {
-        if (!source.entries || source.entries.length === 0) {
-            const compileWarnings = await compileDictPackAndInstall(source.packName, source.dictYaml);
-            if (compileWarnings === null) return;
-            try {
-                await upsertDictPackManifestEntry({
-                    packName: source.packName,
-                    displayName: source.displayName,
-                    entryCount: source.entryCount,
-                    compiledEntryCount: source.entryCount,
-                    rawEntryCount: 0,
-                });
-            } catch (ex) {
-                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, source.packName));
-                await cleanupSharedYaml(source.packName);
-                throw ex;
-            }
-            // The manifest and compiled artifact are now a consistent durable
-            // install. A transient worker/reload failure must not delete one
-            // side and leave the other behind; a later reload can activate it.
-            await sendMessage("ReloadRime");
-            showDictPackImportNotice(source, compileWarnings);
-            return;
-        }
-
-        const classified = await sendMessage("ClassifyDictPackEntries", {
-            schemaId: imeSettings.schema,
-            packName: source.packName,
-            packDictYaml: source.dictYaml,
-        });
-        if (!classified.ok) {
-            showDictPackFailure($$("dict_pack_compile_error"), classified.warnings);
-            return;
-        }
-
-        const validKeys = new Set(classified.entries.map(entry => dictEntryKey(entry.text, entry.code)));
-        const compiledEntries = source.entries.filter(entry => validKeys.has(dictEntryKey(entry.text, entry.code)));
-        const rawEntries = source.entries.filter(entry => !validKeys.has(dictEntryKey(entry.text, entry.code)));
-        const rawTableName = rawEntries.length > 0 ? `${source.packName}_raw` : undefined;
-
-        let compileWarnings: string[] = [];
-        if (compiledEntries.length > 0) {
-            const warnings = await compileDictPackAndInstall(
-                source.packName,
-                buildDictPackYaml(source.packName, compiledEntries),
-            );
-            if (warnings === null) return;
-            compileWarnings = warnings;
-        } else {
-            await cleanupSharedYaml(source.packName);
-        }
-
-        try {
-            if (rawEntries.length > 0 && rawTableName) {
-                await installRawTable(rawTableName, rawEntries);
-            }
-            await upsertDictPackManifestEntry({
-                packName: source.packName,
-                displayName: source.displayName,
-                entryCount: compiledEntries.length + rawEntries.length,
-                compiledEntryCount: compiledEntries.length,
-                rawEntryCount: rawEntries.length,
-                rawTableName,
-            });
-        } catch (ex) {
-            if (compiledEntries.length > 0) {
-                await deleteIfExists(dictPackArtifactPath(imeSettings.schema, source.packName));
-                await cleanupSharedYaml(source.packName);
-            }
-            if (rawTableName) {
-                await deleteIfExists(dictPackRawTablePath(imeSettings.schema, rawTableName));
-            }
-            throw ex;
-        }
-        await sendMessage("ReloadRime");
-        showDictPackImportNotice(source, [...classified.warnings, ...compileWarnings]);
-    }
-
-    // Returns the compiler warnings on success, or null when compilation
-    // failed (the failure alert has already been shown).
-    async function compileDictPackAndInstall(
-        packName: string,
-        dictYaml: string,
-    ): Promise<string[] | null> {
-        let result;
-        try {
-            result = await sendMessage("CompileDictPack", {
-                schemaId: imeSettings.schema,
-                packName,
-                packDictYaml: dictYaml,
-            });
-        } catch (ex) {
-            await cleanupSharedYaml(packName);
-            throw ex;
-        }
-        if (!result.ok) {
-            await cleanupSharedYaml(packName);
-            showDictPackFailure($$("dict_pack_compile_error"), result.warnings);
-            return null;
-        }
-        return result.warnings;
-    }
-
-    async function installRawTable(tableName: string, entries: DictPackEntry[]) {
-        const fs = await getFs();
-        await fs.writeWholeFile(
-            dictPackRawTablePath(imeSettings.schema, tableName),
-            buildRawTableDb(tableName, entries),
-        );
-    }
-
-    async function upsertDictPackManifestEntry(req: {
-        packName: string;
-        displayName: string;
-        entryCount: number;
-        compiledEntryCount: number;
-        rawEntryCount: number;
-        rawTableName?: string;
-    }) {
-        const schemaId = imeSettings.schema;
-        await mutateDictPackManifest(schemaId, async () => {
-            const manifest = await readDictPackManifest(schemaId);
-            const now = Date.now();
-            const existingIndex = manifest.packs.findIndex(p => p.packName === req.packName);
-            const existing = existingIndex >= 0 ? manifest.packs[existingIndex] : undefined;
-            const entry: DictPackMetadata = {
-                id: req.packName,
-                name: req.displayName,
-                packName: req.packName,
-                baseDictionary: schemaId,
-                entryCount: req.entryCount,
-                compiledEntryCount: req.compiledEntryCount,
-                rawEntryCount: req.rawEntryCount,
-                rawTableName: req.rawTableName,
-                enabled: true,
-                installedAt: existingIndex >= 0 ? manifest.packs[existingIndex].installedAt : now,
-                updatedAt: now,
-                source: 'user',
-            };
-            const packs = existingIndex >= 0
-                ? manifest.packs.map((p, i) => i === existingIndex ? entry : p)
-                : [...manifest.packs, entry];
-            const nextManifest: DictPackManifest = { version: 1, packs };
-            await writeDictPackManifest(schemaId, nextManifest);
-            publishMutatedDictPacks(nextManifest.packs);
-
-            // Once the manifest no longer references obsolete files, cleanup
-            // can fail harmlessly without corrupting the installed metadata.
-            if (existing?.rawTableName && existing.rawTableName !== req.rawTableName) {
-                await deleteIfExists(dictPackRawTablePath(schemaId, existing.rawTableName));
-            }
-            if (existing && req.compiledEntryCount === 0
-                && (existing.compiledEntryCount ?? existing.entryCount) > 0) {
-                await deleteIfExists(dictPackArtifactPath(schemaId, existing.packName));
-                await cleanupSharedYaml(existing.packName);
-            }
-        });
-    }
-
-    async function deleteIfExists(path: string) {
-        try {
-            const fs = await getFs();
-            await fs.delPath(path);
-        } catch { /* file may not exist */ }
-    }
-
-    function dictEntryKey(text: string, code: string): string {
-        return `${text}\t${code.trim()}`;
-    }
-
-    async function toggleDictPackEnabled(id: string, enabled: boolean) {
-        setDictPackAlert(null);
-        try {
-            const schemaId = imeSettings.schema;
-            await mutateDictPackManifest(schemaId, async () => {
-                const manifest = await readDictPackManifest(schemaId);
-                const nextManifest: DictPackManifest = {
-                    version: 1,
-                    packs: manifest.packs.map(p => p.id === id ? { ...p, enabled, updatedAt: Date.now() } : p),
-                };
-                await writeDictPackManifest(schemaId, nextManifest);
-                publishMutatedDictPacks(nextManifest.packs);
-            });
-            await sendMessage("ReloadRime");
-        } catch (ex) {
-            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
-        }
-    }
-
-    async function removeDictPack(id: string) {
-        setDictPackAlert(null);
-        try {
-            const schemaId = imeSettings.schema;
-            await mutateDictPackManifest(schemaId, async () => {
-                const manifest = await readDictPackManifest(schemaId);
-                const pack = manifest.packs.find(p => p.id === id);
-                const nextManifest: DictPackManifest = {
-                    version: 1,
-                    packs: manifest.packs.filter(p => p.id !== id),
-                };
-                await writeDictPackManifest(schemaId, nextManifest);
-                publishMutatedDictPacks(nextManifest.packs);
-                if (pack) {
-                    await deleteIfExists(dictPackArtifactPath(schemaId, pack.packName));
-                    await deleteIfExists(`/root/${schemaId}/shared/${pack.packName}.dict.yaml`);
-                    if (pack.rawTableName) {
-                        await deleteIfExists(dictPackRawTablePath(schemaId, pack.rawTableName));
-                    }
-                }
-            });
-            await sendMessage("ReloadRime");
-        } catch (ex) {
-            setDictPackAlert({ severity: 'error', text: $$("dict_pack_import_error") + String(ex) });
         }
     }
 
@@ -893,8 +508,6 @@ function OptionsPage() {
 
             setDownloadProgress(5);
 
-            const fetchInit: RequestInit = { cache: "no-cache" };
-
             const finalRepo = repo || personalRepoURL;
             const finalSchemaId = schema_id || personalRepoSchemaId;
 
@@ -917,145 +530,14 @@ function OptionsPage() {
                 return;
             }
 
-            const update = true;
             const id = data['schema_id'];
-            // [to-do] do not with merge with downloadSchema, there will be more features soon.
             setDownloadProgress(10);
-
-            const schemaBasePath = `/root/${id}`;
-            const kRepoUrl = kConventerUrl + "/schema/"+id;
-            const schemaFile = `build/${id}.schema.yaml`;
-            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`, fetchInit).then(x => x.text());
-            const schema = parse(schemaYaml);
-
-            const dependencies: Set<string> = new Set();
-
-            if (schemaYaml.includes("lua_")) {
-                dependencies.add(`shared/${id}.rime.lua`);
-            }
-            
-            if (schema.engine?.filters) {
-                for (const t of schema.engine.filters) {
-                    const tn = t.split("@");
-                    if (tn[0] == "simplifier") {
-                        const opencc = schema[tn[1] ?? "simplifier"];
-                        const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
-                        dependencies.add(configPath);
-                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`, fetchInit).then(x => x.text());
-                        const config = JSON.parse(opencc_config) as OpenCcConfig;
-
-                        function parseDict(dict: OpenCcDict) {
-                            if (dict.type === 'ocd2' || dict.type === 'text') {
-                                dependencies.add(`shared/opencc/${dict.file}`);
-                            } else if (dict.type === 'group') {
-                                dict.dicts.forEach(parseDict);
-                            }
-                        }
-
-                        if (config.segmentation && config.segmentation.dict) {
-                            parseDict(config.segmentation.dict);
-                        }
-
-                        if (config.conversion_chain) {
-                            config.conversion_chain.forEach((step: { dict?: OpenCcDict }) => {
-                                if (step.dict) {
-                                    parseDict(step.dict);
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-
-            if (schema.engine?.translators) {
-                for (const t of schema.engine.translators) {
-                    const tn = t.split("@");
-                    // Only these two use a dictionary
-                    const translators = ["script_translator", "table_translator", "reverse_lookup_translator"];
-                    if (translators.includes(tn[0])) {
-                        const ns = tn[1] ?? "translator";
-                        const dictName: string = schema[ns].dictionary;
-                        if (!dictName) {
-                            continue;
-                        }
-                        const prismName: string = schema[ns].prism ?? dictName;
-
-                        dependencies.add(`build/${dictName}.table.bin`);
-                        dependencies.add(`build/${dictName}.reverse.bin`);
-                        dependencies.add(`build/${prismName}.prism.bin`);
-                    }
-                }
-            }
-            if (schema.grammar?.language) {
-                dependencies.add(`shared/${schema.grammar.language}.gram`);
-            }
-
-            const kPhase1Weight = 30;
-            const phase2Files = [];
-            const phase2Sizes = [];
-            let phase1Progress = 0;
-
-            const fs = await getFs();
-            // Phase 1: Download small files and get size of big files
-            for (const f of dependencies) {
-                if (await fs.readEntry(`${schemaBasePath}/${f}`) && !update) {
-                    // file already exists
-                    console.log(`${f} already exists, skipped`);
-                } else {
-                    const controller = new AbortController();
-                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal, ...fetchInit });
-                    const sizeHeader = res.headers.get('Content-Length');
-                    const size = sizeHeader ? parseInt(sizeHeader, 10) : Number.NaN;
-                    if ((size && size < 70 * 1024) ||
-                        // If response is gzipped, size = NaN
-                        isNaN(size)
-                    ) {
-                        const buf = await res.arrayBuffer();
-                        fs.writeWholeFile(`${schemaBasePath}/${f}`, new Uint8Array(buf));
-                        console.log("Downloaded", f);
-                    } else {
-                        phase2Files.push(f);
-                        phase2Sizes.push(size);
-                        controller.abort();
-                        console.log("Checked", f, `Size = ${size}`);
-                    }
-                }
-                phase1Progress++;
-                setDownloadProgress(kPhase1Weight * phase1Progress / dependencies.size);
-            }
-
-            // Phase 2: Download big files
-            let downloadedSize = 0;
-            let phase2LastProgress = 0;
-            const phase2TotalSize = _.sum(phase2Sizes);
-            for (let i = 0; i < phase2Files.length; i++) {
-                const f = phase2Files[i];
-                const res = await fetch(`${kRepoUrl}/${f}`, fetchInit);
-                const reader = res.body?.getReader();
-                if (!reader) {
-                    throw new Error(`Missing response body for ${f}`);
-                }
-                const buf = new ArrayBuffer(phase2Sizes[i]);
-                let offset = 0;
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    const chunk = new Uint8Array(buf, offset, value.length);
-                    chunk.set(new Uint8Array(value));
-                    offset += value.length;
-                    downloadedSize += value.length;
-                    const newProgress = kPhase1Weight + (kTotalProgress - kPhase1Weight) * downloadedSize / phase2TotalSize;
-                    if (newProgress - phase2LastProgress > 0.5) {
-                        setDownloadProgress(newProgress);
-                        phase2LastProgress = newProgress;
-                    }
-                }
-                fs.writeWholeFile(`${schemaBasePath}/${f}`, new Uint8Array(buf));
-                console.log("Downloaded", f);
-            }
-
-            // Schema should be the last file to be written, in case an error is encountered while downloading
-            await fs.writeWholeFile(`${schemaBasePath}/${schemaFile}`, new TextEncoder().encode(schemaYaml));
+            const schema = await installRemoteSchema({
+                id,
+                repoUrl: `${kConventerUrl}/schema/${id}`,
+                update: true,
+                onProgress: setDownloadProgress,
+            });
             await addSelfDefinedSchema(id, schema.schema.name, schema.schema.description, data['repo'], finalSchemaId);
             setActiveSchemaOnInstall(id);
         } catch (ex) {
@@ -1070,143 +552,14 @@ function OptionsPage() {
     async function downloadSchema(id: string, update: boolean = false) {
         setFetchListError(null);
         try {
-            const fetchInit: RequestInit = { cache: "no-cache" };
             setDownloadSchemaId(id);
             setDownloadProgress(0);
-
-            const schemaBasePath = `/root/${id}`;
-            const schemaFile = `build/${id}.schema.yaml`;
-            const schemaYaml: string = await fetch(`${kRepoUrl}/${schemaFile}`, fetchInit).then(x => x.text());
-            const schema = parse(schemaYaml);
-
-
-            const dependencies: Set<string> = new Set();
-
-            if (schemaYaml.includes("lua_")) {
-                dependencies.add(`shared/${id}.rime.lua`);
-            }
-
-            if (schema.engine?.filters) {
-                for (const t of schema.engine.filters) {
-                    const tn = t.split("@");
-                    if (tn[0] == "simplifier") {
-                        const opencc = schema[tn[1] ?? "simplifier"];
-                        const configPath = `shared/opencc/${opencc?.opencc_config ?? "t2s.json"}`;
-                        dependencies.add(configPath);
-                        const opencc_config = await fetch(`${kRepoUrl}/${configPath}`, fetchInit).then(x => x.text());
-                        const config = JSON.parse(opencc_config) as OpenCcConfig;
-
-                        function parseDict(dict: OpenCcDict) {
-                            if (dict.type === 'ocd2' || dict.type === 'text') {
-                                dependencies.add(`shared/opencc/${dict.file}`);
-                            } else if (dict.type === 'group') {
-                                dict.dicts.forEach(parseDict);
-                            }
-                        }
-
-                        if (config.segmentation && config.segmentation.dict) {
-                            parseDict(config.segmentation.dict);
-                        }
-
-                        if (config.conversion_chain) {
-                            config.conversion_chain.forEach((step: { dict?: OpenCcDict }) => {
-                                if (step.dict) {
-                                    parseDict(step.dict);
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-
-            if (schema.engine?.translators) {
-                for (const t of schema.engine.translators) {
-                    const tn = t.split("@");
-                    // Only these two use a dictionary
-                    const translators = ["script_translator", "table_translator", "reverse_lookup_translator"];
-                    if (translators.includes(tn[0])) {
-                        const ns = tn[1] ?? "translator";
-                        const dictName: string = schema[ns].dictionary;
-                        if (!dictName) {
-                            continue;
-                        }
-                        const prismName: string = schema[ns].prism ?? dictName;
-
-                        dependencies.add(`build/${dictName}.table.bin`);
-                        dependencies.add(`build/${dictName}.reverse.bin`);
-                        dependencies.add(`build/${prismName}.prism.bin`);
-                    }
-                }
-            }
-            if (schema.grammar?.language) {
-                dependencies.add(`shared/${schema.grammar.language}.gram`);
-            }
-
-            const kPhase1Weight = 30;
-            const phase2Files = [];
-            const phase2Sizes = [];
-            let phase1Progress = 0;
-
-            const fs = await getFs();
-            // Phase 1: Download small files and get size of big files
-            for (const f of dependencies) {
-                if (await fs.readEntry(`${schemaBasePath}/${f}`) && !update) {
-                    // file already exists
-                    console.log(`${f} already exists, skipped`);
-                } else {
-                    const controller = new AbortController();
-                    const res = await fetch(`${kRepoUrl}/${f}`, { signal: controller.signal, ...fetchInit });
-                    const sizeHeader = res.headers.get('Content-Length');
-                    const size = sizeHeader ? parseInt(sizeHeader, 10) : Number.NaN;
-                    if ((size && size < 70 * 1024) ||
-                        // If response is gzipped, size = NaN
-                        isNaN(size)
-                    ) {
-                        const buf = await res.arrayBuffer();
-                        fs.writeWholeFile(`${schemaBasePath}/${f}`, new Uint8Array(buf));
-                        console.log("Downloaded", f);
-                    } else {
-                        phase2Files.push(f);
-                        phase2Sizes.push(size);
-                        controller.abort();
-                        console.log("Checked", f, `Size = ${size}`);
-                    }
-                }
-                phase1Progress++;
-                setDownloadProgress(kPhase1Weight * phase1Progress / dependencies.size);
-            }
-
-            // Phase 2: Download big files
-            let downloadedSize = 0;
-            let phase2LastProgress = 0;
-            const phase2TotalSize = _.sum(phase2Sizes);
-            for (let i = 0; i < phase2Files.length; i++) {
-                const f = phase2Files[i];
-                const res = await fetch(`${kRepoUrl}/${f}`, fetchInit);
-                const reader = res.body?.getReader();
-                if (!reader) {
-                    throw new Error(`Missing response body for ${f}`);
-                }
-                const buf = new ArrayBuffer(phase2Sizes[i]);
-                let offset = 0;
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    const chunk = new Uint8Array(buf, offset, value.length);
-                    chunk.set(new Uint8Array(value));
-                    offset += value.length;
-                    downloadedSize += value.length;
-                    const newProgress = kPhase1Weight + (kTotalProgress - kPhase1Weight) * downloadedSize / phase2TotalSize;
-                    if (newProgress - phase2LastProgress > 0.5) {
-                        setDownloadProgress(newProgress);
-                        phase2LastProgress = newProgress;
-                    }
-                }
-                fs.writeWholeFile(`${schemaBasePath}/${f}`, new Uint8Array(buf));
-                console.log("Downloaded", f);
-            }
-            // Schema should be the last file to be written, in case an error is encountered while downloading
-            await fs.writeWholeFile(`${schemaBasePath}/${schemaFile}`, new TextEncoder().encode(schemaYaml));
+            await installRemoteSchema({
+                id,
+                repoUrl: kRepoUrl,
+                update,
+                onProgress: setDownloadProgress,
+            });
             setActiveSchemaOnInstall(id);
         } catch (ex) {
             console.log(ex);
@@ -1280,9 +633,6 @@ function OptionsPage() {
         </div>
     );
 
-    const activeDictPackEntryCount = dictPacks
-        .filter(pack => pack.enabled)
-        .reduce((sum, pack) => sum + pack.entryCount, 0);
     const manifest = chrome.runtime.getManifest();
 
     return <ThemeProvider theme={theme} defaultMode="system">
@@ -1306,274 +656,37 @@ function OptionsPage() {
                     height={180}
                 />
             </div>
-            <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-                            <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("select_schema")}</h2>
-                            {/* Only worth announcing while there is nothing to show yet
-                                (first run without a cached list); background refreshes
-                                of an already-rendered list stay silent. */}
-                            {fetchingList && schemaList.schemas.length === 0 && (
-                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{$$("fetching_schema_list")}</Box>
-                            )}
-                        </Box>
-
-                        {/* Schema cards */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {schemaList.schemas.map((schema) => {
-                                const isInstalled = localSchemaList.includes(schema.id);
-                                const isActive = schema.id === imeSettings.schema;
-                                return (
-                                    <Box
-                                        key={schema.id}
-                                        sx={{
-                                            display: 'flex',
-                                            alignItems: 'flex-start',
-                                            gap: 1.5,
-                                            px: 2,
-                                            py: 1.5,
-                                            borderRadius: '12px',
-                                            border: '1px solid',
-                                            borderColor: isActive ? 'rgba(228, 0, 70, 0.18)' : 'divider',
-                                            bgcolor: isActive ? 'rgba(228, 0, 70, 0.02)' : 'transparent',
-                                            cursor: isInstalled && !isActive ? 'pointer' : 'default',
-                                            transition: 'background-color 0.15s',
-                                            position: 'relative',
-                                            overflow: 'hidden',
-                                            '&::after': isInstalled && !isActive ? {
-                                                content: '""',
-                                                position: 'absolute',
-                                                inset: 0,
-                                                borderRadius: '12px',
-                                                bgcolor: 'transparent',
-                                                transition: 'background-color 0.15s',
-                                                pointerEvents: 'none',
-                                            } : {},
-                                            '&:hover::after': isInstalled && !isActive ? {
-                                                bgcolor: 'action.hover',
-                                            } : {},
-                                            '&:active::after': isInstalled && !isActive ? {
-                                                bgcolor: 'action.selected',
-                                            } : {},
-                                        }}
-                                        onClick={isInstalled && !isActive ? () => changeSettings({ schema: schema.id }) : undefined}
-                                    >
-                                        {/* Leading: radio / download / progress — fixed 36px column */}
-                                        <Box sx={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.25 }}>
-                                            {downloadSchemaId === schema.id
-                                                ? <CircularProgress variant="determinate" value={downloadProgress} size={22} />
-                                                : isInstalled
-                                                    ? <Radio
-                                                        checked={isActive}
-                                                        onChange={() => changeSettings({ schema: schema.id })}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        size="small"
-                                                        sx={{ p: 0 }}
-                                                        inputProps={{ 'aria-label': `${schema.id} ${schema.name}` }}
-                                                      />
-                                                    : <IconButton
-                                                        size="small"
-                                                        onClick={(e) => { e.stopPropagation(); downloadSchema(schema.id); }}
-                                                        disabled={downloadSchemaId != null}
-                                                        sx={{ p: 0.5 }}
-                                                        aria-label={`${$$("download_schema")} ${schema.name}`}
-                                                      >
-                                                        <CloudDownloadIcon fontSize="small" />
-                                                      </IconButton>
-                                            }
-                                        </Box>
-
-                                        {/* Content */}
-                                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                                            {/* Title + action links */}
-                                            <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px 10px', mb: 0.5 }}>
-                                                <Box sx={{ fontSize: '0.9375rem', fontWeight: isInstalled ? 500 : 400, color: 'text.primary' }}>
-                                                    {schema.user ? schema.realName : schema.id} {schema.name}
-                                                </Box>
-                                                {isInstalled && (!schema.user || schema.website) && (
-                                                    <Link component="button" underline="hover"
-                                                        onClick={(e) => { e.stopPropagation(); schema.user ? convertPersonalSchema(schema.website, schema.realName, true, schema.id) : downloadSchema(schema.id, true); }}
-                                                        sx={{ fontSize: '0.8rem' }}
-                                                        disabled={downloadSchemaId != null}>
-                                                        {$$("update_schema")}
-                                                    </Link>
-                                                )}
-                                                {isInstalled && (
-                                                    <Link component="button" underline="hover"
-                                                        onClick={(e) => { e.stopPropagation(); setRemoveCandidate(schema); setRemoveDialogOpen(true); }}
-                                                        sx={{
-                                                            fontSize: '0.8rem',
-                                                            opacity: isActive ? 0.4 : 1,
-                                                            cursor: isActive ? 'not-allowed' : undefined,
-                                                            color: isActive ? 'primary.main' : 'error.main',
-                                                        }}
-                                                        disabled={downloadSchemaId != null || isActive}>
-                                                        {$$("remove_schema")}
-                                                    </Link>
-                                                )}
-                                            </Box>
-
-                                            {/* Description */}
-                                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary', lineHeight: 1.45, mb: isInstalled ? 1.25 : 0 }}>
-                                                {schema.description}
-                                                {schema.website && (
-                                                    <Link href={schema.website} target="_blank" underline="hover"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        sx={{ ml: 1 }}>
-                                                        {$$("schema_home_page")}
-                                                    </Link>
-                                                )}
-                                            </Box>
-
-                                            {/* Sub-controls (installed schemas only) */}
-                                            {isInstalled && (
-                                                <Box
-                                                    sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 20px' }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <Box component="label" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: isActive ? 'default' : 'pointer' }}>
-                                                        <Switch
-                                                            size="small"
-                                                            checked={isSchemaEnabled(schema.id)}
-                                                            disabled={isActive}
-                                                            onChange={(_, checked) => toggleSchemaEnabled(schema.id, checked)}
-                                                            color="primary"
-                                                            sx={{ ml: -0.75 }}
-                                                        />
-                                                        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                                                            {$$("enable_schema_hint")}
-                                                        </Box>
-                                                    </Box>
-
-                                                    {/* The keys this schema paints — a fact about the schema, so
-                                                        it lives on the schema. The arrangement is global and lives
-                                                        in the keyboard card. */}
-                                                    {showsInputView && (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                                                                {$$("vk_keys")}
-                                                            </Box>
-                                                            <Select
-                                                                size="small"
-                                                                variant="standard"
-                                                                disableUnderline
-                                                                // Resolved: correction → guess → letters.
-                                                                value={resolveSchemaKeys(imeSettings, schema.id, schema.name) ?? "latin"}
-                                                                onChange={(e) => setSchemaKeys(schema.id, e.target.value as SchemaKeys)}
-                                                                inputProps={{ 'aria-label': `${$$("vk_keys")} — ${schema.name || schema.id}` }}
-                                                                sx={{ fontSize: '0.8rem', color: 'text.secondary', '& .MuiSelect-select': { py: 0.25 } }}
-                                                            >
-                                                                <MenuItem value="latin">{schemaKeysNames.latin}</MenuItem>
-                                                                {kScriptLayoutIds.map((id) => (
-                                                                    <MenuItem key={id} value={id}>{schemaKeysNames[id]}</MenuItem>
-                                                                ))}
-                                                            </Select>
-                                                        </Box>
-                                                    )}
-
-                                                </Box>
-                                            )}
-                                        </Box>
-                                    </Box>
-                                );
-                            })}
-                        </Box>
-
-                        {fetchListError && (
-                            <Box role="alert" sx={{ mt: 1.5, color: 'error.main', fontSize: '0.85rem' }}>{fetchListError}</Box>
-                        )}
-
-                        {/* Personal repo import */}
-                        <Box sx={{
-                            mt: 2,
-                            pt: 2,
-                            borderTop: '1px solid',
-                            borderColor: 'divider',
-                            display: 'flex',
-                            flexDirection: { xs: 'column', sm: 'row' },
-                            alignItems: { xs: 'stretch', sm: 'stretch' },
-                            gap: 1.5,
-                        }}>
-                            {downloadSchemaId === fydeosUserDefinedSchema && (
-                                <CircularProgress variant="determinate" value={downloadProgress} size={22} sx={{ flexShrink: 0 }} />
-                            )}
-                            <TextField
-                                label="GitHub Repo URL"
-                                variant="filled"
-                                type="url"
-                                name="repoUrl"
-                                autoComplete="off"
-                                spellCheck={false}
-                                inputRef={repoUrlInputRef}
-                                error={repoError != null && !personalRepoURL}
-                                onChange={e => setPersonalRepoURL(e.target.value)}
-                                sx={{ flex: 1, minWidth: 0 }}
-                            />
-                            <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1.5, flexWrap: 'wrap' }}>
-                                <TextField
-                                    label="Schema Id"
-                                    variant="filled"
-                                    name="schemaId"
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    inputRef={repoSchemaIdInputRef}
-                                    error={repoError != null && !personalRepoSchemaId}
-                                    onChange={e => setPersonalRepoSchemaId(e.target.value)}
-                                    sx={{ width: { xs: '100%', sm: '150px' } }}
-                                />
-                                <Button
-                                    variant="outlined"
-                                    onClick={() => convertPersonalSchema()}
-                                    disabled={downloadSchemaId != null}
-                                >
-                                    {$$("add_schema")}
-                                </Button>
-                            </Box>
-                        </Box>
-
-                        {repoError && (
-                            <Box role="alert" sx={{ mt: 1, color: 'error.main', fontSize: '0.85rem' }}>{repoError}</Box>
-                        )}
-
-                        {/* ZIP import */}
-                        <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                            {downloadSchemaId === 'importing' && (
-                                <CircularProgress variant="determinate" value={downloadProgress} size={22} sx={{ flexShrink: 0 }} />
-                            )}
-                            <input
-                                type="file"
-                                accept=".zip"
-                                id="schema-import-input"
-                                style={{ display: 'none' }}
-                                onChange={async (e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        await importCompiledSchema(e.target.files[0]);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            />
-                            <Button
-                                variant="outlined"
-                                startIcon={<CloudUploadIcon />}
-                                onClick={() => document.getElementById('schema-import-input')?.click()}
-                                disabled={downloadSchemaId != null}
-                                size="small"
-                            >
-                                {$$("import_compiled_schema")}
-                            </Button>
-                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
-                                {$$("import_compiled_schema_hint")}
-                            </Box>
-                        </Box>
-
-                        {importError && (
-                            <Box role="alert" sx={{ mt: 1, color: 'error.main', fontSize: '0.85rem' }}>{importError}</Box>
-                        )}
-                    </FormControl>
-                </div>
-            </div>
-
+            <SchemaSection
+                schemas={schemaList.schemas}
+                fetching={fetchingList}
+                localSchemaIds={localSchemaList}
+                settings={imeSettings}
+                downloadSchemaId={downloadSchemaId}
+                downloadProgress={downloadProgress}
+                fetchError={fetchListError}
+                repoError={repoError}
+                importError={importError}
+                personalRepoUrl={personalRepoURL}
+                personalRepoSchemaId={personalRepoSchemaId}
+                repoUrlInputRef={repoUrlInputRef}
+                repoSchemaIdInputRef={repoSchemaIdInputRef}
+                userDefinedSchemaId={fydeosUserDefinedSchema}
+                showsInputView={showsInputView}
+                schemaKeyNames={schemaKeysNames}
+                onSettingsChange={changeSettings}
+                onDownloadSchema={downloadSchema}
+                onConvertPersonalSchema={convertPersonalSchema}
+                onRemoveRequest={(schema) => {
+                    setRemoveCandidate(schema);
+                    setRemoveDialogOpen(true);
+                }}
+                isSchemaEnabled={isSchemaEnabled}
+                onToggleSchemaEnabled={toggleSchemaEnabled}
+                onSetSchemaKeys={setSchemaKeys}
+                onRepoUrlChange={setPersonalRepoURL}
+                onRepoSchemaIdChange={setPersonalRepoSchemaId}
+                onImportCompiledSchema={importCompiledSchema}
+            />
             <div className={styles.formGroup}>
                 <div className={styles.formBox} style={{ padding: '8px 0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>
@@ -1747,129 +860,7 @@ function OptionsPage() {
                 </div>
             </div>}
 
-            <div className={styles.formGroup}>
-                <div className={styles.formBox}>
-                    <FormControl className={styles.formControl}>
-                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-                            <h2 className={styles.formLabel} style={{ marginBottom: 0 }}>{$$("dict_pack_section_title")}</h2>
-                            {dictPacks.length > 0 && (
-                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                                    {$$("dict_pack_active_entry_count", String(activeDictPackEntryCount))}
-                                </Box>
-                            )}
-                        </Box>
-                        <Box sx={{ fontSize: '0.875rem', color: 'text.secondary', lineHeight: 1.45, mb: 2 }}>
-                            {$$("dict_pack_hint")}
-                        </Box>
-                        {dictPacks.length > 0 ? (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                                {dictPacks.map((pack) => (
-                                    <Box
-                                        key={pack.id}
-                                        sx={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1.5,
-                                            px: 2,
-                                            py: 1.5,
-                                            borderRadius: '12px',
-                                            border: '1px solid',
-                                            borderColor: pack.enabled ? 'rgba(228, 0, 70, 0.18)' : 'divider',
-                                            bgcolor: pack.enabled ? 'rgba(228, 0, 70, 0.02)' : 'transparent',
-                                            transition: 'background-color 0.15s, border-color 0.15s',
-                                        }}
-                                    >
-                                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                                            <Box sx={{ fontSize: '0.9375rem', fontWeight: pack.enabled ? 500 : 400, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {pack.name}
-                                            </Box>
-                                            <Box sx={{ fontSize: '0.85rem', color: 'text.secondary', mt: 0.25 }}>
-                                                {$$("dict_pack_entry_count", String(pack.entryCount))}
-                                            </Box>
-                                        </Box>
-                                        <Switch
-                                            size="small"
-                                            checked={pack.enabled}
-                                            onChange={(_, checked) => toggleDictPackEnabled(pack.id, checked)}
-                                            disabled={dictPackImporting}
-                                            inputProps={{ 'aria-label': pack.enabled ? $$("dict_pack_enabled") : $$("dict_pack_disabled") }}
-                                        />
-                                        <Tooltip title={$$("dict_pack_remove_button")}>
-                                            <span>
-                                                <IconButton
-                                                    aria-label={$$("dict_pack_remove_button")}
-                                                    onClick={() => removeDictPack(pack.id)}
-                                                    disabled={dictPackImporting}
-                                                    color="error"
-                                                    size="small"
-                                                >
-                                                    <DeleteOutlineIcon fontSize="small" />
-                                                </IconButton>
-                                            </span>
-                                        </Tooltip>
-                                    </Box>
-                                ))}
-                            </Box>
-                        ) : (
-                            <Box
-                                sx={{
-                                    mb: 2,
-                                    px: 2,
-                                    py: 2,
-                                    borderRadius: '12px',
-                                    border: '1px dashed',
-                                    borderColor: 'divider',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1.5,
-                                    fontSize: '0.875rem',
-                                    color: 'text.secondary',
-                                }}
-                            >
-                                <CloudUploadIcon fontSize="small" />
-                                {$$("dict_pack_empty_list")}
-                            </Box>
-                        )}
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <input
-                                type="file"
-                                accept=".txt,.tsv,.yaml,.dict.yaml,.scel,.qcel,.qpyd,.bdict,.bcd"
-                                id="dict-pack-import-input"
-                                style={{ display: 'none' }}
-                                onChange={async (e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        await importDictPack(e.target.files[0]);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            />
-                            <Button
-                                variant={dictPacks.length > 0 ? "outlined" : "contained"}
-                                startIcon={dictPackImporting ? <CircularProgress size={16} /> : <CloudUploadIcon />}
-                                onClick={() => document.getElementById('dict-pack-import-input')?.click()}
-                                disabled={dictPackImporting}
-                                size="small"
-                            >
-                                {dictPackImporting ? $$("dict_pack_compiling") : $$("dict_pack_import_button")}
-                            </Button>
-                        </Box>
-                        {dictPackAlert && (
-                            <Box role="alert" sx={{
-                                color: dictPackAlert.severity === 'error' ? 'error.main' : 'warning.main',
-                                fontSize: '0.85rem',
-                                mt: 1.5,
-                                whiteSpace: 'pre-line',
-                                // Defensive cap: even a summarized message must
-                                // never grow the page — scroll inside the box.
-                                maxHeight: 180,
-                                overflowY: 'auto',
-                            }}>
-                                {dictPackAlert.text}
-                            </Box>
-                        )}
-                    </FormControl>
-                </div>
-            </div>
+            <DictionaryPacks schemaId={imeSettings.schema} />
 
             <div className={styles.formGroup}>
                 <div className={styles.formBox}>

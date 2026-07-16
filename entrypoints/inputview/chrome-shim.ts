@@ -10,158 +10,22 @@ import {
     type InputViewToBackground,
     type LayoutId,
 } from '@/lib/shared-types';
-import { kFrameUnits } from './layouts/frame';
-import { kMetrics } from './metrics';
 import type { KeyStroke } from './layouts/types';
 import {
     readClipboard,
     type ClipboardHistoryItem,
     type ClipboardReadResult,
 } from './clipboard';
-
-// Where the keyboard sits:
-//   docked   — full-width, bottom of the screen.
-//   floating — the docked keyboard scaled uniformly, dragged anywhere.
-//   onehand  — phone-shaped keyboard pinned to a bottom corner (see below).
-export type KeyboardMode = 'docked' | 'floating' | 'onehand';
-export type OneHandSide = 'left' | 'right';
-
-// Floating window = docked keyboard scaled uniformly; `scale` is the fraction
-// of docked size. The handle is the card's top strip and the resize button sits
-// at its right end; the OS drag region stops short of the button, because a
-// draggable region swallows the pointer and anything under it could never be
-// tapped. Both numbers come from metrics.ts, which is also what md3.css lays the
-// strip out from — they cannot drift.
-export const kFloatingHandleHeight = kMetrics.handleHeight;
-export const kFloatingResizeWidth = kMetrics.resizeWidth;
-const kFloatingMargin = 8;
-export const kFloatingScaleMin = 0.55;
-export const kFloatingScaleMax = 0.85;
-export const kFloatingDefaultScale = 0.6;
-
-// "Scaled uniformly" is a half-truth: the handle and the candidate bar have
-// floors (they hold real controls), so they DON'T shrink with the card — at
-// scale 0.55 they take 30% of it against 13% docked, and the rows get what is
-// left. Shrunk far enough that crushed the keys: a 5-row layout (zhuyin, kana)
-// came out at 21px per key. So the card has a floor of its own, computed from
-// the rows it must hold. Below it the keyboard stops getting shorter; shrinking
-// past this is what one-hand mode is for, and it reflows instead of scaling.
-function minFloatingHeight(rows: number): number {
-    const keyPitch = kMetrics.minKeyHeight + 2 * kMetrics.cellPad;
-    return rows * keyPitch + kMetrics.handleHeight + kMetrics.barMin + kMetrics.edge;
-}
-
-// One-hand keyboard. NOT a smaller floating keyboard: scaling the docked
-// keyboard preserves its aspect, and the docked keyboard is a wide, squat
-// ribbon (a full screen width over ~372px), so no scale factor yields keys a
-// thumb can work — narrow enough to reach across and the rows collapse to
-// ~30px. This mode reflows to phone proportions instead: the frame is
-// kFrameUnits key columns across, so the pitch is width/kFrameUnits, and rows
-// are 1.4x the pitch tall — keys taller than wide, the shape thumbs actually
-// type on. At the 420px cap that lands on a ~41px pitch and ~52px keys, i.e.
-// the metrics of a phone keyboard.
-//
-// It is corner-anchored on purpose and cannot be dragged: the thumb sweeps an
-// arc pivoted at the hand gripping the edge, so a keyboard adrift in the
-// middle of the screen is worse one-handed than one glued to the corner.
-// Smallest board width that still yields finger-sized keys on the 10-unit
-// frame; shared by the one-hand card and the floating width floor.
-const kMinBoardWidth = 320;
-const kOneHandWidthFraction = 0.36;
-const kOneHandWidthMax = 420;
-// Latin/hangul layouts are 4 rows; zhuyin and kana are 5. The card grows a row
-// rather than dividing a fixed height by more rows — squeezing 5 rows into the
-// 4-row card drops the keys to 35px tall, which defeats the whole mode.
-export const kOneHandRows = 4;
-const kOneHandRowAspect = 1.4;
-export const kOneHandBarHeight = kMetrics.onehand.controlBar;
-
-export interface ScreenSize {
-    width: number;
-    height: number;
-}
-
-// `width`/`height` are the card size (docked ignores them, spans the screen);
-// `left`/`top` place a floating window (omitted → centre). `draggable` arms the
-// OS drag region under the handle — off for the corner-anchored one-hand card.
-export interface ContainerGeometry {
-    floating: boolean;
-    width: number;
-    height: number;
-    draggable: boolean;
-    left?: number;
-    top?: number;
-}
-
-// Persisted placement: the mode, the floating size (scale) and dragged
-// position, and the corner the one-hand keyboard is pinned to.
-export interface Placement {
-    mode: KeyboardMode;
-    scale: number;
-    side: OneHandSide;
-    left?: number;
-    top?: number;
-}
-
-export const kDefaultPlacement: Placement = { mode: 'docked', scale: kFloatingDefaultScale, side: 'right' };
-
-// Docked keyboard height. The legacy keyboard was a fixed 372px and users are
-// calibrated to it, so that is the anchor; larger screens scale up to 42% of
-// screen height, capped at 440. (Earlier cuts at 260/300px read visibly too
-// short.) Two guards keep the anchor sane at the extremes — every screen we
-// currently ship on resolves unchanged:
-//   ≤52% of screen height, or a landscape-phone window is swallowed by the
-//     372 anchor;
-//   ≤42% of screen width (with a 280px floor for phones), or portrait pairs
-//     a tall board with skinny keys.
-export function dockedHeight(screen: ScreenSize): number {
-    return Math.round(Math.min(
-        Math.max(372, screen.height * 0.42),
-        screen.height * 0.52,
-        Math.max(280, screen.width * 0.42),
-        440,
-    ));
-}
-
-// The card size and placement for a given mode. Pure: the caller passes the
-// screen (window.screen on device, a fixture in tests) and, for one-hand, the
-// row count of the layout on screen — docked and floating divide a fixed height
-// among however many rows there are, but the one-hand card is sized FROM the
-// key, so it must know how many rows it is sizing for.
-export function geometryFor(p: Placement, screen: ScreenSize, rows: number = kOneHandRows): ContainerGeometry {
-    if (p.mode === 'docked') {
-        return { floating: false, draggable: false, width: screen.width, height: dockedHeight(screen) };
-    }
-    if (p.mode === 'floating') {
-        // Width floor for phone-class screens (0.55 of a 412px screen is a
-        // 227px keyboard). Raising the EFFECTIVE scale rather than the width
-        // alone keeps the aspect matched to docked.
-        const scale = Math.min(1, Math.max(p.scale, kMinBoardWidth / screen.width));
-        return {
-            floating: true,
-            draggable: true,
-            width: Math.round(screen.width * scale),
-            height: Math.max(Math.round(dockedHeight(screen) * scale), minFloatingHeight(rows)),
-            left: p.left,
-            top: p.top,
-        };
-    }
-    const width = Math.round(
-        Math.min(kOneHandWidthMax, Math.max(kMinBoardWidth, screen.width * kOneHandWidthFraction)));
-    const one = kMetrics.onehand;
-    const rowHeight = Math.round(((width - 2 * one.edge) / kFrameUnits) * kOneHandRowAspect);
-    // 2x edge: the card is padded on top as well as bottom (spec redline:
-    // content box is inset by --kb-edge on all sides).
-    const height = rowHeight * rows + one.bar + one.controlBar + 2 * one.edge;
-    return {
-        floating: true,
-        draggable: false,
-        width,
-        height,
-        left: p.side === 'left' ? kFloatingMargin : Math.max(0, screen.width - width - kFloatingMargin),
-        top: Math.max(0, screen.height - height - kFloatingMargin),
-    };
-}
+import {
+    kDefaultPlacement,
+    kFloatingHandleHeight,
+    kFloatingMargin,
+    kFloatingResizeWidth,
+    kPlacementPrefKey,
+    normalizePlacement,
+    type ContainerGeometry,
+    type Placement,
+} from './placement';
 
 export interface VkHost {
     readonly mock: boolean;
@@ -256,31 +120,6 @@ interface VirtualKeyboardPrivate {
     onClipboardItemUpdated?: {
         addListener(listener: (item: ClipboardHistoryItem) => void): void;
         removeListener(listener: (item: ClipboardHistoryItem) => void): void;
-    };
-}
-
-// Kept under the original key so a stored placement survives the upgrade.
-const kPlacementPrefKey = "inputViewFloating";
-
-// Clamp the persisted scale and migrate the two older shapes stored under this
-// key: a bare boolean, and { floating: boolean, ... } from before one-hand mode.
-export function normalizePlacement(raw: unknown): Placement {
-    if (raw === true) return { ...kDefaultPlacement, mode: 'floating' };
-    if (!raw || typeof raw !== "object") return kDefaultPlacement;
-    const o = raw as Record<string, unknown>;
-    const mode: KeyboardMode = o.mode === 'floating' || o.mode === 'onehand' || o.mode === 'docked'
-        ? o.mode
-        : o.floating === true ? 'floating' : 'docked';
-    const scale = typeof o.scale === "number" && isFinite(o.scale)
-        ? Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, o.scale))
-        : kFloatingDefaultScale;
-    const coord = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : undefined);
-    return {
-        mode,
-        scale,
-        side: o.side === 'left' ? 'left' : 'right',
-        left: coord(o.left),
-        top: coord(o.top),
     };
 }
 

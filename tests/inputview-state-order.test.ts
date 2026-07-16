@@ -29,7 +29,7 @@ vi.mock('@/lib/schema-install', () => ({
 }));
 
 const { postInputViewState, postRefinedInputViewState } =
-    await import('../entrypoints/background/index');
+    await import('../entrypoints/background/inputview-state');
 const { listEnabledInstalledSchemas } =
     await import('../entrypoints/background/schemas');
 

@@ -1,11 +1,19 @@
 import { parse } from "yaml";
-import { getFs, guessScriptForSchema, kDefaultSettings, migrateLayoutSettings, resolveKeyboardLayout, resolveLayoutForSchema, type ImeSettings } from "@/lib/utils";
-import { kInputViewPortName, type BackgroundToInputView, type InputViewState, type InputViewToBackground, type NumericFieldKind } from "@/lib/shared-types";
+import { getFs, kDefaultSettings, migrateLayoutSettings, type ImeSettings } from "@/lib/utils";
+import { kInputViewPortName, type BackgroundToInputView, type InputViewToBackground, type NumericFieldKind } from "@/lib/shared-types";
 import { InputController } from "./controller";
 import { serviceWorkerKeepalive } from "./keepalive";
 import { onMessage } from "@/lib/messaging";
 import { listEnabledInstalledSchemas } from "./schemas";
 import { resolveInstalledSchemaId } from "@/lib/schema-install";
+import {
+  numericFieldFor,
+  postInputViewState,
+  postRefinedInputViewState,
+  readInputViewSettings,
+  settleKeyEventResult,
+  updateVisibleInputViewConnections,
+} from './inputview-state';
 async function buildSchemaMenuItems(activeSchema: string, enabledSchemas?: string[]): Promise<chrome.input.ime.MenuItem[]> {
   const list = await listEnabledInstalledSchemas(activeSchema, enabledSchemas);
   return list.map((entry) => ({
@@ -93,147 +101,11 @@ async function resolveStartupSettings(stored: ImeSettings): Promise<ImeSettings 
   return next;
 }
 
-// Reject if the promise doesn't settle within ms. Used around engine/fs reads
-// that can stall for seconds while RIME is loading on a cold start.
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), ms);
-    promise.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); },
-    );
-  });
-}
-
-// Read the engine's ascii_mode, defaulting to false when the session isn't
-// ready, the read fails, or the engine is too busy loading to answer promptly.
-async function readAsciiMode(controller: InputController | undefined): Promise<boolean> {
-  try {
-    const read = controller?.getAsciiMode();
-    if (!read) return false;
-    return (await withTimeout(read, 3000)) ?? false;
-  } catch {
-    return false;
-  }
-}
-
-// Settings as stored (options-page writes land there first), falling back to the
-// controller's active copy. Read fresh on every state build so layout-binding
-// edits reach the InputView without an engine reload.
-async function readSettings(controller: InputController | undefined): Promise<ImeSettings | undefined> {
-  let settings: ImeSettings | undefined;
-  try {
-    const obj = await chrome.storage.sync.get(["settings"]) as { settings?: ImeSettings };
-    settings = obj.settings ?? controller?.activeSettings;
-  } catch {
-    settings = controller?.activeSettings;
-  }
-  // Migrate on the failed read too, or a legacy profile resolves differently there.
-  return settings && migrateLayoutSettings(settings);
-}
-
-// Fast snapshot: reads ONLY chrome.storage — never the engine or the schema
-// catalog. Both can stall for seconds on a cold start while RIME loads, and
-// the InputView cannot render any keys until it receives a state, so this
-// must always resolve promptly (asciiMode=false, name=id are acceptable
-// placeholders that the refined snapshot corrects).
-export async function buildFastInputViewState(controller: InputController | undefined): Promise<InputViewState> {
-  const settings = await readSettings(controller);
-  const schemaId = settings?.schema ?? "";
-  const layout = resolveLayoutForSchema(settings, schemaId);
-  return {
-    asciiMode: false,
-    layout,
-    latinLayout: resolveKeyboardLayout(settings),
-    script: guessScriptForSchema(schemaId, undefined, layout),
-    schemaId,
-    schemaName: schemaId,
-    numericField: numericFieldFor(controller?.context?.type),
-  };
-}
-
-// Map the focused field's InputContext.type to the numberpad variant. Only
-// number/tel route to a numberpad; every other field type (text, url, search,
-// email, password, …) uses the normal letter keyboard.
-function numericFieldFor(type: string | undefined): NumericFieldKind | null {
-  return type === "number" || type === "tel" ? type : null;
-}
-
-// Fill in the engine/fs-dependent fields (real asciiMode, catalog label),
-// each guarded by a timeout so a busy engine degrades to the fast values.
-export async function refineInputViewState(
-  controller: InputController | undefined,
-  base: InputViewState,
-): Promise<InputViewState> {
-  let schemaName = base.schemaName;
-  try {
-    const settings = await readSettings(controller);
-    const list = await withTimeout(listEnabledInstalledSchemas(base.schemaId, settings?.enabledSchemas), 3000);
-    schemaName = list.find((s) => s.id === base.schemaId)?.label ?? schemaName;
-  } catch {
-    // fs not readable yet — the schema id is an acceptable label.
-  }
-  return {
-    ...base,
-    asciiMode: await readAsciiMode(controller),
-    schemaName,
-    // The catalog label often carries the language signal the id lacks
-    // (e.g. an id like "custom_ime" with the name "日本語ローマ字").
-    script: guessScriptForSchema(base.schemaId, schemaName, base.layout),
-  };
-}
-
-// On connect: post the fast snapshot immediately so the keyboard paints, then
-// the refined one if it differs.
-const inputViewStateRequestIds = new WeakMap<(msg: BackgroundToInputView) => void, number>();
-
-function beginInputViewStateRequest(postToPort: (msg: BackgroundToInputView) => void): number {
-  const requestId = (inputViewStateRequestIds.get(postToPort) ?? 0) + 1;
-  inputViewStateRequestIds.set(postToPort, requestId);
-  return requestId;
-}
-
-function isCurrentInputViewStateRequest(
-  postToPort: (msg: BackgroundToInputView) => void,
-  requestId: number,
-): boolean {
-  return inputViewStateRequestIds.get(postToPort) === requestId;
-}
-
-export async function postInputViewState(
-  controller: InputController | undefined,
-  postToPort: (msg: BackgroundToInputView) => void,
-): Promise<void> {
-  const requestId = beginInputViewStateRequest(postToPort);
-  const fast = await buildFastInputViewState(controller);
-  if (!isCurrentInputViewStateRequest(postToPort, requestId)) return;
-  postToPort({ kind: "state", state: fast });
-  const refined = await refineInputViewState(controller, fast);
-  if (isCurrentInputViewStateRequest(postToPort, requestId)
-    && JSON.stringify(refined) !== JSON.stringify(fast)) {
-    postToPort({ kind: "state", state: refined });
-  }
-}
-
-// On engine events (ascii toggled, schema switched): the engine is up, so post
-// a single refined snapshot — a fast-first pair would flash stale asciiMode.
-export async function postRefinedInputViewState(
-  controller: InputController | undefined,
-  postToPort: (msg: BackgroundToInputView) => void,
-): Promise<void> {
-  const requestId = beginInputViewStateRequest(postToPort);
-  const fast = await buildFastInputViewState(controller);
-  const refined = await refineInputViewState(controller, fast);
-  if (isCurrentInputViewStateRequest(postToPort, requestId)) {
-    postToPort({ kind: "state", state: refined });
-  }
-}
-
 async function postSchemaList(
   controller: InputController | undefined,
   postToPort: (msg: BackgroundToInputView) => void,
 ): Promise<void> {
-  const settings = await readSettings(controller);
+  const settings = await readInputViewSettings(controller);
   const active = settings?.schema ?? "";
   const schemas = await listEnabledInstalledSchemas(active, settings?.enabledSchemas);
   postToPort({ kind: "schemaList", schemas, activeSchema: active });
@@ -243,18 +115,6 @@ async function postSchemaList(
 // options page) can push fresh state without the page asking.
 const inputViewPosters = new Set<(msg: BackgroundToInputView) => void>();
 const visibleInputViewConnections = new Set<symbol>();
-
-export function updateVisibleInputViewConnections(
-  connections: Set<symbol>,
-  connection: symbol,
-  visible: boolean,
-): boolean | null {
-  const wasVisible = connections.size > 0;
-  if (visible) connections.add(connection);
-  else connections.delete(connection);
-  const isVisible = connections.size > 0;
-  return wasVisible === isVisible ? null : isVisible;
-}
 
 function reportInputViewError(operation: string, error: unknown): void {
   console.error(`InputView ${operation} failed:`, error);
@@ -266,22 +126,6 @@ function setInputViewConnectionVisible(connection: symbol, visible: boolean): vo
   if (transition === null) return;
   void self.controller.handleInputViewVisibilityChanged(transition)
     .catch((error: unknown) => reportInputViewError("visibility", error));
-}
-
-export function settleKeyEventResult(
-  result: boolean | Promise<boolean>,
-  requestId: string,
-  onError: (error: unknown) => void,
-): boolean | undefined {
-  if (typeof result === "boolean") return result;
-  result.then(
-    (handled) => chrome.input.ime.keyEventHandled(requestId, handled),
-    (error) => {
-      onError(error);
-      chrome.input.ime.keyEventHandled(requestId, false);
-    },
-  );
-  return undefined;
 }
 
 // Last numberpad routing pushed to the InputView. Focus moves between ordinary
@@ -346,6 +190,12 @@ export default defineBackground({
           void self.controller.clearContext(ctxId)
             .catch((error: unknown) => self.controller.printErr(`clearContext: ${String(error)}`));
         }
+      });
+
+      // Chrome committed the pending preedit on session end; drop RIME's stale copy.
+      chrome.input.ime.onReset.addListener(() => {
+        void self.controller.resetComposition()
+          .catch((error: unknown) => self.controller.printErr(`resetComposition: ${String(error)}`));
       });
 
       chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {

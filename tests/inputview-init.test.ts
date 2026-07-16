@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// index.ts calls defineBackground(...) and onMessage(...) at module load via the
-// wxt auto-import globals. Stub/mocks below keep the import side-effect-free so we
-// can exercise the exported state-building helpers in isolation.
+// The state module has no background-bootstrap side effects, so these tests hit
+// its interface directly.
 vi.stubGlobal('defineBackground', (def: unknown) => def);
 
 vi.mock('@/lib/messaging', () => ({
@@ -39,7 +38,7 @@ const {
     settleKeyEventResult,
     updateVisibleInputViewConnections,
 } =
-    await import('../entrypoints/background/index');
+    await import('../entrypoints/background/inputview-state');
 const { listEnabledInstalledSchemas } = await import('../entrypoints/background/schemas');
 
 // Minimal stand-in for the part of InputController that the state builders read.

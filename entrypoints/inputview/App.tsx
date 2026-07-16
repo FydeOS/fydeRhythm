@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { kLatinLayoutIds, type InputViewCandidate, type InputViewState, type InputViewToBackground, type LatinLayoutId } from '@/lib/shared-types';
 import { strokeForChar } from '@/lib/latin-remap';
+import { createHost } from './chrome-shim';
 import {
-    createHost,
     geometryFor,
-    kFloatingScaleMin,
     kFloatingScaleMax,
+    kFloatingScaleMin,
     kOneHandRows,
     type KeyboardMode,
     type OneHandSide,
     type Placement,
-} from './chrome-shim';
+} from './placement';
 import { t } from './i18n';
 import { bottomRow, getLayerLayout, getLayout, numpadLayout } from './layouts';
 import { kanaModifyNext } from './layouts/kana';
