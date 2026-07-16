@@ -470,6 +470,33 @@ describe('InputController schema switching', () => {
         expect(candidatesBack.mock.calls.at(-1)?.[0]).toEqual([]);
     });
 
+    // Regression: reset must clear RIME's composition or it repaints the preedit
+    // Chrome already committed, duplicating it on wake.
+    it('clears the surviving composition and preedit on reset, keeping focus', async () => {
+        stubChrome();
+        const composed: string[] = [];
+        (chrome.input.ime as unknown as Record<string, unknown>).setComposition =
+            (param: { text: string }, cb: (ok: boolean) => void) => { composed.push(param.text); cb(true); };
+        (chrome.input.ime as unknown as Record<string, unknown>).setCandidateWindowProperties =
+            (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+        const controller = new InputController();
+        const clearComposition = vi.fn(async () => { });
+        controller.engineId = 'engine';
+        controller.context = { contextID: 9 } as chrome.input.ime.InputContext;
+        controller.session = { clearComposition } as never;
+        controller.inputCache = ['n', 'i'];
+        controller.preeditEmpty = false;
+
+        await controller.resetComposition();
+
+        expect(clearComposition).toHaveBeenCalledTimes(1);
+        expect(composed.at(-1)).toBe('');
+        expect(controller.inputCache).toEqual([]);
+        // Reset clears the composition but not focus.
+        expect(controller.context).toEqual({ contextID: 9 });
+        expect(controller.engineId).toBe('engine');
+    });
+
     it('records the last successfully loaded schema', async () => {
         stubChrome(settings({ schema: 'aurora' }));
         const controller = new InputController();

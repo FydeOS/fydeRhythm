@@ -505,6 +505,29 @@ export class InputController extends EventEmitter {
         });
     }
 
+    // onReset means Chrome ended the input session (e.g. suspend) and committed the
+    // pending preedit itself; clear RIME's surviving copy or it repaints on wake.
+    async resetComposition(): Promise<void> {
+        const session = this.session;
+        const sessionEpoch = this.sessionEpoch;
+        const context = this.context;
+        const contextEpoch = this.contextEpoch;
+        this.inputCache = [];
+        this.resetUI();
+        await this.sessionMutex.runExclusive(async () => {
+            if (this.session === session && this.sessionEpoch === sessionEpoch &&
+                this.context === context && this.contextEpoch === contextEpoch) {
+                try {
+                    await session?.clearComposition();
+                } catch (error) {
+                    if (!this.isInactiveImeError(error)) {
+                        this.printErr(`resetComposition: ${String(error)}`);
+                    }
+                }
+            }
+        });
+    }
+
     preeditEmpty = false;
     setComposition(param: chrome.input.ime.CompositionParameters): Promise<void> {
         return new Promise((res, rej) => {

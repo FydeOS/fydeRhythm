@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
         session: undefined as unknown,
         addListener: vi.fn(),
         removeListener: vi.fn(),
+        resetComposition: vi.fn(async () => { }),
         loadRime: vi.fn(async () => true),
         feedKey: vi.fn(),
         setContext: vi.fn(),
@@ -104,6 +105,7 @@ async function bootBackground() {
     const ime = {
         onFocus: listenerCollector(),
         onBlur: listenerCollector(),
+        onReset: listenerCollector(),
         onKeyEvent: listenerCollector(),
         onCandidateClicked: listenerCollector(),
         onMenuItemActivated: listenerCollector(),
