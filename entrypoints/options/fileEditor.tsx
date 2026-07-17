@@ -12,8 +12,9 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import type { IconType } from "@react-icons/all-files";
 import _ from "lodash";
 import React from "react";
-import Editor, { loader, type Monaco } from "@monaco-editor/react";
+import Editor, { type Monaco } from "@monaco-editor/react";
 import type monaco from 'monaco-editor';
+import "./monacoSetup";
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import AppBar from '@mui/material/AppBar';
@@ -25,8 +26,6 @@ import Slide from '@mui/material/Slide';
 import CircularProgress from '@mui/material/CircularProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import type { TransitionProps } from '@mui/material/transitions';
-
-loader.config({ paths: { vs: "/monaco/vs" } });
 
 const Transition = React.forwardRef(function Transition(
     props: TransitionProps & {
