@@ -41,7 +41,6 @@
     "monaco-editor": "^0.55.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "svgo": "^4.0.1",
     "yaml": "^2.8.3"
   },
   "devDependencies": {
@@ -75,7 +74,6 @@
     "overrides": {
       "semver@>=7.0.0 <7.5.2": ">=7.5.2",
       "@babel/traverse@<7.23.2": ">=7.23.2",
-      "svgo@2.8.0": "^4.0.0",
       "dompurify": ">=3.4.11",
       "shell-quote@>=1.1.0 <=1.8.3": ">=1.8.4",
       "tmp@<0.2.6": ">=0.2.6",
@@ -89,8 +87,7 @@
       ],
       "allowedVersions": {
         "react": "19",
-        "react-dom": "19",
-        "svgo": "4"
+        "react-dom": "19"
       }
     },
     "onlyBuiltDependencies": [
