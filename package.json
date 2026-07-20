@@ -1,12 +1,12 @@
 {
   "name": "fyde-rhythm",
   "displayName": "FydeRhythm",
+  "type": "module",
   "version": "3.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.23.0",
   "description": "The FydeRhythm input method",
   "author": "fydeos",
-  "private": true,
-  "type": "module",
-  "packageManager": "pnpm@10.23.0",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
@@ -46,6 +46,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@iconify-json/material-symbols": "^1.2.82",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@svgr/core": "^8.1.0",
     "@svgr/plugin-jsx": "^8.1.0",
     "@types/chrome": "^0.1.40",
@@ -54,15 +55,17 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "4.1.5",
+    "@vitest/eslint-plugin": "^1.6.23",
     "@wxt-dev/module-react": "^1.2.1",
     "emojibase-data": "^17.0.0",
     "eslint": "^9.39.1",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
     "globals": "^16.5.0",
     "less": "^4.6.4",
     "playwright": "^1.61.1",
-    "prettier": "^3.8.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
     "unplugin-icons": "^23.0.1",
@@ -72,13 +75,13 @@
   },
   "pnpm": {
     "overrides": {
-      "semver@>=7.0.0 <7.5.2": ">=7.5.2",
       "@babel/traverse@<7.23.2": ">=7.23.2",
       "dompurify": ">=3.4.11",
+      "esbuild@>=0.27.3 <0.28.1": ">=0.28.1",
+      "semver@>=7.0.0 <7.5.2": ">=7.5.2",
       "shell-quote@>=1.1.0 <=1.8.3": ">=1.8.4",
       "tmp@<0.2.6": ">=0.2.6",
-      "uuid@8.3.2": "^11.1.1",
-      "esbuild@>=0.27.3 <0.28.1": ">=0.28.1"
+      "uuid@8.3.2": "^11.1.1"
     },
     "peerDependencyRules": {
       "ignoreMissing": [
