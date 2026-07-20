@@ -1,0 +1,8 @@
+# Revisions git blame should skip — bulk mechanical reformats that would
+# otherwise attribute every touched line to a single commit.
+#
+# Enable locally:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub and GitLab honor this file automatically.
+
+# style: reformat via @stylistic and sort imports
+d5f3d29c118967d45c706a96c0dc0752a7919ad1
