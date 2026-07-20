@@ -382,6 +382,7 @@ export default defineBackground({
             text: candidate.candidate,
             index: candidate.ix,
           })),
+          highlightedIndex: snapshot.highlightedIndex,
         });
 
         port.onMessage.addListener((raw) => {
@@ -434,12 +435,14 @@ export default defineBackground({
           candidates: Array<{ candidate: string; ix: number }>,
           sequence: number,
           streamId: string,
+          highlightedIndex: number,
         ) {
           postToPort({
             kind: 'candidates',
             streamId,
             sequence,
             candidates: candidates.map(c => ({ text: c.candidate, index: c.ix })),
+            highlightedIndex,
           });
         };
 

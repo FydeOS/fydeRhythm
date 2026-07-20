@@ -61,8 +61,10 @@ const Modifier = {
 
 // Mapping from W3C code to ui::KeyEvent keyCode for non-alphanumeric keys.
 const nonAlphaNumericKeycodes: Record<string, number> = {
+  ArrowDown: 0x28,
   ArrowLeft: 0x25,
   ArrowRight: 0x27,
+  ArrowUp: 0x26,
   Backquote: 0xC0,
   Backslash: 0xDC,
   Backspace: 0x08,
@@ -498,6 +500,7 @@ class MockHost implements VkHost {
   private onMessage: ((msg: BackgroundToInputView) => void) | null = null;
   private composition = '';
   private candidateTotal = 0;
+  private candidateHighlight = -1;
   private asciiMode = false;
   private candidateSequence = 0;
 
@@ -537,6 +540,7 @@ class MockHost implements VkHost {
       streamId: 'mock',
       sequence: ++this.candidateSequence,
       candidates,
+      highlightedIndex: this.candidateHighlight,
     });
   }
 
@@ -554,16 +558,24 @@ class MockHost implements VkHost {
     if (/^[a-z]$/.test(s.key)) {
       this.setComposition(this.composition + s.key);
       this.candidateTotal = 21;
+      this.candidateHighlight = 0;
       this.postCandidates();
     }
     else if (s.code === 'Backspace' && this.composition.length > 0) {
       this.setComposition(this.composition.slice(0, -1));
       this.candidateTotal = this.composition.length > 0 ? 21 : 0;
+      this.candidateHighlight = this.candidateTotal > 0 ? 0 : -1;
+      this.postCandidates();
+    }
+    else if ((s.code === 'ArrowDown' || s.code === 'ArrowUp') && this.candidateTotal > 0) {
+      const step = s.code === 'ArrowDown' ? 1 : -1;
+      this.candidateHighlight = (this.candidateHighlight + step + this.candidateTotal) % this.candidateTotal;
       this.postCandidates();
     }
     else if (s.code === 'Enter' || s.code === 'Space') {
       this.setComposition('');
       this.candidateTotal = 0;
+      this.candidateHighlight = -1;
       this.postCandidates();
     }
   }

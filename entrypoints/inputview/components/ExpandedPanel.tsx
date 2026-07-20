@@ -8,6 +8,7 @@ import { ExpandLessIcon } from './icons';
 
 export interface ExpandedPanelProps {
   candidates: InputViewCandidate[];
+  highlightedIndex: number;
   onSelect: (index: number) => void;
   onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
   onLoadMore: () => void;
@@ -32,6 +33,7 @@ export function ExpandedPanel(props: ExpandedPanelProps) {
             <CandidateChip
               key={c.index}
               candidate={c}
+              highlighted={c.index === props.highlightedIndex}
               onSelect={props.onSelect}
               onDeleteRequest={props.onDeleteRequest}
             />

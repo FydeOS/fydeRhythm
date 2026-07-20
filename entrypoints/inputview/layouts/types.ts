@@ -30,6 +30,8 @@ export type KeyAction
     | { type: 'emoji' }
     // 小゛゜: cycle the last typed kana through its small/゛/゜ variants.
     | { type: 'kanaModify' }
+    // 変換: step to the next candidate; App gates it to composing.
+    | { type: 'convert' }
     // On a numeric field, swap between the numberpad and the letter keyboard.
     | { type: 'numericLetters'; on: boolean }
     | { type: 'none' };

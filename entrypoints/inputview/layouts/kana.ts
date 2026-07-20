@@ -130,10 +130,8 @@ export const kanaLayout: KeyboardLayout = {
       kanaCell('ま', ['み', 'む', 'め', 'も']),
       kanaCell('や', ['「', 'ゆ', '」', 'よ']),
       kanaCell('ら', ['り', 'る', 'れ', 'ろ']),
-      // 変換 = the conversion key. The engine converts/commits on Space,
-      // so it sends the same stroke 空白 does; the two keys exist because
-      // the spec (and every 12-key IME) separates the intents.
-      fn('kana-henkan', '変換', stroke(' ', 'Space')),
+      // 変換 steps candidates (Down); 空白 sends Space to confirm or space.
+      fn('kana-henkan', '変換', { type: 'convert' }),
     ],
     [
       fn('kana-modify', '小゛゜', { type: 'kanaModify' }),

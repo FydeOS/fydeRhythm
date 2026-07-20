@@ -640,10 +640,11 @@ export class InputController extends EventEmitter {
     });
   }
 
-  sendCandidatesToInputView(candidates: Array<{ candidate: string; ix: number }>) {
+  sendCandidatesToInputView(candidates: Array<{ candidate: string; ix: number }>, highlightedIndex = -1) {
     this.lastPublishedCandidates = candidates.map(candidate => ({ ...candidate }));
+    this.lastPublishedHighlight = highlightedIndex;
     const sequence = ++this.candidateSequence;
-    this.emit('candidatesBack', candidates, sequence, this.candidateStreamId);
+    this.emit('candidatesBack', candidates, sequence, this.candidateStreamId, highlightedIndex);
   }
 
   getCandidateSnapshot() {
@@ -651,14 +652,16 @@ export class InputController extends EventEmitter {
       streamId: this.candidateStreamId,
       sequence: this.candidateSequence,
       candidates: this.lastPublishedCandidates.map(candidate => ({ ...candidate })),
+      highlightedIndex: this.lastPublishedHighlight,
     };
   }
 
-  sendCandidateCacheToInputView() {
+  // Default keeps the current highlight across a load-more.
+  sendCandidateCacheToInputView(highlightedIndex = this.lastPublishedHighlight) {
     this.sendCandidatesToInputView(this.candidateCache.map(v => ({
       candidate: v.text,
       ix: v.index,
-    })));
+    })), highlightedIndex);
   }
 
   async refreshContext(): Promise<void> {
@@ -755,6 +758,12 @@ export class InputController extends EventEmitter {
             await this.invalidateCandidateCache();
             generation = this.candidateGeneration;
           }
+          // Rime's highlight is page-relative; fold to the flat list's global
+          // index before the fetch, so its publish uses it.
+          const menu = rimeContext.menu;
+          const highlighted = menu.candidates.length > 0
+            ? menu.pageNumber * menu.pageSize + menu.highlightedCandidateIndex
+            : -1;
           if (!this.candidateIterator && preedit.length > 0) {
             const iterator = await session.iterateCandidates(0);
             // Do not install an iterator obtained for a composition
@@ -769,10 +778,10 @@ export class InputController extends EventEmitter {
             }
             this.candidateIteratorPreedit = preedit;
             this.candidateIterator = iterator;
-            await this.fetchMoreCandidates(10);
+            await this.fetchMoreCandidates(10, highlighted);
           }
           if (generation !== this.candidateGeneration) return;
-          this.sendCandidateCacheToInputView();
+          this.sendCandidateCacheToInputView(highlighted);
         }
       }
       else {
@@ -821,7 +830,7 @@ export class InputController extends EventEmitter {
           this.sendCandidatesToInputView([{
             candidate: chrome.i18n.getMessage('loading_engine'),
             ix: 1,
-          }]);
+          }], 1);
         }
       }
       else {
@@ -1195,6 +1204,7 @@ export class InputController extends EventEmitter {
   candidateStreamId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   candidateSequence = 0;
   lastPublishedCandidates: Array<{ candidate: string; ix: number }> = [];
+  lastPublishedHighlight = -1;
   // Preedit the iterator was created for; a mismatch means the iterator is stale.
   candidateIteratorPreedit: string | null = null;
   // Bumped on every invalidation. fetchMoreCandidates is a slow async loop;
@@ -1204,7 +1214,7 @@ export class InputController extends EventEmitter {
   candidateGeneration = 0;
   candidateDisposal: Promise<void> = Promise.resolve();
 
-  async fetchMoreCandidates(count: number) {
+  async fetchMoreCandidates(count: number, highlightedIndex = this.lastPublishedHighlight) {
     await this.candidateFetchMutex.runExclusive(async () => {
       const generation = this.candidateGeneration;
       const iterator = this.candidateIterator;
@@ -1219,7 +1229,7 @@ export class InputController extends EventEmitter {
         this.candidateCache.push(c);
       }
       if (generation !== this.candidateGeneration || iterator !== this.candidateIterator) return;
-      this.sendCandidateCacheToInputView();
+      this.sendCandidateCacheToInputView(highlightedIndex);
     });
   }
 

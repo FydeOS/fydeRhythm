@@ -21,14 +21,15 @@ describe('InputView candidate packet ordering', () => {
     const current = { streamId: 'worker-a', sequence: 7 };
     expect(acceptCandidatePacket(current, {
       kind: 'candidates', streamId: 'worker-a', sequence: 6,
-      candidates: [{ text: 'stale', index: 0 }],
+      candidates: [{ text: 'stale', index: 0 }], highlightedIndex: 0,
     })).toBeNull();
 
     expect(acceptCandidatePacket(current, {
-      kind: 'candidates', streamId: 'worker-a', sequence: 8, candidates: [],
+      kind: 'candidates', streamId: 'worker-a', sequence: 8, candidates: [], highlightedIndex: -1,
     })).toEqual({
       order: { streamId: 'worker-a', sequence: 8 },
       candidates: [],
+      highlightedIndex: -1,
       collapseExpanded: true,
     });
   });

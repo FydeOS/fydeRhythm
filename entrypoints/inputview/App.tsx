@@ -66,6 +66,7 @@ export default function App() {
 
   const [vk, setVk] = useState<InputViewState | null>(null);
   const [candidates, setCandidates] = useState<InputViewCandidate[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   // Ordering metadata is transient: keep it out of React state so accepting
   // a candidate packet causes only the candidate render itself.
   const candidateOrderRef = useRef<CandidateOrder | null>(null);
@@ -148,6 +149,7 @@ export default function App() {
           if (!accepted) break;
           candidateOrderRef.current = accepted.order;
           setCandidates(accepted.candidates);
+          setHighlightedIndex(accepted.highlightedIndex);
           if (accepted.collapseExpanded) {
             setExpanded(false);
             loadMoreMark.current = -1;
@@ -372,6 +374,10 @@ export default function App() {
         }
         break;
       }
+      case 'convert':
+        // Idle, a bare Down moves the text caret; only convert while composing.
+        if (candidates.length > 0) host.typeStroke({ key: 'ArrowDown', code: 'ArrowDown' });
+        break;
       case 'emoji':
         setPanel('emoji');
         break;
@@ -555,6 +561,7 @@ export default function App() {
       </div>
       <CandidateBar
         candidates={candidates}
+        highlightedIndex={highlightedIndex}
         onSelect={selectCandidate}
         onDeleteRequest={(candidate, anchor) => setPopover({ type: 'confirm', candidate, anchor })}
         onLoadMore={requestLoadMore}
@@ -641,6 +648,7 @@ export default function App() {
         {expanded && (
           <ExpandedPanel
             candidates={candidates}
+            highlightedIndex={highlightedIndex}
             onSelect={selectCandidate}
             onDeleteRequest={(candidate, anchor) => setPopover({ type: 'confirm', candidate, anchor })}
             onLoadMore={requestLoadMore}

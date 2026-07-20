@@ -7,6 +7,7 @@ import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, Keybo
 
 export interface CandidateBarProps {
   candidates: InputViewCandidate[];
+  highlightedIndex: number;
   onSelect: (index: number) => void;
   onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
   onLoadMore: () => void;
@@ -69,8 +70,9 @@ function HideButton({ onHide, onModeMenu }: { onHide: () => void; onModeMenu: (a
 }
 
 // One candidate chip with tap-to-select and long-press-to-delete.
-export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
+export function CandidateChip({ candidate, highlighted, onSelect, onDeleteRequest }: {
   candidate: InputViewCandidate;
+  highlighted?: boolean;
   onSelect: (index: number) => void;
   onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
 }) {
@@ -88,7 +90,7 @@ export function CandidateChip({ candidate, onSelect, onDeleteRequest }: {
   return (
     <button
       ref={ref}
-      className="kb-candidate"
+      className={`kb-candidate${highlighted ? ' selected' : ''}`}
       onPointerDown={() => {
         longPressed.current = false;
         clear();
@@ -174,6 +176,7 @@ export function CandidateBar(props: CandidateBarProps) {
           <CandidateChip
             key={c.index}
             candidate={c}
+            highlighted={c.index === props.highlightedIndex}
             onSelect={props.onSelect}
             onDeleteRequest={props.onDeleteRequest}
           />

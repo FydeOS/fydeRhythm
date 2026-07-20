@@ -50,14 +50,14 @@ describe('InputView background-port reconnect', () => {
     expect(connect).toHaveBeenCalledTimes(2);
 
     first.onMessage.emit({
-      kind: 'candidates', streamId: 'old', sequence: 99, candidates: [{ text: '旧', index: 0 }],
+      kind: 'candidates', streamId: 'old', sequence: 99, candidates: [{ text: '旧', index: 0 }], highlightedIndex: 0,
     });
     replacement.onMessage.emit({
-      kind: 'candidates', streamId: 'new', sequence: 0, candidates: [],
+      kind: 'candidates', streamId: 'new', sequence: 0, candidates: [], highlightedIndex: -1,
     });
 
     expect(received).toEqual([
-      { kind: 'candidates', streamId: 'new', sequence: 0, candidates: [] },
+      { kind: 'candidates', streamId: 'new', sequence: 0, candidates: [], highlightedIndex: -1 },
     ]);
     expect(replacement.postMessage).toHaveBeenCalledWith({ kind: 'visibility', visible: true });
   });

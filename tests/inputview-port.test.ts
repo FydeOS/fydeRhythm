@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => {
     getAsciiMode: vi.fn(async () => false),
     getCurrentSchema: vi.fn(async () => 'aurora'),
     getRimeStatus: vi.fn(async () => ({ loading: false, loaded: true })),
-    getCandidateSnapshot: vi.fn(() => ({ streamId: 'test', sequence: 0, candidates: [] })),
+    getCandidateSnapshot: vi.fn(() => ({ streamId: 'test', sequence: 0, candidates: [], highlightedIndex: -1 })),
     printErr: vi.fn(),
     compileDictPack: vi.fn(async () => ({ status: 'success' })),
     classifyDictPackEntries: vi.fn(async () => ({ status: 'success' })),
@@ -156,7 +156,7 @@ beforeEach(() => {
   mocks.controller.refreshContext.mockResolvedValue(undefined);
   mocks.controller.clearContext.mockResolvedValue(undefined);
   mocks.controller.loadRime.mockResolvedValue(true);
-  mocks.controller.getCandidateSnapshot.mockReturnValue({ streamId: 'test', sequence: 0, candidates: [] });
+  mocks.controller.getCandidateSnapshot.mockReturnValue({ streamId: 'test', sequence: 0, candidates: [], highlightedIndex: -1 });
 });
 
 describe('inputview port message handling', () => {

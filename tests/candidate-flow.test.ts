@@ -96,8 +96,33 @@ describe('inputview candidate cache', () => {
       candidates(10).map(c => ({ candidate: c.text, ix: c.index })),
       expect.any(Number),
       expect.any(String),
+      expect.any(Number),
     );
     expect(iterator.destroy).not.toHaveBeenCalled();
+  });
+
+  it('publishes the highlight folded to a global index across pages', async () => {
+    const iterator = fakeIterator(candidates(12));
+    const controller = makeController([iterator]);
+    // Rime reports the highlight page-relative (index 2 on page 1 of 5), so
+    // the flat keyboard list must see 1 * 5 + 2 = 7.
+    (controller.session as never as { getContext: Mock }).getContext.mockResolvedValue({
+      composition: { cursorPosition: 0, preedit: 'ni' },
+      menu: {
+        candidates: candidates(5).map(c => ({ text: c.text, comment: '' })),
+        pageSize: 5,
+        pageNumber: 1,
+        isLastPage: false,
+        highlightedCandidateIndex: 2,
+      },
+      selectLabels: [],
+    });
+    const candidatesBack = vi.fn();
+    controller.addListener('candidatesBack', candidatesBack);
+
+    await controller.refreshContext();
+
+    expect(candidatesBack.mock.calls.at(-1)?.[3]).toBe(7);
   });
 
   it('concurrent refreshContext calls do not duplicate the candidate cache', async () => {

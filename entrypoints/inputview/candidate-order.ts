@@ -10,6 +10,7 @@ type CandidatePacket = Extract<BackgroundToInputView, { kind: 'candidates' }>;
 export interface AcceptedCandidatePacket {
   order: CandidateOrder;
   candidates: InputViewCandidate[];
+  highlightedIndex: number;
   collapseExpanded: boolean;
 }
 
@@ -27,6 +28,7 @@ export function acceptCandidatePacket(
   return {
     order: { streamId: next.streamId, sequence: next.sequence },
     candidates: next.candidates,
+    highlightedIndex: next.highlightedIndex,
     collapseExpanded: next.candidates.length === 0,
   };
 }

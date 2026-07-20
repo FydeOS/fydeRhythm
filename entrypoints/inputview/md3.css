@@ -636,9 +636,8 @@ body {
   cursor: pointer;
 }
 
-/* The candidate the engine commits on space. The accent's whole job in this bar
-   is to say which one that is. */
-.kb-candidate:first-of-type {
+/* The highlighted candidate — what space commits and 変換 walks to. */
+.kb-candidate.selected {
   color: var(--kb-primary);
   font-weight: 600;
 }
@@ -679,7 +678,7 @@ body {
   align-content: start;
 }
 
-.kb-expanded .grid .kb-candidate:first-of-type {
+.kb-expanded .grid .kb-candidate.selected {
   background: var(--kb-popup-focused);
 }
 

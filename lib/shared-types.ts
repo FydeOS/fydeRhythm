@@ -117,6 +117,8 @@ export type BackgroundToInputView
       /** Monotonic within streamId; older updates must be ignored. */
       sequence: number;
       candidates: InputViewCandidate[];
+      /** Highlighted candidate as a global index (matches InputViewCandidate.index); -1 when none. */
+      highlightedIndex: number;
     }
     | { kind: 'schemaList'; schemas: Array<{ id: string; label: string }>; activeSchema: string };
 
