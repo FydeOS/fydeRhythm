@@ -39,8 +39,7 @@ export function SegmentedPill<T extends string>({
 
   const trackRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
-  // Distinguishes a drag from a click so a drag ending on a segment doesn't
-  // also trigger its onClick.
+  // True once moved past the drag threshold: a drag, not a tap.
   const movedRef = useRef(false);
   const startXRef = useRef(0);
   const rectLeftRef = useRef(0);
@@ -57,7 +56,6 @@ export function SegmentedPill<T extends string>({
     startXRef.current = e.clientX;
     // Measured once per drag to keep pointermove reflow-free.
     rectLeftRef.current = trackRef.current?.getBoundingClientRect().left ?? 0;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!draggingRef.current) return;
@@ -70,8 +68,7 @@ export function SegmentedPill<T extends string>({
   function endDrag(e: React.PointerEvent) {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); }
-    catch { /* already released */ }
+    // A drag selects on release; a plain tap is left to the button's onClick.
     if (movedRef.current) onChange(options[indexFromClientX(e.clientX)].value);
     setDragIndex(null);
   }
