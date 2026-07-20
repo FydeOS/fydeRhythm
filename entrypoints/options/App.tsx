@@ -246,14 +246,14 @@ function OptionsPage() {
 
   useEffect(() => {
     // update RIME status upon loading
-    updateRimeStatus();
-    loadSettings();
-    loadSchemaList();
-    loadLocalSchemaList();
+    void updateRimeStatus();
+    void loadSettings();
+    void loadSchemaList();
+    void loadLocalSchemaList();
 
     const listener = (m: { rimeStatusChanged?: boolean }) => {
       if (m.rimeStatusChanged) {
-        updateRimeStatus();
+        void updateRimeStatus();
       }
     };
     chrome.runtime.onMessage.addListener(listener);

@@ -100,7 +100,7 @@ describe('schema key sets (a fact about the schema, not a preference)', () => {
     } as const;
 
     for (const [schemaId, keySet] of Object.entries(expected)) {
-      expect(resolveSchemaKeys({}, schemaId) ?? 'latin', schemaId).toBe(keySet);
+      expect(resolveSchemaKeys({}, schemaId) ?? 'latin').toBe(keySet);
     }
   });
 });

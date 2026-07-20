@@ -38,7 +38,7 @@ export async function parseQpydEntries(bytes: Uint8Array): Promise<RawDictEntry[
     data = await inflateZlib(bytes.subarray(payloadOffset));
   }
   catch (ex) {
-    throw new Error(`Invalid QQ dictionary file: could not decompress payload (${ex})`);
+    throw new Error(`Invalid QQ dictionary file: could not decompress payload (${String(ex)})`);
   }
 
   const entries: RawDictEntry[] = [];

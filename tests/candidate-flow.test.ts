@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { RimeCandidate } from '../lib/shared-types';
 
@@ -124,7 +124,7 @@ describe('inputview candidate cache', () => {
     const controller = makeController([iterator]);
     // Invalidate while refreshContext awaits iterateCandidates: the
     // iterator that resolves afterwards belongs to a stale composition.
-    (controller.session as never as { iterateCandidates: ReturnType<typeof vi.fn> })
+    (controller.session as never as { iterateCandidates: Mock<() => Promise<unknown>> })
       .iterateCandidates
       .mockImplementationOnce(async () => {
         await controller.invalidateCandidateCache();

@@ -568,12 +568,12 @@ export class InputController extends EventEmitter {
               rej(new Error(chrome.runtime.lastError.message));
             }
             else {
-              ok ? res() : rej();
+              ok ? res() : rej(new Error('setComposition failed'));
             }
           });
         }
         catch (err) {
-          rej(err);
+          rej(err instanceof Error ? err : new Error('setComposition failed'));
         }
       }
     });
@@ -602,7 +602,7 @@ export class InputController extends EventEmitter {
       ? error
       : error instanceof Error
         ? error.message
-        : String(error ?? '');
+        : '';
     return message.includes('IME is not active');
   }
 
@@ -634,7 +634,7 @@ export class InputController extends EventEmitter {
           res();
         }
         else {
-          rej(error);
+          rej(error instanceof Error ? error : new Error('setCandidateWindowProperties failed'));
         }
       }
     });
@@ -1131,12 +1131,12 @@ export class InputController extends EventEmitter {
     const curTime = (new Date()).getTime();
     if (this.lastRightClickItem == index && curTime - this.lastRightClickTime < 3000) {
       console.log('Del candidate');
-      deleteQuietly(index);
+      void deleteQuietly(index);
       this.lastRightClickItem = -1;
     }
     else {
       console.log('Ready Del candidate');
-      deleteQuietly(index);
+      void deleteQuietly(index);
       this.lastRightClickItem = index;
       this.lastRightClickTime = curTime;
     }

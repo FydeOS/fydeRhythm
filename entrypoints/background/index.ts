@@ -171,7 +171,7 @@ export default defineBackground({
     }
 
     const postLoad = async () => {
-      chrome.input.ime.onFocus.addListener(async (context) => {
+      chrome.input.ime.onFocus.addListener((context) => {
         // Todo: in incognito tab, context.shouldDoLearning = false,
         // we should disable rime learning in such context
         console.log('Got focus event, context = ', context);
@@ -244,7 +244,7 @@ export default defineBackground({
     // Initialize controller
     let rimeLoaded = false;
     self.controller = new InputController();
-    self.controller.addListener('schemaSwitched', () => { refreshImeMenuItems(); });
+    self.controller.addListener('schemaSwitched', () => { void refreshImeMenuItems(); });
 
     void restoreEngineId();
 
@@ -267,11 +267,11 @@ export default defineBackground({
     });
 
     // IME activation listener
-    chrome.input.ime.onActivate.addListener(async (engineId, _screen) => {
+    chrome.input.ime.onActivate.addListener((engineId, _screen) => {
       self.controller.engineId = engineId;
       void persistEngineId(engineId);
       serviceWorkerKeepalive();
-      refreshImeMenuItems();
+      void refreshImeMenuItems();
     });
 
     chrome.input.ime.onDeactivated.addListener((engineId) => {
@@ -282,7 +282,7 @@ export default defineBackground({
     // Rebuild menu when schemas are installed/removed or active setting changes elsewhere
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && (changes.schemaList || changes.selfDefinedSchema)) {
-        refreshImeMenuItems();
+        void refreshImeMenuItems();
       }
       else if (area === 'sync' && changes.settings) {
         // Keep the schema-switch shortcut live on the hot key path without waiting
@@ -291,7 +291,7 @@ export default defineBackground({
         const next = changes.settings.newValue as ImeSettings | undefined;
         self.controller?.applySchemaSwitchKey(next?.schemaSwitchKey);
         self.controller?.applyLayoutSettings(next && migrateLayoutSettings(next));
-        refreshImeMenuItems();
+        void refreshImeMenuItems();
         // Layout bindings / Latin layout may have changed — push fresh state to
         // any connected InputView.
         for (const poster of inputViewPosters) {

@@ -34,7 +34,7 @@ export function serviceWorkerKeepalive() {
           console.log(`(DEBUG StayAlive): "ping" sent through ${alivePort.name} port`);
         }
         catch (e) {
-          console.log(`(DEBUG StayAlive): postMessage failed: ${e}`);
+          console.log(`(DEBUG StayAlive): postMessage failed: ${String(e)}`);
           alivePort = null;
         }
       }

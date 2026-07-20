@@ -465,7 +465,7 @@ export class FastIndexedDbFsController {
     for (const b of allBlobs.values()) {
       if (!usedBlobs.has(b)) {
         console.log(`Removing unused blob ${b}`);
-        blobStore.delete(b);
+        void blobStore.delete(b);
       }
     }
     console.log('Waiting for transaction to finish...');

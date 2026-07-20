@@ -23,7 +23,7 @@ function RimeLogDisplay() {
   }
 
   useEffect(() => {
-    updateRimeLogs();
+    void updateRimeLogs();
 
     const listener = (m: { rimeLog?: string }) => {
       if (m.rimeLog) {

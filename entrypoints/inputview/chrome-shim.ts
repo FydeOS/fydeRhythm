@@ -185,7 +185,7 @@ export class RealHost implements VkHost {
           });
         }
         catch (error) {
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error)));
         }
       }),
     }, { canDelete: typeof this.vk.deleteClipboardItem === 'function' });

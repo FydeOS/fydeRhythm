@@ -25,6 +25,11 @@ function response(body: string | Uint8Array, status = 200): Response {
   } as unknown as Response;
 }
 
+// fetch mocks receive string | URL | Request; Request has no useful toString.
+function urlOf(input: string | URL | Request): string {
+  return input instanceof Request ? input.url : String(input);
+}
+
 function streamedResponse(body: Uint8Array, declaredSize: number): Response {
   return {
     ...response(body),
@@ -70,7 +75,7 @@ describe('remote Schema installation', () => {
     ].join('\n');
     const payload = new TextEncoder().encode('bin');
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
+      const url = urlOf(input);
       if (url.endsWith('/build/demo.schema.yaml')) {
         return response(schemaYaml);
       }
@@ -142,7 +147,7 @@ describe('remote Schema installation', () => {
     ]);
     const fetchedPaths: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
+      const url = urlOf(input);
       const path = url.split('/fyderhythm/').at(-1)!;
       fetchedPaths.push(path);
       return response(assets.get(path) ?? 'bin');
@@ -221,7 +226,7 @@ describe('remote Schema installation', () => {
     ]);
     const fetchedPaths: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const path = String(input).split('/fyderhythm/').at(-1)!;
+      const path = urlOf(input).split('/fyderhythm/').at(-1)!;
       fetchedPaths.push(path);
       const body = assets.get(path);
       return body === undefined ? response('not found', 404) : response(body);
@@ -266,7 +271,7 @@ describe('remote Schema installation', () => {
       '',
     ].join('\n');
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      if (String(input).endsWith('/build/required.schema.yaml')) return response(schemaYaml);
+      if (urlOf(input).endsWith('/build/required.schema.yaml')) return response(schemaYaml);
       return response('not found', 404);
     }));
 
@@ -297,7 +302,7 @@ describe('remote Schema installation', () => {
       '',
     ].join('\n');
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      if (String(input).endsWith('/build/server_failure.schema.yaml')) return response(schemaYaml);
+      if (urlOf(input).endsWith('/build/server_failure.schema.yaml')) return response(schemaYaml);
       return response('server failure', 500);
     }));
 
@@ -329,7 +334,7 @@ describe('remote Schema installation', () => {
     ].join('\n');
     const payload = new Uint8Array(70 * 1024);
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      if (String(input).endsWith('/build/large_demo.schema.yaml')) return response(schemaYaml);
+      if (urlOf(input).endsWith('/build/large_demo.schema.yaml')) return response(schemaYaml);
       return streamedResponse(payload, payload.byteLength + 1);
     }));
 
@@ -359,7 +364,7 @@ describe('remote Schema installation', () => {
     ].join('\n');
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
+      const url = urlOf(input);
       if (url.endsWith('/build/broken.schema.yaml')) return response(schemaYaml);
       if (url.endsWith('/shared/broken.rime.lua')) return response('missing_filter = require("missing_filter")');
       return response('not found', 404);
