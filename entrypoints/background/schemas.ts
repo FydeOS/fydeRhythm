@@ -1,5 +1,5 @@
-import { getFs } from "@/lib/utils";
-import { getInstalledSchemaIds } from "@/lib/schema-install";
+import { getInstalledSchemaIds } from '@/lib/schema-install';
+import { getFs } from '@/lib/utils';
 
 interface SchemaMetadata {
   id: string;
@@ -27,7 +27,7 @@ export async function listEnabledInstalledSchemas(
     : null;
   const isEnabled = (id: string) => enabledSet === null || enabledSet.has(id);
 
-  const stored = await chrome.storage.local.get(["schemaList"]) as { schemaList?: { schemas?: SchemaMetadata[] } };
+  const stored = await chrome.storage.local.get(['schemaList']) as { schemaList?: { schemas?: SchemaMetadata[] } };
   const catalog: SchemaMetadata[] = stored.schemaList?.schemas ?? [];
   const byId = new Map<string, SchemaMetadata>();
   for (const s of catalog) byId.set(s.id, s);

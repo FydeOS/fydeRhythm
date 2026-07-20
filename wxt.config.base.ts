@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
-import type { UserConfig, WxtHooks } from 'wxt';
+
 import Icons from 'unplugin-icons/vite';
+import type { UserConfig, WxtHooks } from 'wxt';
 
 const licensePath = fileURLToPath(new URL('./LICENSE', import.meta.url));
 
@@ -9,7 +10,7 @@ const licensePath = fileURLToPath(new URL('./LICENSE', import.meta.url));
 export const sharedHooks: Partial<WxtHooks> = {
   'build:publicAssets': (_wxt, assets) => {
     assets.push({ absoluteSrc: licensePath, relativeDest: 'LICENSE' });
-  }
+  },
 };
 
 const icons = {
@@ -17,7 +18,7 @@ const icons = {
   32: '/icon-32.png',
   48: '/icon-48.png',
   64: '/icon-64.png',
-  128: '/icon-128.png'
+  128: '/icon-128.png',
 };
 
 export const sharedManifest = {
@@ -28,15 +29,15 @@ export const sharedManifest = {
   icons,
   action: { default_icon: icons },
   content_security_policy: {
-    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
-  }
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+  },
 };
 
 export const sharedInputComponent = {
   name: '__MSG_input_method_name__',
   id: 'fyde-rhythm',
   language: ['zh-CN', 'zh', 'en', 'jp', 'ko', 'zh-TW'],
-  layouts: ['us']
+  layouts: ['us'],
 };
 
 export const sharedVite: UserConfig['vite'] = () => ({
@@ -54,14 +55,14 @@ export const sharedVite: UserConfig['vite'] = () => ({
             return '[name].[ext]';
           }
           return 'assets/[name]-[hash].[ext]';
-        }
+        },
       },
       onwarn(warning, warn) {
         if (warning.code === 'EVAL' && warning.id?.includes('lottie-web')) {
           return;
         }
         warn(warning);
-      }
-    }
-  }
+      },
+    },
+  },
 });

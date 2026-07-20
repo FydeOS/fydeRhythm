@@ -3,28 +3,28 @@
 // Material Symbols via unplugin-icons — each import inlines an SVG component at
 // build time (no runtime dep, CSP-safe). Re-exported under the previous names.
 
-import Settings from '~icons/material-symbols/settings-outline';
-import Mood from '~icons/material-symbols/mood-outline';
-import KeyboardHide from '~icons/material-symbols/keyboard-hide-outline';
+import Backspace from '~icons/material-symbols/backspace';
 import ChevronLeft from '~icons/material-symbols/chevron-left';
 import ChevronRight from '~icons/material-symbols/chevron-right';
-import ExpandMore from '~icons/material-symbols/expand-more';
-import ExpandLess from '~icons/material-symbols/expand-less';
-import Schedule from '~icons/material-symbols/schedule-outline';
-import Backspace from '~icons/material-symbols/backspace';
-import KeyboardReturn from '~icons/material-symbols/keyboard-return';
-import Shift from '~icons/material-symbols/shift';
-import ShiftOutline from '~icons/material-symbols/shift-outline';
-import ShiftLock from '~icons/material-symbols/shift-lock';
-import Language from '~icons/material-symbols/language';
-import Resize from '~icons/material-symbols/resize-window-rounded';
-import OpenInFull from '~icons/material-symbols/open-in-full';
+import Close from '~icons/material-symbols/close';
 import ContentPaste from '~icons/material-symbols/content-paste';
 import ContentPasteOff from '~icons/material-symbols/content-paste-off';
-import ErrorOutline from '~icons/material-symbols/error-outline';
-import Refresh from '~icons/material-symbols/refresh';
-import Close from '~icons/material-symbols/close';
 import DeleteOutline from '~icons/material-symbols/delete-outline';
+import ErrorOutline from '~icons/material-symbols/error-outline';
+import ExpandLess from '~icons/material-symbols/expand-less';
+import ExpandMore from '~icons/material-symbols/expand-more';
+import KeyboardHide from '~icons/material-symbols/keyboard-hide-outline';
+import KeyboardReturn from '~icons/material-symbols/keyboard-return';
+import Language from '~icons/material-symbols/language';
+import Mood from '~icons/material-symbols/mood-outline';
+import OpenInFull from '~icons/material-symbols/open-in-full';
+import Refresh from '~icons/material-symbols/refresh';
+import Resize from '~icons/material-symbols/resize-window-rounded';
+import Schedule from '~icons/material-symbols/schedule-outline';
+import Settings from '~icons/material-symbols/settings-outline';
+import Shift from '~icons/material-symbols/shift';
+import ShiftLock from '~icons/material-symbols/shift-lock';
+import ShiftOutline from '~icons/material-symbols/shift-outline';
 
 export const SettingsIcon = Settings;
 export const MoodIcon = Mood;

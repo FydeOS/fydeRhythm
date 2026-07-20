@@ -1,10 +1,10 @@
 import {
-    DEFAULT_DICT_ENTRY_WEIGHT,
-    RawDictEntry,
-    readAscii,
-    readUint16Le,
-    readUint32Le,
-    readUtf16Le,
+  DEFAULT_DICT_ENTRY_WEIGHT,
+  type RawDictEntry,
+  readAscii,
+  readUint16Le,
+  readUint32Le,
+  readUtf16Le,
 } from './binary';
 
 // Baidu cell dictionary (.bdict — desktop, .bcd — mobile; identical layout).
@@ -27,94 +27,94 @@ const BDICT_ENTRY_COUNT_OFFSET = 0x70;
 const BDICT_ENTRY_TABLE_OFFSET = 0x350;
 
 const BDICT_INITIALS = [
-    'c', 'd', 'b', 'f', 'g', 'h', 'ch', 'j', 'k', 'l', 'm', 'n',
-    '', 'p', 'q', 'r', 's', 't', 'sh', 'zh', 'w', 'x', 'y', 'z',
+  'c', 'd', 'b', 'f', 'g', 'h', 'ch', 'j', 'k', 'l', 'm', 'n',
+  '', 'p', 'q', 'r', 's', 't', 'sh', 'zh', 'w', 'x', 'y', 'z',
 ];
 
 const BDICT_FINALS = [
-    'uang', 'iang', 'iong', 'ang', 'eng', 'ian', 'iao', 'ing', 'ong',
-    'uai', 'uan', 'ai', 'an', 'ao', 'ei', 'en', 'er', 'ua', 'ie', 'in',
-    'iu', 'ou', 'ia', 'ue', 'ui', 'un', 'uo', 'a', 'e', 'i', 'o', 'u', 'v',
+  'uang', 'iang', 'iong', 'ang', 'eng', 'ian', 'iao', 'ing', 'ong',
+  'uai', 'uan', 'ai', 'an', 'ao', 'ei', 'en', 'er', 'ua', 'ie', 'in',
+  'iu', 'ou', 'ia', 'ue', 'ui', 'un', 'uo', 'a', 'e', 'i', 'o', 'u', 'v',
 ];
 
 export function parseBdictEntries(bytes: Uint8Array): RawDictEntry[] {
-    if (bytes.length <= BDICT_ENTRY_TABLE_OFFSET) {
-        throw new Error('Invalid Baidu dictionary file: file is too small');
-    }
-    const declaredCount = readUint32Le(bytes, BDICT_ENTRY_COUNT_OFFSET);
-    const entries: RawDictEntry[] = [];
-    let offset = BDICT_ENTRY_TABLE_OFFSET;
+  if (bytes.length <= BDICT_ENTRY_TABLE_OFFSET) {
+    throw new Error('Invalid Baidu dictionary file: file is too small');
+  }
+  const declaredCount = readUint32Le(bytes, BDICT_ENTRY_COUNT_OFFSET);
+  const entries: RawDictEntry[] = [];
+  let offset = BDICT_ENTRY_TABLE_OFFSET;
 
-    while (entries.length < declaredCount && offset + 4 <= bytes.length) {
-        const length = readUint16Le(bytes, offset);
-        const frequency = readUint16Le(bytes, offset + 2);
-        offset += 4;
-        if (length === 0) break;
-        const weight = frequency > 0 ? frequency : DEFAULT_DICT_ENTRY_WEIGHT;
+  while (entries.length < declaredCount && offset + 4 <= bytes.length) {
+    const length = readUint16Le(bytes, offset);
+    const frequency = readUint16Le(bytes, offset + 2);
+    offset += 4;
+    if (length === 0) break;
+    const weight = frequency > 0 ? frequency : DEFAULT_DICT_ENTRY_WEIGHT;
 
-        // A (0, 0) first pinyin pair would decode to the nonexistent syllable
-        // "cuang", so a zero u16 here reliably marks format 3.
-        if (offset + 2 <= bytes.length && readUint16Le(bytes, offset) === 0) {
-            const wordLength = readUint16Le(bytes, offset + 2);
-            offset += 4;
-            if (offset + (length + wordLength) * 2 > bytes.length) break;
-            const code = readUtf16Le(bytes, offset, length * 2);
-            offset += length * 2;
-            const word = readUtf16Le(bytes, offset, wordLength * 2);
-            offset += wordLength * 2;
-            pushEntry(entries, word, normalizeLooseCode(code), weight);
-            continue;
-        }
-
-        const firstByte = bytes[offset];
-        if (firstByte !== 0xff && firstByte >= BDICT_INITIALS.length) {
-            if (offset + length > bytes.length) break;
-            const word = readAscii(bytes, offset, length);
-            offset += length;
-            pushEntry(entries, word, word.toLowerCase(), weight);
-            continue;
-        }
-
-        if (offset + length * 4 > bytes.length) break;
-        const syllables: string[] = [];
-        let valid = true;
-        for (let i = 0; i < length; i++) {
-            const initialIdx = bytes[offset];
-            const finalIdx = bytes[offset + 1];
-            offset += 2;
-            if (initialIdx === 0xff) {
-                syllables.push(String.fromCharCode(finalIdx).toLowerCase());
-                continue;
-            }
-            const initial = BDICT_INITIALS[initialIdx];
-            const final = BDICT_FINALS[finalIdx];
-            if (initial === undefined || final === undefined) {
-                valid = false;
-                break;
-            }
-            syllables.push(initial + final);
-        }
-        // An out-of-range index means we lost the record boundary; stop
-        // instead of emitting garbage from the rest of the file.
-        if (!valid) break;
-        const word = readUtf16Le(bytes, offset, length * 2);
-        offset += length * 2;
-        pushEntry(entries, word, syllables.join(' '), weight);
+    // A (0, 0) first pinyin pair would decode to the nonexistent syllable
+    // "cuang", so a zero u16 here reliably marks format 3.
+    if (offset + 2 <= bytes.length && readUint16Le(bytes, offset) === 0) {
+      const wordLength = readUint16Le(bytes, offset + 2);
+      offset += 4;
+      if (offset + (length + wordLength) * 2 > bytes.length) break;
+      const code = readUtf16Le(bytes, offset, length * 2);
+      offset += length * 2;
+      const word = readUtf16Le(bytes, offset, wordLength * 2);
+      offset += wordLength * 2;
+      pushEntry(entries, word, normalizeLooseCode(code), weight);
+      continue;
     }
 
-    if (entries.length === 0) {
-        throw new Error('Invalid Baidu dictionary file: no entries found');
+    const firstByte = bytes[offset];
+    if (firstByte !== 0xff && firstByte >= BDICT_INITIALS.length) {
+      if (offset + length > bytes.length) break;
+      const word = readAscii(bytes, offset, length);
+      offset += length;
+      pushEntry(entries, word, word.toLowerCase(), weight);
+      continue;
     }
-    return entries;
+
+    if (offset + length * 4 > bytes.length) break;
+    const syllables: string[] = [];
+    let valid = true;
+    for (let i = 0; i < length; i++) {
+      const initialIdx = bytes[offset];
+      const finalIdx = bytes[offset + 1];
+      offset += 2;
+      if (initialIdx === 0xff) {
+        syllables.push(String.fromCharCode(finalIdx).toLowerCase());
+        continue;
+      }
+      const initial = BDICT_INITIALS[initialIdx];
+      const final = BDICT_FINALS[finalIdx];
+      if (initial === undefined || final === undefined) {
+        valid = false;
+        break;
+      }
+      syllables.push(initial + final);
+    }
+    // An out-of-range index means we lost the record boundary; stop
+    // instead of emitting garbage from the rest of the file.
+    if (!valid) break;
+    const word = readUtf16Le(bytes, offset, length * 2);
+    offset += length * 2;
+    pushEntry(entries, word, syllables.join(' '), weight);
+  }
+
+  if (entries.length === 0) {
+    throw new Error('Invalid Baidu dictionary file: no entries found');
+  }
+  return entries;
 }
 
 function pushEntry(entries: RawDictEntry[], text: string, code: string, weight: number): void {
-    if (!text || !code) return;
-    entries.push({ text, code, weight });
+  if (!text || !code) return;
+  entries.push({ text, code, weight });
 }
 
 // Format-3 codes are free text; map separator characters to the space that
 // RIME expects between syllables.
 function normalizeLooseCode(code: string): string {
-    return code.toLowerCase().replace(/['\s]+/g, ' ').trim();
+  return code.toLowerCase().replace(/['\s]+/g, ' ').trim();
 }

@@ -1,7 +1,9 @@
 import { copyFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { defineConfig } from 'wxt';
-import { sharedManifest, sharedInputComponent, sharedVite, sharedHooks } from './wxt.config.base';
+
+import { sharedHooks, sharedInputComponent, sharedManifest, sharedVite } from './wxt.config.base';
 
 // WXT loads .env files after importing this config, so read the key when the manifest is resolved.
 const getExtensionKey = () => process.env.FYDE_RHYTHM_KEY?.trim();
@@ -28,7 +30,7 @@ export default defineConfig({
         'unlimitedStorage',
         'input',
         'virtualKeyboardPrivate',
-        'inputMethodPrivate'
+        'inputMethodPrivate',
       ],
 
       input_components: [
@@ -41,11 +43,11 @@ export default defineConfig({
           // emits /inputview.html; the build:done hook below copies it here
           // (all asset references in the page are absolute, so the copy works
           // from any directory).
-          input_view: 'inputview/inputview.html'
-        }
+          input_view: 'inputview/inputview.html',
+        },
       ],
 
-      update_url: 'https://store.fydeos.com/update/nfglebjgiflmmcdddkbcbgmdkomlfcpa/updates.xml'
+      update_url: 'https://store.fydeos.com/update/nfglebjgiflmmcdddkbcbgmdkomlfcpa/updates.xml',
     } as any;
   },
 
@@ -57,6 +59,6 @@ export default defineConfig({
       const outDir = wxt.config.outDir;
       await mkdir(join(outDir, 'inputview'), { recursive: true });
       await copyFile(join(outDir, 'inputview.html'), join(outDir, 'inputview', 'inputview.html'));
-    }
-  }
+    },
+  },
 });

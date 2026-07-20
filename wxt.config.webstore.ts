@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
-import { sharedManifest, sharedInputComponent, sharedVite, sharedHooks } from './wxt.config.base';
+
+import { sharedHooks, sharedInputComponent, sharedManifest, sharedVite } from './wxt.config.base';
 
 // Chrome Web Store configuration - removes features not supported by Chrome Web Store
 export default defineConfig({
@@ -13,20 +14,20 @@ export default defineConfig({
     permissions: [
       'storage',
       'unlimitedStorage',
-      'input'
+      'input',
     ],
 
     input_components: [
       {
-        ...sharedInputComponent
+        ...sharedInputComponent,
         // Removed indicator (not supported on Web Store)
         // Removed input_view (custom virtual keyboard not supported on Web Store)
-      }
-    ]
+      },
+    ],
 
     // update_url is managed by Chrome Web Store
   } as any,
 
   vite: sharedVite,
-  hooks: sharedHooks
+  hooks: sharedHooks,
 });

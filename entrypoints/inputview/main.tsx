@@ -1,8 +1,10 @@
+import './md3.css';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
 import App from './App';
 import { applyMetrics } from './metrics';
-import './md3.css';
 
 // The geometry md3.css lays the board out from — the same numbers geometryFor()
 // sizes the OS window with. Published before the first render, so the keys are
@@ -14,28 +16,30 @@ applyMetrics(document.documentElement);
 // changes its setting (same-origin localStorage 'mui-mode' → storage event)
 // or when the system scheme flips.
 function applyTheme() {
-    let mode = 'system';
-    try {
-        mode = localStorage.getItem('mui-mode') ?? 'system';
-    } catch { /* storage unavailable — keep system */ }
-    const dark = mode === 'system'
-        ? window.matchMedia('(prefers-color-scheme: dark)').matches
-        : mode === 'dark';
-    document.documentElement.classList.toggle('dark', dark);
-    document.documentElement.classList.toggle('light', !dark);
+  let mode = 'system';
+  try {
+    mode = localStorage.getItem('mui-mode') ?? 'system';
+  }
+  catch { /* storage unavailable — keep system */ }
+  const dark = mode === 'system'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : mode === 'dark';
+  document.documentElement.classList.toggle('dark', dark);
+  document.documentElement.classList.toggle('light', !dark);
 }
 
 window.addEventListener('storage', (e) => {
-    if (!e.key || e.key === 'mui-mode') applyTheme();
+  if (!e.key || e.key === 'mui-mode') applyTheme();
 });
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
 try {
-    document.documentElement.lang = chrome.i18n.getUILanguage();
-} catch { /* dev tab — keep the static lang */ }
+  document.documentElement.lang = chrome.i18n.getUILanguage();
+}
+catch { /* dev tab — keep the static lang */ }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
 );

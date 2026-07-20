@@ -4,15 +4,15 @@
 // emoji font. `skin: true` marks emoji that take Fitzpatrick modifiers.
 
 export interface EmojiDef {
-    char: string;
-    skin?: boolean;
+  char: string;
+  skin?: boolean;
 }
 
 export interface EmojiCategory {
-    // Tab names resolve via i18n as vk_emoji_<id>.
-    id: string;
-    icon: string;
-    emoji: EmojiDef[];
+  // Tab names resolve via i18n as vk_emoji_<id>.
+  id: string;
+  icon: string;
+  emoji: EmojiDef[];
 }
 
 export const kSkinTones = ['\u{1F3FB}', '\u{1F3FC}', '\u{1F3FD}', '\u{1F3FE}', '\u{1F3FF}'];
@@ -24,18 +24,18 @@ const kEmojiModifierBase = /\p{Emoji_Modifier_Base}/u;
 // unchanged. VS16 on a toned base is redundant, but selectors on later symbols
 // still matter (for example the one after ⚕ in 🧑‍⚕️).
 export function withSkinTone(base: string, tone: string): string {
-    const components = base.split('\u200D');
-    const toneComponent = (component: string) => component.replace(/\uFE0F/g, '') + tone;
-    components[0] = toneComponent(components[0]);
-    const last = components.length - 1;
-    if (last > 0 && kEmojiModifierBase.test(components[last])) {
-        components[last] = toneComponent(components[last]);
-    }
-    return components.join('\u200D');
+  const components = base.split('\u200D');
+  const toneComponent = (component: string) => component.replace(/\uFE0F/g, '') + tone;
+  components[0] = toneComponent(components[0]);
+  const last = components.length - 1;
+  if (last > 0 && kEmojiModifierBase.test(components[last])) {
+    components[last] = toneComponent(components[last]);
+  }
+  return components.join('\u200D');
 }
 
 export function skinVariants(base: string): string[] {
-    return [base, ...kSkinTones.map((t) => withSkinTone(base, t))];
+  return [base, ...kSkinTones.map(t => withSkinTone(base, t))];
 }
 
 export { kEmojiCategories } from './catalog';

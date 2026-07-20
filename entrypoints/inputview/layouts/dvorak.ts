@@ -5,6 +5,6 @@ import type { LatinFrameSpec } from './frame';
 // 10-letter home row squeezes to 0.9u, and row 3 drops ';' (it lives on the
 // symbols layer) so its nine letters fit between the anchors.
 export const dvorakSpec: LatinFrameSpec = {
-    id: 'dvorak',
-    rows: ["',.pyfgcrl", 'aoeuidhtns', 'qjkxbmwvz'],
+  id: 'dvorak',
+  rows: ["',.pyfgcrl", 'aoeuidhtns', 'qjkxbmwvz'],
 };

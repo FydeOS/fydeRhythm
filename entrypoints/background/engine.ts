@@ -1,252 +1,254 @@
-import CreateRimeWasm from "./rime_emscripten"
 import { Mutex } from 'async-mutex';
-import { openDB, deleteDB } from "idb";
-import type { RimeCandidate, RimeCommit, RimeContext, RimeSchema, RimeStatus } from "@/lib/shared-types";
-import type { FastIndexedDbFsController } from "@/lib/fs";
-import EventEmitter from "events";
+import EventEmitter from 'events';
+import { deleteDB, openDB } from 'idb';
+
+import type { FastIndexedDbFsController } from '@/lib/fs';
+import type { RimeCandidate, RimeCommit, RimeContext, RimeSchema, RimeStatus } from '@/lib/shared-types';
+
+import CreateRimeWasm from './rime_emscripten';
 
 export class RimeCandidateIterator {
-    wasmIterator: any;
-    engine: RimeEngine;
-    // destroy() can run while an advance()/current() is queued on the engine
-    // mutex; calling into a deleted embind handle aborts, so both methods
-    // re-check this flag inside the exclusive section (JS is single-threaded,
-    // so destroy() cannot interleave between that check and the wasm call).
-    private destroyed = false;
-    private destroyPromise: Promise<void> | null = null;
+  wasmIterator: any;
+  engine: RimeEngine;
+  // destroy() can run while an advance()/current() is queued on the engine
+  // mutex; calling into a deleted embind handle aborts, so both methods
+  // re-check this flag inside the exclusive section (JS is single-threaded,
+  // so destroy() cannot interleave between that check and the wasm call).
+  private destroyed = false;
+  private destroyPromise: Promise<void> | null = null;
 
-    constructor(it: any, eng: RimeEngine) {
-        this.wasmIterator = it;
-        this.engine = eng;
-    }
+  constructor(it: any, eng: RimeEngine) {
+    this.wasmIterator = it;
+    this.engine = eng;
+  }
 
-    async destroy(): Promise<void> {
-        if (this.destroyPromise) return this.destroyPromise;
-        this.destroyed = true;
-        this.destroyPromise = this.engine.mutex.runExclusive(async () => {
-            this.wasmIterator?.delete();
-        });
-        return this.destroyPromise;
-    }
+  async destroy(): Promise<void> {
+    if (this.destroyPromise) return this.destroyPromise;
+    this.destroyed = true;
+    this.destroyPromise = this.engine.mutex.runExclusive(async () => {
+      this.wasmIterator?.delete();
+    });
+    return this.destroyPromise;
+  }
 
-    async advance() {
-        await this.engine.mutex.runExclusive(async () => {
-            if (this.destroyed) return;
-            await this.wasmIterator.advance();
-        });
-    }
+  async advance() {
+    await this.engine.mutex.runExclusive(async () => {
+      if (this.destroyed) return;
+      await this.wasmIterator.advance();
+    });
+  }
 
-    async current() : Promise<RimeCandidate | null> {
-        return await this.engine.mutex.runExclusive(async () => {
-            if (this.destroyed) return null;
-            return await this.wasmIterator.current();
-        });
-    }
+  async current(): Promise<RimeCandidate | null> {
+    return await this.engine.mutex.runExclusive(async () => {
+      if (this.destroyed) return null;
+      return await this.wasmIterator.current();
+    });
+  }
 }
 
 export class RimeSession extends EventEmitter {
-    engine: RimeEngine;
-    wasmSession: any;
+  engine: RimeEngine;
+  wasmSession: any;
 
-    constructor(session: any, engine: RimeEngine) {
-        super();
-        this.wasmSession = session;
-        this.engine = engine;
-    }
+  constructor(session: any, engine: RimeEngine) {
+    super();
+    this.wasmSession = session;
+    this.engine = engine;
+  }
 
-    async processKey(keyId: number, mask: number): Promise<boolean> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.processKey(keyId, mask);
-        });
-    }
+  async processKey(keyId: number, mask: number): Promise<boolean> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.processKey(keyId, mask);
+    });
+  }
 
-    async getContext(): Promise<RimeContext> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.getContext();
-        });
-    }
+  async getContext(): Promise<RimeContext> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.getContext();
+    });
+  }
 
-    async getCommit(): Promise<RimeCommit> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.getCommit();
-        });
-    }
+  async getCommit(): Promise<RimeCommit> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.getCommit();
+    });
+  }
 
-    async getStatus(): Promise<RimeStatus> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.getStatus();
-        });
-    }
+  async getStatus(): Promise<RimeStatus> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.getStatus();
+    });
+  }
 
-    async clearComposition(): Promise<void> {
-        await this.engine.mutex.runExclusive(async () => {
-            await this.wasmSession.clearComposition();
-        });
-    }
+  async clearComposition(): Promise<void> {
+    await this.engine.mutex.runExclusive(async () => {
+      await this.wasmSession.clearComposition();
+    });
+  }
 
-    async getCurrentSchema(): Promise<string> {
-        return await this.engine.mutex.runExclusive(async () => {
-            const s = await this.wasmSession.getCurrentSchema();
-            if (s == null)
-                throw new Error("Cannot get current schema");
-            return s;
-        });
-    }
+  async getCurrentSchema(): Promise<string> {
+    return await this.engine.mutex.runExclusive(async () => {
+      const s = await this.wasmSession.getCurrentSchema();
+      if (s == null)
+        throw new Error('Cannot get current schema');
+      return s;
+    });
+  }
 
-    async actionCandidate(index: number, op: 'select' | 'delete', currentPage: boolean): Promise<void> {
-        await this.engine.mutex.runExclusive(async () => {
-            const action = op === 'select' ? 0 : 1;
-            const s = await this.wasmSession.actionCandidate(index, action, currentPage);
-            if (!s)
-                throw new Error(`Cannot ${op} candidate ${index}`);
-        });
-    }
+  async actionCandidate(index: number, op: 'select' | 'delete', currentPage: boolean): Promise<void> {
+    await this.engine.mutex.runExclusive(async () => {
+      const action = op === 'select' ? 0 : 1;
+      const s = await this.wasmSession.actionCandidate(index, action, currentPage);
+      if (!s)
+        throw new Error(`Cannot ${op} candidate ${index}`);
+    });
+  }
 
-    async setOption(option: string, val: boolean) {
-        await this.engine.mutex.runExclusive(async () => {
-            await this.wasmSession.setOption(option, val);
-        });
-    }
+  async setOption(option: string, val: boolean) {
+    await this.engine.mutex.runExclusive(async () => {
+      await this.wasmSession.setOption(option, val);
+    });
+  }
 
-    async getOption(option: string): Promise<boolean> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.getOption(option);
-        });
-    }
+  async getOption(option: string): Promise<boolean> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.getOption(option);
+    });
+  }
 
-    async getOptionLabel(option: string, state: boolean): Promise<string> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return await this.wasmSession.getOptionLabel(option, state);
-        });
-    }
+  async getOptionLabel(option: string, state: boolean): Promise<string> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return await this.wasmSession.getOptionLabel(option, state);
+    });
+  }
 
-    async iterateCandidates(startIndex: number): Promise<RimeCandidateIterator> {
-        return await this.engine.mutex.runExclusive(async () => {
-            return new RimeCandidateIterator(await this.wasmSession.iterateCandidates(startIndex), this.engine);
-        });
-    }
+  async iterateCandidates(startIndex: number): Promise<RimeCandidateIterator> {
+    return await this.engine.mutex.runExclusive(async () => {
+      return new RimeCandidateIterator(await this.wasmSession.iterateCandidates(startIndex), this.engine);
+    });
+  }
 
-    destroy() {
-        this.wasmSession.delete();
-    }
+  destroy() {
+    this.wasmSession.delete();
+  }
 }
 
 export class RimeEngine {
-    wasmObject: any;
-    mutex: Mutex;
-    initialized: boolean;
-    constructor() {
-        this.mutex = new Mutex();
-        this.initialized = false;
-    }
+  wasmObject: any;
+  mutex: Mutex;
+  initialized: boolean;
+  constructor() {
+    this.mutex = new Mutex();
+    this.initialized = false;
+  }
 
-    async initialize(printErr: (message: string) => void, fs: FastIndexedDbFsController, mountPath: string) {
-        await this.mutex.runExclusive(async () => {
-            if (!this.initialized) {
-                this.wasmObject = await CreateRimeWasm({
-                    locateFile: (path: string, _dir: string) => {
-                        return '/' + path;
-                    },
-                    fsc: fs,
-                    idb: { openDB, deleteDB },
-                    printErr: printErr,
-                })
-                await this.wasmObject.rimeSetup(mountPath);
-                this.initialized = true;
-            }
-        })
-    }
-
-    async rebuildPrism(schemaId: string, schemaConfig: string): Promise<void> {
-        await this.mutex.runExclusive(async () => {
-            await this.wasmObject.rimeRebuildPrismForSchema(schemaId, schemaConfig);
+  async initialize(printErr: (message: string) => void, fs: FastIndexedDbFsController, mountPath: string) {
+    await this.mutex.runExclusive(async () => {
+      if (!this.initialized) {
+        this.wasmObject = await CreateRimeWasm({
+          locateFile: (path: string, _dir: string) => {
+            return '/' + path;
+          },
+          fsc: fs,
+          idb: { openDB, deleteDB },
+          printErr: printErr,
         });
-    }
+        await this.wasmObject.rimeSetup(mountPath);
+        this.initialized = true;
+      }
+    });
+  }
 
-    // Dictionary-pack import depends on RIME compilation entry points that are
-    // only present in a wasm binary rebuilt with the dict-pack support. Guard
-    // against an older engine binary so the failure is actionable rather than a
-    // cryptic "rimeBuildDictionaryPack is not a function".
-    private assertDictionaryPackSupport(): void {
-        if (typeof this.wasmObject?.rimeBuildDictionaryPack !== 'function'
-            || typeof this.wasmObject?.rimeCollectValidDictionaryEntries !== 'function') {
-            throw new Error(
-                'This build of the RIME engine does not support dictionary-pack import. '
-                + 'Please update the extension to a build that includes the dictionary compiler.',
-            );
-        }
-    }
+  async rebuildPrism(schemaId: string, schemaConfig: string): Promise<void> {
+    await this.mutex.runExclusive(async () => {
+      await this.wasmObject.rimeRebuildPrismForSchema(schemaId, schemaConfig);
+    });
+  }
 
-    async compileDictionaryPack(req: {
-        schemaId: string;
-        schemaConfigYaml: string;
-        baseDictionary: string;
-        packName: string;
-        packDictYaml: string;
-    }): Promise<{ ok: boolean; warnings: string[] }> {
-        return await this.mutex.runExclusive(async () => {
-            this.assertDictionaryPackSupport();
-            const result = await this.wasmObject.rimeBuildDictionaryPack(
-                req.schemaId,
-                req.schemaConfigYaml,
-                req.baseDictionary,
-                req.packName,
-                req.packDictYaml,
-            );
-            return { ok: result.ok as boolean, warnings: (result.warnings as string[]) ?? [] };
-        });
+  // Dictionary-pack import depends on RIME compilation entry points that are
+  // only present in a wasm binary rebuilt with the dict-pack support. Guard
+  // against an older engine binary so the failure is actionable rather than a
+  // cryptic "rimeBuildDictionaryPack is not a function".
+  private assertDictionaryPackSupport(): void {
+    if (typeof this.wasmObject?.rimeBuildDictionaryPack !== 'function'
+      || typeof this.wasmObject?.rimeCollectValidDictionaryEntries !== 'function') {
+      throw new Error(
+        'This build of the RIME engine does not support dictionary-pack import. '
+        + 'Please update the extension to a build that includes the dictionary compiler.',
+      );
     }
+  }
 
-    async collectValidDictionaryEntries(req: {
-        baseDictionary: string;
-        packName: string;
-        packDictYaml: string;
-    }): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
-        return await this.mutex.runExclusive(async () => {
-            this.assertDictionaryPackSupport();
-            const result = await this.wasmObject.rimeCollectValidDictionaryEntries(
-                req.baseDictionary,
-                req.packName,
-                req.packDictYaml,
-            );
-            return {
-                ok: result.ok as boolean,
-                warnings: (result.warnings as string[]) ?? [],
-                entries: (result.entries as Array<{ text: string; code: string; weight: number }>) ?? [],
-            };
-        });
-    }
+  async compileDictionaryPack(req: {
+    schemaId: string;
+    schemaConfigYaml: string;
+    baseDictionary: string;
+    packName: string;
+    packDictYaml: string;
+  }): Promise<{ ok: boolean; warnings: string[] }> {
+    return await this.mutex.runExclusive(async () => {
+      this.assertDictionaryPackSupport();
+      const result = await this.wasmObject.rimeBuildDictionaryPack(
+        req.schemaId,
+        req.schemaConfigYaml,
+        req.baseDictionary,
+        req.packName,
+        req.packDictYaml,
+      );
+      return { ok: result.ok as boolean, warnings: (result.warnings as string[]) ?? [] };
+    });
+  }
 
-    async createSession(schemaId: string, schemaConfig: string): Promise<RimeSession> {
-        return await this.mutex.runExclusive(async () => {
-            console.log("Creating session")
-            const newSession = new this.wasmObject.RimeSession();
-            console.log("Initializing session");
-            const session = new RimeSession(newSession, this);
-            await newSession.initialize(schemaId, schemaConfig, (name: string, val: boolean, label: string) => {
-                session.emit('optionChanged', name, val, label);
-            });
-            return session;
-        });
-    }
+  async collectValidDictionaryEntries(req: {
+    baseDictionary: string;
+    packName: string;
+    packDictYaml: string;
+  }): Promise<{ ok: boolean; warnings: string[]; entries: Array<{ text: string; code: string; weight: number }> }> {
+    return await this.mutex.runExclusive(async () => {
+      this.assertDictionaryPackSupport();
+      const result = await this.wasmObject.rimeCollectValidDictionaryEntries(
+        req.baseDictionary,
+        req.packName,
+        req.packDictYaml,
+      );
+      return {
+        ok: result.ok as boolean,
+        warnings: (result.warnings as string[]) ?? [],
+        entries: (result.entries as Array<{ text: string; code: string; weight: number }>) ?? [],
+      };
+    });
+  }
 
-    async performMaintenance(): Promise<void> {
-        return await this.mutex.runExclusive(async () => {
-            await this.wasmObject.rimePerformMaintenance(true);
-        });
-    }
+  async createSession(schemaId: string, schemaConfig: string): Promise<RimeSession> {
+    return await this.mutex.runExclusive(async () => {
+      console.log('Creating session');
+      const newSession = new this.wasmObject.RimeSession();
+      console.log('Initializing session');
+      const session = new RimeSession(newSession, this);
+      await newSession.initialize(schemaId, schemaConfig, (name: string, val: boolean, label: string) => {
+        session.emit('optionChanged', name, val, label);
+      });
+      return session;
+    });
+  }
 
-    async destroy() {
-        this.wasmObject?.rimeFinalize();
-        this.wasmObject = null;
-    }
+  async performMaintenance(): Promise<void> {
+    return await this.mutex.runExclusive(async () => {
+      await this.wasmObject.rimePerformMaintenance(true);
+    });
+  }
 
-    async getSchemaList(): Promise<RimeSchema[]> {
-        return await this.mutex.runExclusive(async () => {
-            const l = await this.wasmObject.rimeGetSchemaList();
-            if (l != null)
-                return l;
-            throw Error("Cannot get schema list");
-        });
-    }
+  async destroy() {
+    this.wasmObject?.rimeFinalize();
+    this.wasmObject = null;
+  }
+
+  async getSchemaList(): Promise<RimeSchema[]> {
+    return await this.mutex.runExclusive(async () => {
+      const l = await this.wasmObject.rimeGetSchemaList();
+      if (l != null)
+        return l;
+      throw Error('Cannot get schema list');
+    });
+  }
 }
