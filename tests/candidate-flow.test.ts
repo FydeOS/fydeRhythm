@@ -83,22 +83,87 @@ beforeEach(() => {
 });
 
 describe('inputview candidate cache', () => {
-  it('installs one iterator and caches the first 10 candidates', async () => {
+  it('installs one iterator and seeds the reported viewport window', async () => {
     const iterator = fakeIterator(candidates(12));
     const controller = makeController([iterator]);
     const candidatesBack = vi.fn();
     controller.addListener('candidatesBack', candidatesBack);
 
+    // The keyboard reported an 8-candidate viewport before typing, so the
+    // composition seeds 8 — not the old hard-coded 10 — even though more exist.
+    await controller.setCandidateWindow(8);
     await controller.refreshContext();
 
-    expect(controller.candidateCache.map(c => c.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(controller.candidateCache.map(c => c.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(candidatesBack).toHaveBeenLastCalledWith(
-      candidates(10).map(c => ({ candidate: c.text, ix: c.index })),
+      candidates(8).map(c => ({ candidate: c.text, ix: c.index })),
       expect.any(Number),
       expect.any(String),
       expect.any(Number),
     );
     expect(iterator.destroy).not.toHaveBeenCalled();
+  });
+
+  it('reseeds each new word at the full window, so none starts short then grows', async () => {
+    const wordA = fakeIterator(candidates(30));
+    const wordB = fakeIterator(candidates(30, 100));
+    const controller = makeController([wordA, wordB]);
+    await controller.setCandidateWindow(20);
+
+    await controller.refreshContext(); // word "ni"
+    expect(controller.candidateCache).toHaveLength(20);
+
+    // A new word (preedit changes) must reseed the same window, not fall back
+    // to a smaller default — the regression that flickered on narrow words.
+    (controller.session as never as { getContext: Mock }).getContext.mockResolvedValue({
+      composition: { cursorPosition: 0, preedit: 'hao' },
+      menu: { candidates: [], pageSize: 5, pageNumber: 0, isLastPage: false },
+      selectLabels: [],
+    });
+    await controller.refreshContext(); // word "hao"
+
+    expect(controller.candidateCache.map(c => c.index)).toEqual(
+      candidates(20, 100).map(c => c.index),
+    );
+  });
+
+  it('publishes a seed in one full batch, never a growing sequence', async () => {
+    const controller = makeController([fakeIterator(candidates(30))]);
+    const lengths: number[] = [];
+    controller.addListener('candidatesBack', (list: unknown) => lengths.push((list as unknown[]).length));
+    await controller.setCandidateWindow(20);
+
+    await controller.refreshContext();
+
+    // Every non-empty publish for the composition is already the full window;
+    // a 1→2→…→N ramp would be the visible flicker.
+    const published = lengths.filter(n => n > 0);
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.every(n => n === 20)).toBe(true);
+  });
+
+  it('tops up a live composition when the window grows (resize / expand)', async () => {
+    const iterator = fakeIterator(candidates(20));
+    const controller = makeController([iterator]);
+    await controller.setCandidateWindow(6);
+    await controller.refreshContext();
+    expect(controller.candidateCache).toHaveLength(6);
+
+    const candidatesBack = vi.fn();
+    controller.addListener('candidatesBack', candidatesBack);
+    // A wider viewport is reported mid-composition: the existing cache is
+    // extended to the new window without rebuilding the iterator.
+    await controller.setCandidateWindow(15);
+
+    expect(controller.candidateCache.map(c => c.index)).toEqual(
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+    );
+    expect(candidatesBack).toHaveBeenLastCalledWith(
+      candidates(15).map(c => ({ candidate: c.text, ix: c.index })),
+      expect.any(Number),
+      expect.any(String),
+      expect.any(Number),
+    );
   });
 
   it('publishes the highlight folded to a global index across pages', async () => {
@@ -166,6 +231,8 @@ describe('inputview candidate cache', () => {
   it('stops fetching when the cache is invalidated mid-fetch', async () => {
     const iterator = fakeIterator(candidates(20));
     const controller = makeController([iterator]);
+    // Seed small so the follow-up fetch still has candidates to advance into.
+    await controller.setCandidateWindow(10);
     await controller.refreshContext();
 
     // Invalidate (e.g. a keystroke) on the 3rd advance of a follow-up

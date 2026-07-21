@@ -128,5 +128,7 @@ export type InputViewToBackground
     | { kind: 'selectCandidate'; index: number }
     | { kind: 'deleteCandidate'; index: number }
     | { kind: 'loadMoreCandidates'; count: number }
+    /** Viewport-fill count; the engine seeds each composition at this size. */
+    | { kind: 'setCandidateWindow'; count: number }
     | { kind: 'switchSchema'; schemaId: string }
     | { kind: 'getSchemaList' };

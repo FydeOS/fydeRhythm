@@ -415,11 +415,16 @@ export default function App() {
     }
   };
 
-  const requestLoadMore = () => {
+  const requestLoadMore = (count = kCandidatePageSize) => {
     if (loadMoreMark.current === candidates.length) return;
     loadMoreMark.current = candidates.length;
-    post({ kind: 'loadMoreCandidates', count: kCandidatePageSize });
+    post({ kind: 'loadMoreCandidates', count });
   };
+
+  const setCandidateWindow = useCallback(
+    (count: number) => postRef.current?.({ kind: 'setCandidateWindow', count }),
+    [],
+  );
 
   const selectCandidate = (index: number) => {
     setPopover(null);
@@ -565,6 +570,7 @@ export default function App() {
         onSelect={selectCandidate}
         onDeleteRequest={(candidate, anchor) => setPopover({ type: 'confirm', candidate, anchor })}
         onLoadMore={requestLoadMore}
+        onSetWindow={setCandidateWindow}
         onExpand={() => { requestLoadMore(); setExpanded(true); }}
         onOpenSettings={() => { dismissClipboard(); host.openSettings(); }}
         onEmoji={() => { dismissClipboard(); setPanel('emoji'); }}

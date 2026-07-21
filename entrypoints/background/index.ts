@@ -414,6 +414,11 @@ export default defineBackground({
               void self.controller.fetchMoreCandidates(msg.count)
                 .catch((error: unknown) => reportInputViewError('loadMoreCandidates', error));
               break;
+            case 'setCandidateWindow':
+              if (!Number.isSafeInteger(msg.count) || msg.count <= 0) break;
+              void self.controller.setCandidateWindow(msg.count)
+                .catch((error: unknown) => reportInputViewError('setCandidateWindow', error));
+              break;
             case 'switchSchema':
               if (typeof msg.schemaId !== 'string' || msg.schemaId.trim().length === 0) break;
               void activateSchema(msg.schemaId)

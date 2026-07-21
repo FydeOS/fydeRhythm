@@ -778,7 +778,7 @@ export class InputController extends EventEmitter {
             }
             this.candidateIteratorPreedit = preedit;
             this.candidateIterator = iterator;
-            await this.fetchMoreCandidates(10, highlighted);
+            await this.fetchMoreCandidates(this.candidateWindow, highlighted);
           }
           if (generation !== this.candidateGeneration) return;
           this.sendCandidateCacheToInputView(highlighted);
@@ -1213,6 +1213,19 @@ export class InputController extends EventEmitter {
   // the fresh cache and re-sending them AFTER the list was cleared.
   candidateGeneration = 0;
   candidateDisposal: Promise<void> = Promise.resolve();
+  // Per-composition seed size, reported by the keyboard's width measurement.
+  // Default covers the first composition before that report arrives; erring
+  // high only over-fetches once and never under-fills (which would flicker).
+  candidateWindow = 24;
+
+  async setCandidateWindow(count: number) {
+    this.candidateWindow = Math.max(1, Math.min(64, Math.floor(count)));
+    // Fill a widened viewport now, not on the next keystroke.
+    const deficit = this.candidateWindow - this.candidateCache.length;
+    if (deficit > 0 && this.candidateIterator) {
+      await this.fetchMoreCandidates(deficit);
+    }
+  }
 
   async fetchMoreCandidates(count: number, highlightedIndex = this.lastPublishedHighlight) {
     await this.candidateFetchMutex.runExclusive(async () => {

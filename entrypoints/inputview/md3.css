@@ -615,6 +615,8 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  /* proximity, not mandatory — mandatory fights programmatic paging. */
+  scroll-snap-type: x proximity;
 }
 
 .kb-candidates::-webkit-scrollbar {
@@ -624,6 +626,7 @@ body {
 .kb-candidate {
   flex: none;
   max-width: 45vw;
+  scroll-snap-align: start;
   border: none;
   background: transparent;
   border-radius: var(--kb-panel-radius);

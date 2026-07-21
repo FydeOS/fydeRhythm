@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { InputViewCandidate } from '@/lib/shared-types';
 
+import { candidateSeed, kMinBatch } from '../candidate-window';
 import { t } from '../i18n';
 import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, KeyboardHideIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
 
@@ -10,7 +11,8 @@ export interface CandidateBarProps {
   highlightedIndex: number;
   onSelect: (index: number) => void;
   onDeleteRequest: (candidate: InputViewCandidate, anchor: DOMRect) => void;
-  onLoadMore: () => void;
+  onLoadMore: (count?: number) => void;
+  onSetWindow: (count: number) => void; // bar-width fill count → engine seed size
   onExpand: () => void;
   onOpenSettings: () => void;
   onEmoji: () => void;
@@ -114,12 +116,50 @@ export function CandidateChip({ candidate, highlighted, onSelect, onDeleteReques
   );
 }
 
+// An element's content width as state, re-measured on resize. Returns a ref
+// callback to attach and the latest width (0 until first measured).
+function useMeasuredWidth() {
+  const [width, setWidth] = useState(0);
+  const observer = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    observer.current?.disconnect();
+    observer.current = null;
+    if (el) {
+      observer.current = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+      observer.current.observe(el);
+    }
+  }, []);
+  return [ref, width] as const;
+}
+
 export function CandidateBar(props: CandidateBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevFirstRef = useRef<{ index: number; text: string } | null>(null);
+  const [barRef, barWidth] = useMeasuredWidth();
+
+  // Width-derived seed: steady across words, so candidates never grow in place.
+  const seed = candidateSeed(barWidth);
+  const { onSetWindow } = props;
+  useEffect(() => { if (seed) onSetWindow(seed); }, [seed, onSetWindow]);
+
+  // A new composition reuses the scroll container and its old scrollLeft; snap
+  // back unless this is a load-more append (same first candidate).
+  useEffect(() => {
+    const first = props.candidates[0] ?? null;
+    const prev = prevFirstRef.current;
+    const append = prev != null && first != null && first.index === prev.index && first.text === prev.text;
+    if (!append && scrollRef.current) scrollRef.current.scrollLeft = 0;
+    prevFirstRef.current = first ? { index: first.index, text: first.text } : null;
+  });
+
+  const maybeLoadMore = () => {
+    const el = scrollRef.current;
+    if (el && el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) props.onLoadMore(seed || kMinBatch);
+  };
 
   if (props.candidates.length === 0 || props.activeTool === 'clipboard') {
     return (
-      <div className="kb-bar">
+      <div className="kb-bar" ref={barRef}>
         <div className="kb-toolbar">
           <button className="icon-btn" aria-label={t('vk_settings')} onClick={props.onOpenSettings}><SettingsIcon /></button>
           <button
@@ -154,23 +194,27 @@ export function CandidateBar(props: CandidateBarProps) {
     );
   }
 
+  // Page to whole-chip boundaries so no glyph is clipped at the leading edge.
   const page = (dir: 1 | -1) => {
     const el = scrollRef.current;
     if (!el) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: reduced ? 'auto' : 'smooth' });
+    const strip = el.getBoundingClientRect();
+    const chips = Array.from(el.children) as HTMLElement[];
+    const anchor = dir === 1
+      ? chips.find(c => c.getBoundingClientRect().right > strip.right + 1)
+      : chips.find(c => c.getBoundingClientRect().left - strip.left >= -el.clientWidth - 1) ?? chips[0];
+    if (anchor) {
+      const target = el.scrollLeft + (anchor.getBoundingClientRect().left - strip.left);
+      if (Math.abs(target - el.scrollLeft) >= 1) {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollTo({ left: target, behavior: reduced ? 'auto' : 'smooth' });
+      }
+    }
     if (dir === 1) maybeLoadMore();
   };
 
-  const maybeLoadMore = () => {
-    const el = scrollRef.current;
-    if (el && el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) {
-      props.onLoadMore();
-    }
-  };
-
   return (
-    <div className="kb-bar">
+    <div className="kb-bar" ref={barRef}>
       <div className="kb-candidates" ref={scrollRef} onScroll={maybeLoadMore}>
         {props.candidates.map(c => (
           <CandidateChip
