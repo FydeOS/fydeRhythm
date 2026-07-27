@@ -19,15 +19,14 @@ import { bottomRow, getLayerLayout, getLayout, numpadLayout } from './layouts';
 import { kanaModifyNext } from './layouts/kana';
 import { type AltDef, codeForChar, type KeyAction, type KeyDef, type LayerId } from './layouts/types';
 import {
-  geometryFor,
   type KeyboardMode,
   kFloatingScaleMax,
   kFloatingScaleMin,
   kOneHandRows,
   type OneHandSide,
-  type Placement,
 } from './placement';
 import { tapShift, typeWithShift } from './shift-state';
+import { type FloatingPos, VkContainer } from './vk-container';
 
 type Popover
   = | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -36,12 +35,7 @@ type Popover
     | { type: 'kbmode'; anchor: DOMRect }
     | null;
 
-type FloatingPos = { left: number; top: number };
 type InputPanel = 'emoji' | 'clipboard' | null;
-
-function readWindowPos(): FloatingPos {
-  return { left: window.screenX, top: window.screenY };
-}
 
 const kCandidatePageSize = 10;
 
@@ -83,7 +77,8 @@ export default function App() {
   const [placementLoaded, setPlacementLoaded] = useState(false);
   const [mode, setMode] = useState<KeyboardMode>('docked');
   const [side, setSide] = useState<OneHandSide>('right');
-  const [floatingScale, setFloatingScale] = useState(1);
+  // Only a re-render trigger: container.geometry() reads floatingScaleRef.
+  const [, setFloatingScale] = useState(1);
   // Mirrors for the once-on-mount handlers (visibility/orientation) and the
   // resize gesture, which would otherwise capture stale state.
   const modeRef = useRef<KeyboardMode>('docked');
@@ -97,13 +92,6 @@ export default function App() {
   // effect would leave the card a render behind the window it sits in.
   const [rows, setRows] = useState(0);
   const rowsRef = useRef(0);
-  const placementLoadedRef = useRef(false);
-  // Geometry last handed to the OS, so a re-render that changes nothing about
-  // the card doesn't re-place the window.
-  const appliedRef = useRef('');
-  // Last known floating window position (null = never placed → centre it).
-  // One-hand ignores it: geometryFor pins that card to a corner.
-  const floatingPosRef = useRef<FloatingPos | null>(null);
   // Active corner-grip drag: start pointer-x, scale, window position, and card
   // width — the top-right corner is held fixed so it grows toward lower-left.
   const resizeStart = useRef<{ x: number; scale: number; pos: FloatingPos } | null>(null);
@@ -124,19 +112,12 @@ export default function App() {
   const deleteClipboardItem = useCallback((itemId: string) => host.deleteClipboardItem(itemId), [host]);
   const subscribeClipboard = useCallback((refresh: () => void) => host.subscribeClipboard(refresh), [host]);
 
-  // Placement read off the mirrors, so the mount-only handlers and the resize
-  // gesture always see the live values. `over` applies a not-yet-committed
-  // change (the mode being picked, the side being swapped).
-  const placement = (over: Partial<Placement> = {}): Placement => ({
-    mode: modeRef.current,
-    scale: floatingScaleRef.current,
-    side: sideRef.current,
-    left: floatingPosRef.current?.left,
-    top: floatingPosRef.current?.top,
-    ...over,
-  });
-  const geom = (over: Partial<Placement> = {}) =>
-    geometryFor(placement(over), window.screen, rowsRef.current || kOneHandRows);
+  // Reads the refs, not render-1 captures: the mount-only handlers outlive it.
+  const container = useMemo(() => new VkContainer(
+    host,
+    () => ({ mode: modeRef.current, scale: floatingScaleRef.current, side: sideRef.current }),
+    () => rowsRef.current,
+  ), [host]);
 
   useEffect(() => {
     postRef.current = host.connect((msg) => {
@@ -163,63 +144,30 @@ export default function App() {
     });
     post({ kind: 'visibility', visible: true });
 
-    // Re-assert geometry, keeping a floating keyboard where it sits. (A
-    // one-hand card is re-pinned to its corner, which is what we want after
-    // a rotation.)
-    const resetContainer = () => {
-      if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
-      const next = geom();
-      appliedRef.current = JSON.stringify(next);
-      return host.setupContainer(next);
-    };
-
     const onVisibility = () => {
       post({ kind: 'visibility', visible: !document.hidden });
-      // Before the stored placement lands, the refs still say "docked" —
-      // re-asserting that would place the wrong container.
-      if (!placementLoadedRef.current) return;
-      if (document.hidden) {
-        // Remember where a floating keyboard was before it hides.
-        if (modeRef.current === 'floating') {
-          floatingPosRef.current = readWindowPos();
-          host.writePlacement(placement());
-        }
-      }
-      else {
-        void resetContainer();
-      }
+      if (document.hidden) void container.hide();
+      else void container.restore();
     };
     document.addEventListener('visibilitychange', onVisibility);
 
     // Restore saved placement; the effect below performs the setup, once it
     // knows enough to size the card.
-    void host.readPlacement().then((prefs) => {
+    void container.load().then((prefs) => {
       modeRef.current = prefs.mode;
       sideRef.current = prefs.side;
       floatingScaleRef.current = prefs.scale;
-      floatingPosRef.current = prefs.left !== undefined && prefs.top !== undefined
-        ? { left: prefs.left, top: prefs.top }
-        : null;
       setMode(prefs.mode);
       setSide(prefs.side);
       setFloatingScale(prefs.scale);
-      placementLoadedRef.current = true;
       setPlacementLoaded(true);
     });
-    const onOrientation = () => void resetContainer();
+    // screen.* can be stale when the orientation event fires; resize fires
+    // after the OS actually resized.
+    const onOrientation = () => void container.rotate();
     window.screen.orientation?.addEventListener('change', onOrientation);
 
-    // screen.* can be stale when the orientation event fires; resize fires
-    // after the OS actually resized. Dedup ends our own resizeTo echo.
-    const onResize = () => {
-      if (!placementLoadedRef.current || resizeStart.current || document.hidden) return;
-      if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
-      const next = geom();
-      const key = JSON.stringify(next);
-      if (key === appliedRef.current) return;
-      appliedRef.current = key;
-      void host.setupContainer(next);
-    };
+    const onResize = () => void container.resized();
     window.addEventListener('resize', onResize);
 
     // Never leave the keyboard blank: if no state arrives (background dead
@@ -228,6 +176,7 @@ export default function App() {
 
     return () => {
       window.clearTimeout(fallback);
+      void container.hide();
       document.removeEventListener('visibilitychange', onVisibility);
       window.screen.orientation?.removeEventListener('change', onOrientation);
       window.removeEventListener('resize', onResize);
@@ -283,23 +232,8 @@ export default function App() {
   // mean resizing it out from under the user a frame later.
   useEffect(() => {
     if (!placementLoaded) return;
-    if (mode === 'onehand' && !rows) return;
-    // The OS moves a floating window when the user drags the handle, and
-    // tells us nothing. Re-read where it actually is before re-asserting
-    // geometry, or we would teleport it back to wherever we last put it.
-    if (mode === 'floating' && appliedRef.current) floatingPosRef.current = readWindowPos();
-    const next = geom();
-    const key = JSON.stringify(next);
-    // Rows change on every layer switch, but only a one-hand card resizes
-    // for them — don't re-place a window whose geometry hasn't moved.
-    if (key === appliedRef.current) {
-      setContainerReady(true);
-      return;
-    }
-    appliedRef.current = key;
-    void host.setupContainer(next).then(() => setContainerReady(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placementLoaded, mode, side, rows, host]);
+    void container.sync().then(() => setContainerReady(true));
+  }, [placementLoaded, mode, side, rows, container]);
 
   // Tell Chrome to show the window only after the container mode is confirmed
   // AND the first keyboard has rendered — signaling earlier can flash a
@@ -467,13 +401,13 @@ export default function App() {
     // Capture where the OS actually left the card before leaving floating —
     // a drag of the handle fires no event, so this is the only chance to
     // learn about it, and persisting without it would throw the drag away.
-    if (modeRef.current === 'floating') floatingPosRef.current = readWindowPos();
+    container.capturePos();
     modeRef.current = next;
     setMode(next);
     // A keyboard returning to float lands where it was left (the position is
     // kept across modes); docked and one-hand place themselves. The container
     // effect applies the new geometry.
-    host.writePlacement(placement());
+    container.persist();
   };
 
   // Pin the one-hand keyboard to a bottom corner — the frequent gesture (you
@@ -483,7 +417,7 @@ export default function App() {
     if (next === sideRef.current) return;
     sideRef.current = next;
     setSide(next);
-    host.writePlacement(placement());
+    container.persist();
   };
 
   // The resize button sits at the right end of the drag handle, so dragging it
@@ -494,7 +428,7 @@ export default function App() {
     e.preventDefault();
     try { e.currentTarget.setPointerCapture(e.pointerId); }
     catch { /* synthetic */ }
-    resizeStart.current = { x: e.screenX, scale: floatingScaleRef.current, pos: readWindowPos() };
+    resizeStart.current = { x: e.screenX, scale: floatingScaleRef.current, pos: container.beginDrag() };
   };
   const onResizeMove = (e: React.PointerEvent) => {
     const start = resizeStart.current;
@@ -509,21 +443,18 @@ export default function App() {
     const next = Math.min(kFloatingScaleMax, Math.max(kFloatingScaleMin, start.scale + (e.screenX - start.x) / window.screen.width));
     floatingScaleRef.current = next;
     setFloatingScale(next);
-    floatingPosRef.current = start.pos;
     if (!resizeRaf.current) {
       resizeRaf.current = true;
       requestAnimationFrame(() => {
         resizeRaf.current = false;
-        const g = geom();
-        appliedRef.current = JSON.stringify(g);
-        void host.setupContainer(g);
+        void container.dragTo();
       });
     }
   };
   const onResizeUp = () => {
     if (!resizeStart.current) return;
     resizeStart.current = null;
-    host.writePlacement(placement());
+    container.endDrag();
   };
 
   if (!vk || !view) {
@@ -532,9 +463,7 @@ export default function App() {
 
   // The card is the window on device; only the mock tab, which has no OS
   // window to size it, needs the inline size.
-  const card = host.mock && mode !== 'docked'
-    ? geometryFor({ mode, scale: floatingScale, side }, window.screen, rows || kOneHandRows)
-    : undefined;
+  const card = host.mock && mode !== 'docked' ? container.geometry() : undefined;
   // A panel covers the keys, so --kb-rows is how its strip finds a row height.
   const cardStyle = {
     ...(card ? { width: card.width, height: card.height } : {}),

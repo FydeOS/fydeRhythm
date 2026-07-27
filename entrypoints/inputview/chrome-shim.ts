@@ -19,6 +19,7 @@ import {
 import type { KeyStroke } from './layouts/types';
 import {
   type ContainerGeometry,
+  dockedHeight,
   kDefaultPlacement,
   kFloatingHandleHeight,
   kFloatingMargin,
@@ -27,6 +28,7 @@ import {
   normalizePlacement,
   type Placement,
 } from './placement';
+import { windowCollapsed } from './window-state';
 
 export interface VkHost {
   readonly mock: boolean;
@@ -42,6 +44,8 @@ export interface VkHost {
   // the mode is confirmed — signal keyboardLoaded only after, or Chrome may
   // show the window with another IME's geometry.
   setupContainer(geom: ContainerGeometry): Promise<void>;
+  // Hand the container to the next keyboard; must not move this window.
+  releaseContainer(): Promise<void>;
   readPlacement(): Promise<Placement>;
   writePlacement(placement: Placement): void;
   openSettings(): void;
@@ -133,19 +137,34 @@ function getVkPrivate(): VirtualKeyboardPrivate | undefined {
 
 export class RealHost implements VkHost {
   readonly mock = false;
+  private hitTest: { width: number; height: number } | null = null;
 
   constructor(private readonly vk: VirtualKeyboardPrivate) {
     window.addEventListener('resize', () => this.updateHitTest());
   }
 
-  private updateHitTest(): void {
-    const width = window.innerWidth || window.screen.width;
-    const height = window.innerHeight || 1;
+  // A caller that just applied a size knows it better than a live read.
+  private updateHitTest(explicit?: { width: number; height: number }): void {
+    if (!explicit && windowCollapsed()) return;
+    const width = explicit?.width ?? window.innerWidth;
+    const height = explicit?.height ?? window.innerHeight;
+    // resizeTo echoes back a resize that would re-send the identical rect.
+    if (width === this.hitTest?.width && height === this.hitTest?.height) return;
+    this.hitTest = { width, height };
     try {
       this.vk.setHitTestBounds([{ left: 0, top: 0, width, height }]);
     }
     catch (e) {
       console.warn('setHitTestBounds failed', e);
+    }
+  }
+
+  private setDrag(bounds: { left: number; top: number; width: number; height: number }): void {
+    try {
+      this.vk.setDraggableArea(bounds);
+    }
+    catch (e) {
+      console.warn('setDraggableArea failed', e);
     }
   }
 
@@ -300,30 +319,42 @@ export class RealHost implements VkHost {
       : this.setupDocked(geom.height);
   }
 
+  releaseContainer(): Promise<void> {
+    return this.fullWidth(dockedHeight(window.screen), false).then(() => {
+      // We are no longer the only writer: whatever takes the container next
+      // may set its own region, so the next placement must re-send ours.
+      this.hitTest = null;
+    });
+  }
+
   private setupDocked(height: number): Promise<void> {
-    // Same call sequence as the legacy adapter, which handled stale
-    // container state (another IME leaving the shared VK container in
-    // floating mode) correctly: confirm FULL_WIDTH first, then size.
+    return this.fullWidth(height, true);
+  }
+
+  // Confirm FULL_WIDTH before sizing: another IME may have left the shared
+  // container floating. placeWindow is false on handback — that moveTo lands
+  // after the next keyboard took over and reads back as a user-chosen spot.
+  private fullWidth(height: number, placeWindow: boolean): Promise<void> {
+    const width = window.screen.width;
     return new Promise((resolve) => {
       this.vk.setContainerBehavior({
         mode: 'FULL_WIDTH',
-        bounds: { left: 0, top: 0, width: window.screen.width, height: 0 },
+        bounds: { left: 0, top: 0, width, height: 0 },
       }, () => {
         if (chrome.runtime.lastError) {
           console.warn('setContainerBehavior:', chrome.runtime.lastError.message);
         }
-        window.resizeTo(window.screen.width, height);
-        window.moveTo(0, window.screen.height - height);
-        // Retire any drag region left by a floating session. A docked
-        // keyboard has no handle, so a surviving region would sit over
-        // the candidate bar and swallow taps on the first candidates.
-        try {
-          this.vk.setDraggableArea({ left: 0, top: 0, width: window.screen.width, height: 0 });
+        if (placeWindow) {
+          window.resizeTo(width, height);
+          window.moveTo(0, window.screen.height - height);
         }
-        catch (e) {
-          console.warn('setDraggableArea failed', e);
-        }
-        this.updateHitTest();
+        // Retire any drag region left by a floating session. A docked keyboard
+        // has no handle, so a surviving region would sit over the candidate bar
+        // and swallow taps on the first candidates.
+        this.setDrag({ left: 0, top: 0, width, height: 0 });
+        // Full width, or the next keyboard inherits our small floating rect and
+        // only that area stays touchable.
+        this.updateHitTest({ width, height });
         resolve();
       });
     });
@@ -355,17 +386,15 @@ export class RealHost implements VkHost {
           // retires the region entirely: one-hand is corner-anchored, and
           // a stale drag area from a previous floating session would still
           // swallow taps on the swap bar.
-          this.vk.setDraggableArea({
+          this.setDrag({
             left: 0,
             top: 0,
             width: draggable ? Math.max(0, width - kFloatingResizeWidth) : width,
             height: draggable ? kFloatingHandleHeight : 0,
           });
         }
-        catch (e) {
-          console.warn('setDraggableArea failed', e);
-        }
-        this.updateHitTest();
+        finally { /* setDrag already contains its own failure */ }
+        this.updateHitTest({ width, height });
         resolve();
       });
     });
@@ -612,6 +641,11 @@ class MockHost implements VkHost {
 
   setupContainer(geom: ContainerGeometry): Promise<void> {
     console.log('[mock] setupContainer', geom);
+    return Promise.resolve();
+  }
+
+  releaseContainer(): Promise<void> {
+    console.log('[mock] releaseContainer');
     return Promise.resolve();
   }
 

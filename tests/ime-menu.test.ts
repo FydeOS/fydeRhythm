@@ -114,6 +114,38 @@ describe('refreshImeMenuItems', () => {
     await expect(refreshImeMenuItems()).resolves.toBeUndefined();
     expect(setMenuItems).toHaveBeenCalledTimes(1);
   });
+
+  it('does not warn when setMenuItems reports an inactive engine (lock/teardown handoff)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { setMenuItems, chromeStub } = stubChrome();
+    const stub = chromeStub as { runtime?: { lastError: { message: string } | null } };
+    setMenuItems.mockImplementation((_arg: unknown, cb: () => void) => {
+      stub.runtime = { lastError: { message: '[input.ime.setMenuItems]: The engine is not active.' } };
+      cb();
+      stub.runtime = { lastError: null };
+    });
+    stubController('fyde-rhythm');
+
+    await refreshImeMenuItems();
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('still warns when setMenuItems reports a real failure', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { setMenuItems, chromeStub } = stubChrome();
+    const stub = chromeStub as { runtime?: { lastError: { message: string } | null } };
+    setMenuItems.mockImplementation((_arg: unknown, cb: () => void) => {
+      stub.runtime = { lastError: { message: 'quota exceeded' } };
+      cb();
+      stub.runtime = { lastError: null };
+    });
+    stubController('fyde-rhythm');
+
+    await refreshImeMenuItems();
+
+    expect(warn).toHaveBeenCalledWith('setMenuItems failed:', 'quota exceeded');
+  });
 });
 
 describe('restoreEngineId', () => {

@@ -44,7 +44,10 @@ export async function refreshImeMenuItems() {
     const items = await buildSchemaMenuItems(active.schema, active.enabledSchemas);
     chrome.input.ime.setMenuItems({ engineID, items }, () => {
       const error = chrome.runtime.lastError;
-      if (error) console.warn('setMenuItems failed:', error.message);
+      // "The engine is not active" is expected during a lock/teardown handoff.
+      if (error && !/not active/i.test(error.message ?? '')) {
+        console.warn('setMenuItems failed:', error.message);
+      }
     });
   }
   catch (ex) {

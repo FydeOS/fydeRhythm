@@ -1015,7 +1015,11 @@ export class InputController extends EventEmitter {
           if (asciiChar !== null && asciiChar !== keyData.key) {
             const contextId = this.context.contextID;
             await new Promise<void>((res) => {
-              chrome.input.ime.commitText({ contextID: contextId, text: asciiChar }, () => res());
+              chrome.input.ime.commitText({ contextID: contextId, text: asciiChar }, () => {
+                const error = chrome.runtime.lastError;
+                if (error) console.warn('commitText (ascii remap) failed:', error.message);
+                res();
+              });
             });
             handled = true;
           }
