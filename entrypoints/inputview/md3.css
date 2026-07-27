@@ -94,7 +94,8 @@
    * on the docked 372px board, per the spec's redline. */
   --kb-candidate-font: clamp(11px, 5.9cqh, 26px);
   --kb-bar-height: clamp(var(--kb-bar-min), 13cqh, var(--kb-bar-max));
-  --kb-emoji-cell: clamp(36px, 14cqh, 56px);
+  /* Rows in the active layout; App overrides it (zhuyin has 5). */
+  --kb-rows: 4;
 
   font-family: "Google Sans Text", Roboto, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
 }
@@ -383,7 +384,15 @@ body {
   flex: none;
   width: 1em;
   height: 1em;
+}
+
+.icon-btn svg {
   font-size: clamp(13px, 5.9cqh, 26px);
+}
+
+/* Tracks the tab font; over 1em because the emoji beside it overfill their box. */
+.kb-emoji-tabs .tab svg {
+  font-size: 1.1em;
 }
 
 /* Frame filler: invisible, non-interactive — and no hairline to give it away. */
@@ -971,10 +980,20 @@ body {
   background: var(--kb-background);
 }
 
+/* Registered so the cq unit below resolves once here, not on all ~1900 cells:
+   as a raw var, every resize restyled all of them (65ms a drag step, keys 7ms). */
+@property --kb-emoji-cell {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 44px;
+}
+
 /* One continuous scroll across every category. position: relative makes the
    sections' offsetTop read against this scroller, which is what the tabs
    scroll to and spy on. */
 .kb-emoji-grid {
+  /* Stepped: a continuous size reflows the grid on every pixel of a drag. */
+  --kb-emoji-cell: round(clamp(36px, 14cqh, 56px), 4px);
   flex: 1;
   position: relative;
   overflow-y: auto;
@@ -1021,32 +1040,24 @@ body {
   cursor: pointer;
 }
 
-.kb-emoji-cell {
-  /* Big categories render ~200 cells; skip offscreen rows */
+/* Skipped per section, not per cell. EmojiPanel writes the placeholder height:
+   guessing it here drifts the offsets the tabs scroll by (400px guess, 790px out). */
+.kb-emoji-grid section {
   content-visibility: auto;
-  contain-intrinsic-size: var(--kb-emoji-cell);
 }
 
 .kb-emoji-cell:active {
   background: var(--kb-surface);
 }
 
-/* Bottom strip mirrors the keyboard's bottom row: [ABC][tabs][⌫] */
+/* Bottom strip mirrors the keyboard's bottom row: [ABC][tabs][⌫] — so it IS one,
+   a row-tall size container, and every key token below resolves as on a row. */
 .kb-emoji-bottom {
   flex: none;
-  height: clamp(44px, 17cqh, 64px);
+  height: calc(100% / var(--kb-rows));
   display: flex;
   align-items: stretch;
-  padding: var(--kb-cell-pad);
-  gap: calc(var(--kb-cell-pad) * 2);
-}
-
-/* The panel's back/backspace keys are .kb-key, but they sit in the emoji strip
-   rather than in a .kb-row — so the row-relative icon scale has no row to
-   measure and falls back to the card, which blew a 40px icon into a 37px key.
-   These two get a card-relative size of their own. */
-.kb-emoji-side svg {
-  font-size: clamp(16px, 8cqh, 28px);
+  container-type: size;
 }
 
 /* These two are .kb-key but plain click buttons — they never receive the
@@ -1058,23 +1069,25 @@ body {
   transform: scale(0.98);
 }
 
+/* Frame units, so each is the box its twin has on the keyboard: ABC 1u like the
+   layer key, backspace 1.5u. Font, radius and icon come from .kb-key.fn. */
 .kb-emoji-side {
   flex: none;
-  width: 12%;
-  min-width: 72px;
-  font-size: var(--kb-key-font-fn);
-  /* Same no-row fallback as the icon size above: the row-relative key radius
-     would resolve against the card and pin at its cap. This is the key
-     proportion (~28% of height) restated against the strip these keys sit in. */
-  border-radius: clamp(10px, 4.3cqh, 16px);
+  width: calc(10% - var(--kb-cell-pad) * 2);
+  margin: var(--kb-cell-pad);
+}
+
+.kb-emoji-side.back {
+  width: calc(15% - var(--kb-cell-pad) * 2);
 }
 
 .kb-emoji-tabs {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-evenly;
-  gap: 2px;
+  padding: var(--kb-cell-pad);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1083,14 +1096,16 @@ body {
   display: none;
 }
 
+/* An index, not keys: two thirds of a row, never squeezed below it — a narrow
+   board scrolls the strip instead, and EmojiPanel keeps the active tab in view. */
 .kb-emoji-tabs .tab {
   flex: none;
-  min-width: 44px;
-  height: 44px;
+  width: 60cqh;
+  height: min(100%, 60cqh);
   border: none;
   background: transparent;
   border-radius: 999px;
-  font-size: 20px;
+  font-size: var(--kb-icon-font);
   color: var(--kb-on-surface-variant);
   display: flex;
   align-items: center;

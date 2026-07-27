@@ -535,7 +535,11 @@ export default function App() {
   const card = host.mock && mode !== 'docked'
     ? geometryFor({ mode, scale: floatingScale, side }, window.screen, rows || kOneHandRows)
     : undefined;
-  const cardStyle = card ? { width: card.width, height: card.height } : undefined;
+  // A panel covers the keys, so --kb-rows is how its strip finds a row height.
+  const cardStyle = {
+    ...(card ? { width: card.width, height: card.height } : {}),
+    '--kb-rows': rowCount ?? kOneHandRows,
+  } as React.CSSProperties;
 
   return (
     <div className={`kb-root${mode === 'docked' ? '' : ` ${mode}`}`} style={cardStyle}>

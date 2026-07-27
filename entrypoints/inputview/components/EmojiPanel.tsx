@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type EmojiDef, kEmojiCategories, skinVariants } from '../emoji/data';
 import { t } from '../i18n';
@@ -48,7 +48,7 @@ function saveRecents(recents: string[]): void {
 
 // One emoji cell: tap inserts; long-press opens the skin-tone bubble for
 // emoji that take modifiers.
-function EmojiCell({ def, onInsert, onOpenTones }: {
+const EmojiCell = React.memo(function EmojiCell({ def, onInsert, onOpenTones }: {
   def: EmojiDef;
   onInsert: (emoji: string) => void;
   onOpenTones: (def: EmojiDef, anchor: DOMRect, pointerId: number) => void;
@@ -116,7 +116,36 @@ function EmojiCell({ def, onInsert, onOpenTones }: {
       {def.char}
     </button>
   );
-}
+});
+
+// Memoised as a unit: the panel re-renders with the card on every frame of a
+// resize, and reconciling ~1900 cells cost 56ms of it, against 18ms for keys.
+const EmojiSection = React.memo(function EmojiSection({ id, label, emoji, onInsert, onOpenTones, register }: {
+  id: string;
+  label: string;
+  emoji: EmojiDef[];
+  onInsert: (emoji: string) => void;
+  onOpenTones: (def: EmojiDef, anchor: DOMRect, pointerId: number) => void;
+  register: (id: string, el: HTMLElement | null) => void;
+}) {
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    register(id, ref.current);
+    return () => register(id, null);
+  }, [id, register]);
+
+  return (
+    <section ref={ref} data-count={emoji.length}>
+      <div className="kb-emoji-head">{label}</div>
+      <div className="kb-emoji-section-grid">
+        {emoji.map(def => (
+          <EmojiCell key={def.char} def={def} onInsert={onInsert} onOpenTones={onOpenTones} />
+        ))}
+      </div>
+    </section>
+  );
+});
 
 // Hold-to-repeat backspace, mirroring the keyboard's backspace behavior.
 function RepeatBackspace({ onBackspace }: { onBackspace: () => void }) {
@@ -134,7 +163,7 @@ function RepeatBackspace({ onBackspace }: { onBackspace: () => void }) {
 
   return (
     <button
-      className="kb-key fn kb-emoji-side"
+      className="kb-key fn kb-emoji-side back"
       aria-label={t('vk_key_backspace')}
       onPointerDown={() => {
         onBackspace();
@@ -164,9 +193,11 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
   const [shelf, setShelf] = useState<string[]>([]);
   const [tones, setTones] = useState<{ def: EmojiDef; anchor: DOMRect; pointerId: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef(new Map<string, HTMLElement>());
   const recentsRef = useRef<string[]>([]);
   const spyRaf = useRef(false);
+  const picked = useRef<number | null>(null);
 
   useEffect(() => {
     void loadRecents().then((r) => {
@@ -176,35 +207,94 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
     });
   }, []);
 
-  const insert = (emoji: string) => {
-    onInsert(emoji);
+  // EmojiSection compares these, so they must keep their identity across a
+  // re-render or every cell renders again.
+  const insertRef = useRef(onInsert);
+  insertRef.current = onInsert;
+  const insert = useCallback((emoji: string) => {
+    insertRef.current(emoji);
     recentsRef.current = [emoji, ...recentsRef.current.filter(x => x !== emoji)].slice(0, kMaxRecents);
     saveRecents(recentsRef.current);
-  };
+  }, []);
+
+  const openTones = useCallback((def: EmojiDef, anchor: DOMRect, pointerId: number) => {
+    setTones({ def, anchor, pointerId });
+  }, []);
+
+  const registerSection = useCallback((id: string, el: HTMLElement | null) => {
+    if (el) sectionRefs.current.set(id, el);
+    else sectionRefs.current.delete(id);
+  }, []);
 
   // One continuous scroll across every category; the tabs are scroll-spies.
-  const sections: Array<{ id: string; label: string; emoji: EmojiDef[] }> = [
+  const sections: Array<{ id: string; label: string; emoji: EmojiDef[] }> = useMemo(() => [
     ...(shelf.length > 0 ? [{ id: 'recents', label: t('vk_recent_emoji'), emoji: shelf.map(char => ({ char })) }] : []),
     ...kEmojiCategories.map(c => ({ id: c.id, label: t(`vk_emoji_${c.id}`), emoji: c.emoji })),
-  ];
+  ], [shelf]);
 
+  // A skipped section still has to occupy the height it would have rendered at,
+  // or the offsets the tabs scroll by are fiction. A uniform grid: count it.
+  const sizeSections = useCallback(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const cs = getComputedStyle(grid);
+    const cell = parseFloat(cs.getPropertyValue('--kb-emoji-cell'));
+    const width = grid.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (!cell || width <= 0) return;
+    const cols = Math.max(1, Math.floor(width / cell));
+    for (const el of sectionRefs.current.values()) {
+      const head = el.querySelector<HTMLElement>('.kb-emoji-head');
+      const count = Number(el.dataset.count ?? 0);
+      el.style.containIntrinsicSize
+        = `${width}px ${(head?.offsetHeight ?? 0) + Math.ceil(count / cols) * cell}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    sizeSections();
+    const grid = gridRef.current;
+    if (!grid || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(sizeSections);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, [sizeSections, sections]);
+
+  // Only the narrowest boards scroll the tabs, and there the spy can leave the
+  // active one off the strip. Centre it in the track, never the page.
+  useEffect(() => {
+    const track = tabsRef.current;
+    const tab = track?.querySelector<HTMLElement>('.tab.active');
+    if (!track || !tab || track.scrollWidth <= track.clientWidth) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    track.scrollTo({
+      left: tab.offsetLeft - (track.clientWidth - tab.offsetWidth) / 2,
+      behavior: reduced ? 'auto' : 'smooth',
+    });
+  }, [active]);
+
+  // Jump, don't glide: gliding scrolled through every category in between, and
+  // the spy below read each one, walking the underline there a tab at a time.
   const pick = (id: string) => {
     const el = sectionRefs.current.get(id);
     const grid = gridRef.current;
     if (!el || !grid) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    grid.scrollTo({ top: el.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
+    grid.scrollTo({ top: el.offsetTop });
+    // Where it landed: short of the target for the sections that cannot reach the top.
+    picked.current = grid.scrollTop;
     setActive(id);
   };
 
   // The active tab follows the scroll: the last section whose top has passed
   // the sticky-header line. rAF-coalesced — scroll fires per frame anyway.
   const spy = () => {
+    const grid = gridRef.current;
+    // The jump's own scroll event, which would undo a pick that fell short.
+    if (grid && grid.scrollTop === picked.current) return;
+    picked.current = null;
     if (spyRaf.current) return;
     spyRaf.current = true;
     requestAnimationFrame(() => {
       spyRaf.current = false;
-      const grid = gridRef.current;
       if (!grid) return;
       let current = sections[0]?.id;
       for (const s of sections) {
@@ -219,32 +309,22 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
     <div className="kb-emoji">
       <div className="kb-emoji-grid" ref={gridRef} onScroll={spy}>
         {sections.map(s => (
-          <section
+          <EmojiSection
             key={s.id}
-            ref={(el) => {
-              if (el) sectionRefs.current.set(s.id, el);
-              else sectionRefs.current.delete(s.id);
-            }}
-          >
-            <div className="kb-emoji-head">{s.label}</div>
-            <div className="kb-emoji-section-grid">
-              {s.emoji.map(def => (
-                <EmojiCell
-                  key={def.char}
-                  def={def}
-                  onInsert={insert}
-                  onOpenTones={(d, anchor, pid) => setTones({ def: d, anchor, pointerId: pid })}
-                />
-              ))}
-            </div>
-          </section>
+            id={s.id}
+            label={s.label}
+            emoji={s.emoji}
+            onInsert={insert}
+            onOpenTones={openTones}
+            register={registerSection}
+          />
         ))}
       </div>
       <div className="kb-emoji-bottom">
         <button className="kb-key fn kb-emoji-side" aria-label={t('vk_back_to_keyboard')} onClick={onBack}>
           ABC
         </button>
-        <div className="kb-emoji-tabs">
+        <div className="kb-emoji-tabs" ref={tabsRef}>
           {shelf.length > 0 && (
             <button
               className={`tab${active === 'recents' ? ' active' : ''}`}
