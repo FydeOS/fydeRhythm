@@ -1,6 +1,6 @@
 export {};
-import type { InputController } from '~background/controller';
-import type { RimeEngine } from '~background/engine';
+import type { InputController } from '../controller';
+import type { RimeEngine } from '../engine';
 
 declare global {
   interface Window {
