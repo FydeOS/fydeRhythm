@@ -147,31 +147,27 @@ export class FastIndexedDbFsController {
     if (curEntry.isDirectory) {
       throw new Error('Path ' + path + ' is a directory, cannot set its size.');
     }
-    const curBlobs = curEntry.blobs;
-    const newBlobs = [];
-    let seek = 0;
-    for (let i = 0; i < curBlobs.length; i++) {
-      const curBlob = curBlobs[i];
-      if (size >= seek + curBlob.size) {
-        // not arrived yet
-        newBlobs.push(curBlob);
+    // ftruncate contract: exactly `size` bytes. `kept` is the byte count
+    // covered by newBlobs — every push must advance it, or truncation and
+    // the zero-fill extension below drift apart.
+    const newBlobs: BlobInfo[] = [];
+    let kept = 0;
+    for (const blob of curEntry.blobs) {
+      if (kept >= size) break;
+      if (kept + blob.size <= size) {
+        newBlobs.push(blob);
+        kept += blob.size;
       }
       else {
-        const preserve = size - seek;
-        if (preserve > 0) {
-          const cutBlobData = (await this.readBlob(curBlob)).slice(0, preserve);
-          const cutBlob = await this.createBlob(cutBlobData);
-          newBlobs.push(cutBlob);
-        }
+        const head = (await this.readBlob(blob)).slice(0, size - kept);
+        newBlobs.push(await this.createBlob(head));
+        kept = size;
         break;
       }
-      seek += curBlob.size;
     }
 
-    if (seek < size) {
-      const stubData = new ArrayBuffer(size - seek);
-      const stubBlob = await this.createBlob(stubData);
-      newBlobs.push(stubBlob);
+    if (kept < size) {
+      newBlobs.push(await this.createBlob(new ArrayBuffer(size - kept)));
     }
 
     curEntry.blobs = newBlobs;
