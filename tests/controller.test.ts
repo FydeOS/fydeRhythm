@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parse } from 'yaml';
 
 import type { ImeSettings } from '../lib/utils';
 
@@ -1366,5 +1367,90 @@ describe('physical-key Latin layout remap', () => {
     // keysym from the code field (83 = 'S'). The point here: NOT dvorak 'o'.
     expect(fed).toEqual(['S'.charCodeAt(0)]);
     expect(commits).toEqual([]);
+  });
+});
+
+describe('InputController loadRimeConfig', () => {
+  const kSchemaYamlPath = '/root/aurora/build/aurora.schema.yaml';
+  const kManifestPath = '/root/aurora/user/dict-packs.json';
+
+  beforeEach(() => {
+    stubChrome();
+    mocks.getFs.mockReset();
+    mocks.getFs.mockResolvedValue(mocks.fs);
+    mocks.fs.readEntryRaw.mockReset();
+    mocks.fs.readWholeFile.mockReset();
+  });
+
+  // Paths absent from `files` do not exist; the rest read as UTF-8 text.
+  function scriptFs(files: Record<string, string>) {
+    mocks.fs.readEntryRaw.mockImplementation(async (path: string) => path in files);
+    mocks.fs.readWholeFile.mockImplementation(async (path: string) => {
+      if (!(path in files)) throw new Error(`no fixture for ${path}`);
+      return new TextEncoder().encode(files[path]);
+    });
+  }
+
+  async function loadConfig(overrides: Partial<ImeSettings> = {}) {
+    const controller = new InputController();
+    return parse(await controller.loadRimeConfig(settings(overrides))) as Record<string, any>;
+  }
+
+  it('injects the page size, creating the menu node if missing', async () => {
+    scriptFs({ [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n' });
+
+    const config = await loadConfig({ pageSize: 9 });
+
+    expect(config.menu.page_size).toBe(9);
+    expect(config.translator.dictionary).toBe('aurora_dict');
+  });
+
+  it('overrides the page size inside an existing menu block', async () => {
+    scriptFs({ [kSchemaYamlPath]: 'menu:\n  page_size: 7\n  alternative_select_keys: "123"\n' });
+
+    const config = await loadConfig({ pageSize: 5 });
+
+    expect(config.menu.page_size).toBe(5);
+    expect(config.menu.alternative_select_keys).toBe('123');
+  });
+
+  it('appends user algebra after the schema speller rules', async () => {
+    scriptFs({ [kSchemaYamlPath]: 'speller:\n  algebra:\n    - derive/^x/y/\n' });
+
+    const config = await loadConfig({ algebraList: ['abbrev/^(.).+$/$1/'] });
+
+    expect(config.speller.algebra).toEqual(['derive/^x/y/', 'abbrev/^(.).+$/$1/']);
+  });
+
+  it('creates the speller block when the schema has none', async () => {
+    scriptFs({ [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n' });
+
+    const config = await loadConfig({ algebraList: ['abbrev/^(.).+$/$1/'] });
+
+    expect(config.speller.algebra).toEqual(['abbrev/^(.).+$/$1/']);
+  });
+
+  it('adds no speller block when no algebra is configured', async () => {
+    scriptFs({ [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n' });
+
+    const config = await loadConfig();
+
+    expect(config.speller).toBeUndefined();
+  });
+
+  it('survives a corrupt dict-pack manifest and keeps the config usable', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    scriptFs({
+      [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n',
+      [kManifestPath]: 'not json {{',
+    });
+
+    const config = await loadConfig({ pageSize: 6 });
+
+    expect(config.menu.page_size).toBe(6);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not read dict pack manifest'),
+      expect.anything(),
+    );
   });
 });
