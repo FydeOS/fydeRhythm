@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
 import vitest from '@vitest/eslint-plugin';
+import gitignore from 'eslint-config-flat-gitignore';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
@@ -23,6 +24,9 @@ const sourceFiles = [
 ];
 
 export default tseslint.config(
+  // Nested agent worktrees would otherwise be linted as extra copies of the
+  // repo; `.git/info/exclude` is read so local-only entries count too.
+  gitignore({ files: ['.gitignore', '.git/info/exclude'], strict: false }),
   autoImports,
   {
     ignores: [

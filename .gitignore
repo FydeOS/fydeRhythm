@@ -48,3 +48,6 @@ build-*/
 tmp/
 .vscode/
 /entrypoints/background/rime_emscripten.wasm
+
+# Agent worktrees live inside the repo; the config beside them stays tracked.
+.claude/worktrees/
