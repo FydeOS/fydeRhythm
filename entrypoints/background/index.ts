@@ -207,7 +207,7 @@ export default defineBackground({
       });
 
       chrome.input.ime.onKeyEvent.addListener((engineID: string, keyData: chrome.input.ime.KeyboardEvent, requestId: string) => {
-        console.log('Processing key: ', JSON.stringify(keyData));
+        // console.log('Processing key: ', JSON.stringify(keyData));
         let result: boolean | Promise<boolean>;
         try {
           result = self.controller.feedKey(keyData);
