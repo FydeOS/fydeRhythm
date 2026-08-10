@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allLayouts, bottomRow, getLayout } from '../entrypoints/inputview/layouts';
+import { allLayouts, bottomRow, getLayerLayout, getLayout, numpadLayout } from '../entrypoints/inputview/layouts';
 import { kFrameUnits } from '../entrypoints/inputview/layouts/frame';
 import { codeForChar, type KeyAction, type KeyDef } from '../entrypoints/inputview/layouts/types';
 
@@ -35,8 +35,8 @@ function checkAction(action: KeyAction, keyId: string) {
       expect(s.code, `${keyId}: stroke '${s.key}' needs a code`).not.toBe('');
     }
   }
-  else if (action.type === 'commit') {
-    expect(action.text.length, `${keyId}: commit text must be non-empty`).toBeGreaterThan(0);
+  else if (action.type === 'char') {
+    expect(action.glyph.length, `${keyId}: char glyph must be non-empty`).toBeGreaterThan(0);
   }
 }
 
@@ -143,15 +143,22 @@ describe('layout data', () => {
     expect(badge('ko', true)).toBe('A');
   });
 
-  it('punctuation follows ASCII mode and sends the plain keystroke', () => {
-    const bottom = (asciiMode: boolean) =>
-      bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script: 'zh' });
+  it('punctuation follows ASCII mode and carries both identities', () => {
+    const bottom = (asciiMode: boolean, script: 'zh' | 'ja' | 'ko' = 'zh') =>
+      bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script });
     const zh = bottom(false).find(k => k.id === 'Comma');
     const en = bottom(true).find(k => k.id === 'Comma');
     expect(zh?.label).toBe('，');
     expect(en?.label).toBe(',');
-    // Both send the same plain keystroke — the engine picks the width.
-    expect(zh?.action.type === 'stroke' && zh.action.stroke.key).toBe(',');
+    // The char action pairs the painted glyph with its plain keystroke;
+    // classifyChar picks stroke (punctuator) or literal per schema.
+    expect(zh?.action).toEqual({ type: 'char', glyph: '，', ascii: ',' });
+    expect(en?.action).toEqual({ type: 'char', glyph: ',', ascii: ',' });
+    // Japanese caps show 、 over the same keystroke; Korean writes Western
+    // punctuation, so 한 mode keeps the ASCII caps.
+    expect(bottom(false, 'ja').find(k => k.id === 'Comma')?.label).toBe('、');
+    expect(bottom(false, 'ko').find(k => k.id === 'Comma')?.label).toBe(',');
+    expect(bottom(false, 'ko').find(k => k.id === 'Period')?.label).toBe('.');
     // ，。 live only on the bottom row; the letter frame never hosts them.
     expect(getLayout('qwerty', false).rows.flat().find(k => k.id === 'Comma')).toBeUndefined();
     // Dvorak's row-1 punctuation cells follow ASCII mode the same way,
@@ -162,6 +169,76 @@ describe('layout data', () => {
     const cap = dv(false)[0];
     // The 、 cap sends backslash — where Rime's punctuator puts 顿号.
     expect(cap.action.type === 'stroke' && cap.action.stroke.key).toBe('\\');
+  });
+
+  it('unknown layout ids fall back to QWERTY; sym2 is script-independent', () => {
+    expect(getLayout('bogus' as never, false).id).toBe('qwerty');
+    expect(getLayerLayout('sym2', 'zh', false).id).toBe('sym2');
+  });
+
+  it('symbol page paints the script\'s punctuation, Gboard-style', () => {
+    const labels = (script: 'zh' | 'ja' | 'ko', ascii: boolean) =>
+      getLayerLayout('sym', script, ascii).rows.flat().map(k => k.label);
+    expect(labels('zh', false)).toEqual(
+      expect.arrayContaining(['！', '？', '：', '；', '（', '）', '～', '“', '‘']),
+    );
+    expect(labels('ja', false)).toEqual(expect.arrayContaining(['「', '」', '！', '？']));
+    // Korean uses Western punctuation; ASCII mode always shows the ASCII page.
+    expect(labels('ko', false)).toEqual(labels('zh', true));
+    // Digits, math and currency stay ASCII on every variant.
+    expect(labels('zh', false)).toEqual(expect.arrayContaining(['1', '0', '@', '#', '￥']));
+
+    const zhKeys = getLayerLayout('sym', 'zh', false).rows.flat();
+    // Full-width keys keep their ASCII keystroke, so pinyin still routes
+    // them through the punctuator; quotes are literal-only — a fixed key
+    // cannot alternate open/close the way the punctuator does.
+    expect(zhKeys.find(k => k.label === '！')?.action).toEqual({ type: 'char', glyph: '！', ascii: '!' });
+    expect(zhKeys.find(k => k.label === '“')?.action).toEqual({ type: 'char', glyph: '“', ascii: '' });
+  });
+
+  it('engine keys (Space/Enter/Backspace) are strokes on every board', () => {
+    // Space commits candidates, Enter commits raw, Backspace edits the
+    // composition — literal-izing any of them would break the engine loop.
+    for (const script of ['zh', 'ja', 'ko'] as const) {
+      for (const asciiMode of [false, true]) {
+        const row = bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script });
+        for (const id of ['Space', 'Enter']) {
+          expect(row.find(k => k.id === id)?.action.type, `${script}/${id}`).toBe('stroke');
+        }
+      }
+    }
+    for (const layout of allLayouts()) {
+      for (const key of layout.rows.flat()) {
+        if (key.id === 'Backspace' || key.id === 'Enter') {
+          expect(key.action.type, `${layout.id}/${key.id}`).toBe('stroke');
+        }
+      }
+    }
+  });
+
+  it('char keys never lie: the label is exactly the glyph they insert', () => {
+    // The literal branch of a char action inserts `glyph` as-is, so a label
+    // that differs would type something other than what the cap shows. The
+    // stroke branch may still defer to the punctuator — that deviation is
+    // deliberate and per-schema, not a layout bug.
+    const checkAction = (label: string, action: KeyAction) => {
+      if (action.type !== 'char') return;
+      expect(label, `char key labeled ${label}`).toBe(action.glyph);
+      expect(action.ascii, `ascii of ${label}`).toMatch(/^[\x20-\x7E]?$/);
+    };
+    const checkKey = (key: KeyDef) => {
+      checkAction(key.label, key.action);
+      for (const alt of key.alts ?? []) checkAction(alt.label, alt.action);
+      for (const petal of Object.values(key.flick ?? {})) checkAction(petal.label, petal.action);
+    };
+    const boards = [
+      ...allLayouts().flatMap(l => l.rows),
+      numpadLayout('number').rows.flat(),
+      numpadLayout('tel').rows.flat(),
+      ...(['zh', 'ja', 'ko'] as const).flatMap(script =>
+        [false, true].map(asciiMode => bottomRow({ layer: 'main', asciiMode, spaceLabel: 's', script }))),
+    ];
+    for (const row of boards) for (const key of row.flat()) checkKey(key);
   });
 });
 

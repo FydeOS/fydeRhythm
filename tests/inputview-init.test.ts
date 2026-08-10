@@ -107,8 +107,25 @@ describe('buildFastInputViewState', () => {
       script: 'zh',
       schemaId: '',
       schemaName: '',
+      alphabet: '',
       numericField: null,
     });
+  });
+
+  it('publishes the engine alphabet once the schema has loaded', async () => {
+    const fast = await buildFastInputViewState(
+      { ...fakeController(null), schemaAlphabet: 'abc123' } as never,
+    );
+    expect(fast.alphabet).toBe('abc123');
+
+    // The refine pass re-reads it: the engine may finish loading in between.
+    const cold = await buildFastInputViewState(undefined);
+    expect(cold.alphabet).toBe('');
+    const refined = await refineInputViewState(
+      { ...fakeController(null), schemaAlphabet: 'xyz,./' } as never,
+      cold,
+    );
+    expect(refined.alphabet).toBe('xyz,./');
   });
 
   it('routes number/tel fields to the numberpad and leaves others alone', async () => {

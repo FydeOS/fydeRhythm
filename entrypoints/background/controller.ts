@@ -8,7 +8,7 @@ import {
   injectDictPacksIntoSchema,
 } from '@/lib/dict-packs';
 import { remapPhysicalKey } from '@/lib/latin-remap';
-import type { LatinLayoutId, RimeCandidate } from '@/lib/shared-types';
+import { clampCandidateWindow, kDefaultCandidateWindow, type LatinLayoutId, type RimeCandidate } from '@/lib/shared-types';
 import { getFs, type ImeSettings, kDefaultSettings, matchesSchemaSwitchKey, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type SchemaSwitchKey } from '@/lib/utils';
 
 import { type RimeCandidateIterator, RimeEngine, type RimeSession } from './engine';
@@ -47,6 +47,17 @@ for (let i = 0; i <= 9; i++) {
 
 for (let i = 'A'.charCodeAt(0); i <= 'Z'.charCodeAt(0); i++) {
   kConventionalKeys[`Key${String.fromCharCode(i)}`] = i;
+}
+
+// The Unicode fullwidth mapping librime's own shaper applies: U+0021–U+007E
+// shift into the fullwidth block, space becomes ideographic space. A fixed
+// character-set table, not schema behavior — so it cannot drift per schema.
+function toFullShape(text: string): string {
+  return [...text].map((c) => {
+    const cp = c.codePointAt(0)!;
+    if (cp === 0x20) return '　';
+    return cp >= 0x21 && cp <= 0x7E ? String.fromCodePoint(cp + 0xFEE0) : c;
+  }).join('');
 }
 
 export class InputController extends EventEmitter {
@@ -242,12 +253,24 @@ export class InputController extends EventEmitter {
     });
   }
 
+  // speller/alphabet of the loaded schema, sent to the InputView so char keys
+  // can tell composition chars from literal ones. '' until a schema loads.
+  schemaAlphabet = '';
+
+  // Live full_shape state of the session (librime's standard full-width
+  // switch, toggled by schema hotkeys). Literal inserts must convert the
+  // same way the engine's own output does.
+  fullShape = false;
+
   async loadRimeConfig(settings: ImeSettings): Promise<string> {
     const fs = await getFs();
     const schemaBasePath = `/root/${settings.schema}`;
     const schemaConfigBuffer = await fs.readWholeFile(`${schemaBasePath}/build/${settings.schema}.schema.yaml`);
     const schemaConfigString = new TextDecoder().decode(schemaConfigBuffer);
     const schemaConfig = parse(schemaConfigString);
+    this.schemaAlphabet = typeof schemaConfig?.speller?.alphabet === 'string'
+      ? schemaConfig.speller.alphabet
+      : '';
     if (!schemaConfig.menu) {
       schemaConfig.menu = {};
     }
@@ -323,6 +346,11 @@ export class InputController extends EventEmitter {
               asciiMode = await this.session.getOption('ascii_mode');
               this.session.destroy();
               this.session = null;
+              // Both are per-schema: carrying the old schema's values into
+              // the load window would pair them with the NEW schema id in
+              // the state snapshot. Empty degrades to librime defaults.
+              this.fullShape = false;
+              this.schemaAlphabet = '';
             }
             await this.engine.destroy();
             this.engine = null;
@@ -360,11 +388,17 @@ export class InputController extends EventEmitter {
             console.log('engine.createSession');
             session = await engine.createSession(this.activeSettings.schema, config);
             await session.setOption('ascii_mode', asciiMode);
+            // Schemas may declare full_shape with reset: 1 (on by default),
+            // so the live value must be read, not assumed off.
+            this.fullShape = await session.getOption('full_shape');
             const installedSession = session;
             session.addListener('optionChanged', (name: string, val: boolean) => {
               if (this.session !== installedSession) return;
               if (name == 'ascii_mode') {
                 this.onToggleLanguageState(val);
+              }
+              if (name == 'full_shape') {
+                this.fullShape = val;
               }
               void installedSession.getOptionLabel(name, val).then((v) => {
                 const empty = v == null || v.trim() == '';
@@ -393,6 +427,7 @@ export class InputController extends EventEmitter {
           catch (error) {
             if (this.session === session) this.session = null;
             if (this.engine === engine) this.engine = null;
+            this.fullShape = false;
             session?.destroy();
             await engine.destroy();
             this.sessionEpoch++;
@@ -1098,6 +1133,46 @@ export class InputController extends EventEmitter {
     }
   }
 
+  // A literal glyph from the InputView (symbol layers, ，。 under 大千,
+  // emoji). Serialized with key processing. An open composition is flushed
+  // first — committing what RIME itself would commit (commitTextPreview) —
+  // so the glyph lands after the text, never inside the preedit. While
+  // full_shape is on, ASCII glyphs convert to their full-width forms —
+  // except into numeric fields, which reject full-width characters. The
+  // flushed text is never re-shaped: the engine already shaped its own.
+  async insertLiteral(text: string) {
+    await this.invalidateCandidateCache();
+    await this.sessionMutex.runExclusive(async () => {
+      const session = this.session;
+      const context = this.context;
+      const sessionEpoch = this.sessionEpoch;
+      const contextEpoch = this.contextEpoch;
+      if (!context) return;
+      const stale = () => this.session !== session || this.sessionEpoch !== sessionEpoch
+        || this.context !== context || this.contextEpoch !== contextEpoch;
+      let flushed = '';
+      if (session) {
+        const rimeContext = await session.getContext();
+        if (stale()) return;
+        const preedit = rimeContext?.composition?.preedit ?? '';
+        if (preedit.length > 0) {
+          flushed = rimeContext.commitTextPreview || preedit;
+          await session.clearComposition();
+          if (stale()) return;
+        }
+      }
+      const numeric = context.type === 'number' || context.type === 'tel';
+      const literal = this.fullShape && !numeric ? toFullShape(text) : text;
+      await new Promise<void>((res, rej) => {
+        chrome.input.ime.commitText({
+          contextID: context.contextID,
+          text: flushed + literal,
+        }, this.imeCallDone('commitText', res, rej));
+      });
+      if (flushed) await this.refreshContextInSessionOperation();
+    });
+  }
+
   async selectCandidate(index: number, currentPage: boolean = true) {
     await this.invalidateCandidateCache();
     await this.sessionMutex.runExclusive(async () => {
@@ -1220,10 +1295,10 @@ export class InputController extends EventEmitter {
   // Per-composition seed size, reported by the keyboard's width measurement.
   // Default covers the first composition before that report arrives; erring
   // high only over-fetches once and never under-fills (which would flicker).
-  candidateWindow = 24;
+  candidateWindow = kDefaultCandidateWindow;
 
   async setCandidateWindow(count: number) {
-    this.candidateWindow = Math.max(1, Math.min(64, Math.floor(count)));
+    this.candidateWindow = clampCandidateWindow(count);
     // Fill a widened viewport now, not on the next keystroke.
     const deficit = this.candidateWindow - this.candidateCache.length;
     if (deficit > 0 && this.candidateIterator) {

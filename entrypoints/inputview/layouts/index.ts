@@ -33,18 +33,19 @@ export function getLayout(id: LayoutId, ascii: boolean): KeyboardLayout {
   return staticLayouts[id] ?? buildLatinLayout(qwertySpec, ascii);
 }
 
-export function getLayerLayout(layer: 'sym' | 'sym2'): KeyboardLayout {
-  return layer === 'sym' ? symLayout() : sym2Layout();
+export function getLayerLayout(layer: 'sym' | 'sym2', script: ScriptId, ascii: boolean): KeyboardLayout {
+  return layer === 'sym' ? symLayout(script, ascii) : sym2Layout();
 }
 
-// Every layout that can appear on screen, in both ASCII modes — the
-// layout-validation tests iterate this, so new layouts get structural checks
-// for free.
+// Every layout that can appear on screen, in both ASCII modes and every
+// script's symbol page — the layout-validation tests iterate this, so new
+// layouts get structural checks for free.
 export function allLayouts(): KeyboardLayout[] {
   return [
     ...Object.values(latinSpecs).flatMap(spec => [buildLatinLayout(spec, false), buildLatinLayout(spec, true)]),
     ...Object.values(staticLayouts) as KeyboardLayout[],
-    symLayout(),
+    ...(['zh', 'ja', 'ko'] as const).map(script => symLayout(script, false)),
+    symLayout('zh', true),
     sym2Layout(),
   ];
 }
@@ -105,9 +106,9 @@ export function bottomRow(ctx: BottomRowContext): KeyDef[] {
   const row = [
     layerToggle,
     asciiToggle,
-    commaKey(ctx.asciiMode),
+    commaKey(ctx.asciiMode, ctx.script),
     space,
-    periodKey(ctx.asciiMode),
+    periodKey(ctx.asciiMode, ctx.script),
     { ...enterKey, width: 2 },
   ];
   const scale = (ctx.units ?? kFrameUnits) / kFrameUnits;

@@ -70,6 +70,11 @@ export type LatinLayoutId = typeof kLatinLayoutIds[number];
 export const kScriptLayoutIds = ['zhuyin', 'kana', 'hangul'] as const;
 export type ScriptLayoutId = typeof kScriptLayoutIds[number];
 
+// Whether a layout paints the schema's own script rather than Latin letters.
+export function isScriptLayout(id: string): id is ScriptLayoutId {
+  return (kScriptLayoutIds as readonly string[]).includes(id);
+}
+
 export const kLayoutIds = [...kLatinLayoutIds, ...kScriptLayoutIds] as const;
 export type LayoutId = typeof kLayoutIds[number];
 
@@ -78,6 +83,16 @@ export type LayoutId = typeof kLayoutIds[number];
 export interface InputViewCandidate {
   text: string;
   index: number;
+}
+
+/** Candidates seeded per composition before the bar reports its measured
+ *  width. Shared so the dev MockHost seeds exactly like the controller. */
+export const kDefaultCandidateWindow = 24;
+
+/** The bar sends a viewport-derived count; clamp it to something the engine
+ *  can serve. Shared for the same reason as the default above. */
+export function clampCandidateWindow(count: number): number {
+  return Math.max(1, Math.min(64, Math.floor(count)));
 }
 
 /** Writing system of the active schema — drives the language badge on the
@@ -103,6 +118,11 @@ export interface InputViewState {
   script: ScriptId;
   schemaId: string;
   schemaName: string;
+  /** The active schema's speller/alphabet — the keys the engine composes
+   *  with. Decides whether a char key strokes or inserts literally.
+   *  Empty = unknown (engine loading); the classifier substitutes the
+   *  librime default (letters only). */
+  alphabet: string;
   /** Set when the focused field is numeric — the keyboard renders a
      *  numberpad rather than letters. `null` for ordinary text fields. */
   numericField: NumericFieldKind | null;
@@ -131,4 +151,8 @@ export type InputViewToBackground
     /** Viewport-fill count; the engine seeds each composition at this size. */
     | { kind: 'setCandidateWindow'; count: number }
     | { kind: 'switchSchema'; schemaId: string }
-    | { kind: 'getSchemaList' };
+    | { kind: 'getSchemaList' }
+    /** Insert text as-is, bypassing the engine. Serialized with key
+     *  processing; an open composition is flushed (commitTextPreview)
+     *  first so the literal lands after it, never inside it. */
+    | { kind: 'insertLiteral'; text: string };

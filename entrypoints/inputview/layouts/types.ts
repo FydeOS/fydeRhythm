@@ -20,8 +20,11 @@ export type KeyAction
     // `kana` names the glyph the sequence spells, so 小゛゜ can find and
     // transform the last typed kana.
     | { type: 'strokes'; strokes: KeyStroke[]; kana?: string }
-    // Commit text directly, bypassing the engine (emoji, glyphs with no key mapping)
-    | { type: 'commit'; text: string }
+    // A literal character key. Whether it strokes `ascii` through the engine
+    // or inserts `glyph` directly is decided at tap time by classifyChar —
+    // it depends on the active schema's alphabet, which layouts (static
+    // data) cannot know. Empty `ascii` = no key mapping, always literal.
+    | { type: 'char'; glyph: string; ascii: string }
     | { type: 'shift' }
     | { type: 'layer'; layer: LayerId }
     | { type: 'toggleAscii' }
@@ -88,10 +91,6 @@ export function stroke(key: string, code: string, shiftKey?: boolean): KeyAction
   return { type: 'stroke', stroke: { key, code, ...(shiftKey ? { shiftKey } : {}) } };
 }
 
-export function commit(text: string): KeyAction {
-  return { type: 'commit', text };
-}
-
 // Characters that live on the shifted layer of a US physical keyboard. Their
 // synthesized key events MUST carry the shift modifier: the system rebuilds
 // the typed character from keyCode+modifiers (not from charValue), so an '@'
@@ -99,17 +98,20 @@ export function commit(text: string): KeyAction {
 const kShiftedSymbols = new Set([...'~!@#$%^&*()_+{}|:"<>?']);
 
 // The keystroke that types a single printable ASCII char.
-export function charStroke(c: string): KeyAction {
-  return stroke(c, codeForChar(c), /^[A-Z]$/.test(c) || kShiftedSymbols.has(c));
+export function charStroke(c: string): Extract<KeyAction, { type: 'stroke' }> {
+  return { type: 'stroke', stroke: { key: c, code: codeForChar(c), ...(/^[A-Z]$/.test(c) || kShiftedSymbols.has(c) ? { shiftKey: true } : {}) } };
 }
 
-// Alternates that type a plain character. Single Latin chars are sent as
-// strokes (so the engine sees them); anything else is committed directly.
+// A char action: printable ASCII keeps its keystroke identity for the
+// stroke branch; anything else can only be inserted literally.
+export function char(glyph: string, ascii?: string): KeyAction {
+  const a = ascii ?? (/^[\x20-\x7e]$/.test(glyph) ? glyph : '');
+  return { type: 'char', glyph, ascii: a };
+}
+
+// Alternates that type a plain character.
 export function charAlts(chars: string[]): AltDef[] {
-  return chars.map(c => ({
-    label: c,
-    action: /^[\x20-\x7e]$/.test(c) ? charStroke(c) : commit(c),
-  }));
+  return chars.map(c => ({ label: c, action: char(c) }));
 }
 
 // W3C KeyboardEvent.code for a printable ASCII char, for strokes synthesized
@@ -155,7 +157,7 @@ export function charKey(c: string, altChars?: string[]): KeyDef {
   return {
     id: `char-${c}`,
     label: c,
-    action: /^[\x20-\x7e]$/.test(c) ? charStroke(c) : commit(c),
+    action: char(c),
     ...(altChars && altChars.length > 0
       ? { hint: altChars[0], alts: charAlts(altChars) }
       : {}),

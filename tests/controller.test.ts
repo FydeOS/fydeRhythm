@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
     addListener: vi.fn(),
     destroy: vi.fn(),
     getContext: vi.fn(async () => null),
-    getOption: vi.fn(async () => false),
+    getOption: vi.fn(async (_name: string) => false),
     getOptionLabel: vi.fn(async () => ''),
     getStatus: vi.fn(async () => ({ schemaId: schema })),
     processKey: vi.fn(async () => true),
@@ -497,6 +497,50 @@ describe('InputController schema switching', () => {
     // Reset clears the composition but not focus.
     expect(controller.context).toEqual({ contextID: 9 });
     expect(controller.engineId).toBe('engine');
+  });
+
+  it('tracks the session full_shape option: initial read, changes, stale guard, reload reset', async () => {
+    stubChrome(settings({ schema: 'aurora' }));
+    const controller = new InputController();
+    vi.spyOn(controller, 'loadRimeConfig').mockResolvedValue('schema: aurora\n');
+
+    // A schema can declare full_shape with reset: 1 — the load must read
+    // the live value instead of assuming off.
+    mocks.createSession.mockImplementationOnce((schema: string) => ({
+      addListener: vi.fn(),
+      destroy: vi.fn(),
+      getContext: vi.fn(async () => null),
+      getOption: vi.fn(async (name: string) => name === 'full_shape'),
+      getOptionLabel: vi.fn(async () => ''),
+      getStatus: vi.fn(async () => ({ schemaId: schema })),
+      processKey: vi.fn(async () => true),
+      setOption: vi.fn(async () => { }),
+    }));
+    await expect(controller.loadRime(false)).resolves.toBe(true);
+    expect(controller.fullShape).toBe(true);
+
+    // The hotkey path: rime (e.g. rime-ice's Control+Shift binding) flips
+    // the option and the session emits optionChanged.
+    const session = controller.session as unknown as { addListener: ReturnType<typeof vi.fn> };
+    const listener = session.addListener.mock.calls.find(c => c[0] === 'optionChanged')?.[1] as
+      (name: string, val: boolean) => void;
+    listener('full_shape', false);
+    expect(controller.fullShape).toBe(false);
+    listener('full_shape', true);
+    expect(controller.fullShape).toBe(true);
+    listener('ascii_mode', false); // unrelated options leave it alone
+    expect(controller.fullShape).toBe(true);
+
+    // Events from a replaced session are ignored.
+    const live = controller.session;
+    controller.session = null;
+    listener('full_shape', false);
+    expect(controller.fullShape).toBe(true);
+    controller.session = live;
+
+    // Reloading (schema switch) re-reads from the new session: default off.
+    await expect(controller.loadRime(false)).resolves.toBe(true);
+    expect(controller.fullShape).toBe(false);
   });
 
   it('records the last successfully loaded schema', async () => {
@@ -1370,6 +1414,135 @@ describe('physical-key Latin layout remap', () => {
   });
 });
 
+describe('InputController insertLiteral', () => {
+  function literalHarness(rimeContext: unknown, contextType?: string) {
+    stubChrome();
+    const commits: string[] = [];
+    (chrome.input.ime as unknown as Record<string, unknown>).commitText
+      = (opts: { text: string }, cb: (ok: boolean) => void) => { commits.push(opts.text); cb(true); };
+    for (const api of ['setCandidateWindowProperties', 'setComposition', 'setCandidates', 'setCursorPosition']) {
+      (chrome.input.ime as unknown as Record<string, unknown>)[api]
+        = (_opts: unknown, cb: (ok: boolean) => void) => cb(true);
+    }
+    const controller = new InputController();
+    controller.engineId = 'engine-1';
+    controller.context = { contextID: 7, ...(contextType ? { type: contextType } : {}) } as never;
+    let context = rimeContext;
+    const cleared = vi.fn(async () => { context = null; });
+    controller.session = {
+      getContext: async () => context,
+      getCommit: async () => null,
+      clearComposition: cleared,
+      processKey: async () => true,
+    } as never;
+    return { controller, commits, cleared };
+  }
+
+  const composing = {
+    composition: { length: 2, cursorPosition: 2, selectionStart: 0, selectionEnd: 0, preedit: 'ni' },
+    menu: { pageSize: 5, pageNumber: 0, isLastPage: true, highlightedCandidateIndex: 0, candidates: [] },
+    selectKeys: '',
+    commitTextPreview: '你',
+    selectLabels: [],
+  };
+
+  it('inserts the glyph directly when nothing is composing', async () => {
+    const { controller, commits, cleared } = literalHarness(null);
+    await controller.insertLiteral('，');
+    expect(commits).toEqual(['，']);
+    expect(cleared).not.toHaveBeenCalled();
+  });
+
+  it('flushes the open composition first — one commit, text then glyph', async () => {
+    const { controller, commits, cleared } = literalHarness(composing);
+    await controller.insertLiteral('，');
+    expect(cleared).toHaveBeenCalledTimes(1);
+    expect(commits).toEqual(['你，']);
+  });
+
+  it('falls back to the raw preedit when the engine offers no preview', async () => {
+    const { controller, commits } = literalHarness({ ...composing, commitTextPreview: '' });
+    await controller.insertLiteral('！');
+    expect(commits).toEqual(['ni！']);
+  });
+
+  it('does nothing without a focused context', async () => {
+    const { controller, commits } = literalHarness(composing);
+    controller.context = null as never;
+    await controller.insertLiteral('，');
+    expect(commits).toEqual([]);
+  });
+
+  it('still inserts while the engine is loading (no session)', async () => {
+    const { controller, commits } = literalHarness(null);
+    controller.session = null as never;
+    await controller.insertLiteral('🙂');
+    expect(commits).toEqual(['🙂']);
+  });
+
+  it('tolerates a context object with no composition', async () => {
+    const { controller, commits } = literalHarness({});
+    await controller.insertLiteral('，');
+    expect(commits).toEqual(['，']);
+  });
+
+  it('aborts when the session is replaced while reading the context', async () => {
+    const { controller, commits } = literalHarness(composing);
+    (controller.session as unknown as { getContext: () => Promise<unknown> }).getContext = async () => {
+      controller.session = null as never;
+      return composing;
+    };
+    await controller.insertLiteral('，');
+    expect(commits).toEqual([]);
+  });
+
+  it('aborts when the field changes while clearing the composition', async () => {
+    const { controller, commits } = literalHarness(composing);
+    (controller.session as unknown as { clearComposition: () => Promise<void> }).clearComposition = async () => {
+      controller.context = { contextID: 8 } as never;
+    };
+    await controller.insertLiteral('，');
+    expect(commits).toEqual([]);
+  });
+
+  // full_shape: literal inserts must convert exactly as the engine's own
+  // output would, in every language, and never into numeric fields.
+  it('converts ASCII literals to full width while full_shape is on', async () => {
+    const { controller, commits } = literalHarness(null);
+    controller.fullShape = true;
+    await controller.insertLiteral('1');
+    await controller.insertLiteral('(');
+    await controller.insertLiteral(' '); // space maps to ideographic space
+    expect(commits).toEqual(['１', '（', '　']);
+  });
+
+  it('full_shape leaves already-shaped glyphs alone across scripts', async () => {
+    const { controller, commits } = literalHarness(null);
+    controller.fullShape = true;
+    for (const glyph of ['，', '“', '、', '「', '🙂']) {
+      await controller.insertLiteral(glyph);
+    }
+    expect(commits).toEqual(['，', '“', '、', '「', '🙂']);
+  });
+
+  it('number and tel fields never receive full-width characters', async () => {
+    for (const type of ['number', 'tel']) {
+      const { controller, commits } = literalHarness(null, type);
+      controller.fullShape = true;
+      await controller.insertLiteral('1');
+      expect(commits).toEqual(['1']);
+    }
+  });
+
+  it('re-shapes only the literal, never the flushed composition', async () => {
+    const { controller, commits } = literalHarness({ ...composing, commitTextPreview: '' });
+    controller.fullShape = true;
+    await controller.insertLiteral('!');
+    // The raw preedit 'ni' is the engine's own text — committed as-is.
+    expect(commits).toEqual(['ni！']);
+  });
+});
+
 describe('InputController loadRimeConfig', () => {
   const kSchemaYamlPath = '/root/aurora/build/aurora.schema.yaml';
   const kManifestPath = '/root/aurora/user/dict-packs.json';
@@ -1436,6 +1609,17 @@ describe('InputController loadRimeConfig', () => {
     const config = await loadConfig();
 
     expect(config.speller).toBeUndefined();
+  });
+
+  it('captures speller/alphabet for the InputView, resetting when absent', async () => {
+    const controller = new InputController();
+    scriptFs({ [kSchemaYamlPath]: 'speller:\n  alphabet: abc123\n' });
+    await controller.loadRimeConfig(settings());
+    expect(controller.schemaAlphabet).toBe('abc123');
+
+    scriptFs({ [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n' });
+    await controller.loadRimeConfig(settings());
+    expect(controller.schemaAlphabet).toBe('');
   });
 
   it('survives a corrupt dict-pack manifest and keeps the config usable', async () => {

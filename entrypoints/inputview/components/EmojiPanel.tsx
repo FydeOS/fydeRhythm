@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type EmojiDef, kEmojiCategories, skinVariants } from '../emoji/data';
 import { t } from '../i18n';
-import { commit, type KeyAction } from '../layouts/types';
+import { char, type KeyAction } from '../layouts/types';
 import { AltBubble } from './AltBubble';
 import { BackspaceIcon, ScheduleIcon } from './icons';
 
@@ -349,11 +349,11 @@ export function EmojiPanel({ onInsert, onBack, onBackspace }: {
       </div>
       {tones && (
         <AltBubble
-          alts={skinVariants(tones.def.char).map(v => ({ label: v, action: commit(v) }))}
+          alts={skinVariants(tones.def.char).map(v => ({ label: v, action: char(v) }))}
           anchor={tones.anchor}
           pointerId={tones.pointerId}
           onSelect={(action: KeyAction) => {
-            if (action.type === 'commit') insert(action.text);
+            if (action.type === 'char') insert(action.glyph);
           }}
           onClose={() => setTones(null)}
         />

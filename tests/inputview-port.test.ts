@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => {
     applySchemaSwitchKey: vi.fn(),
     handleInputViewVisibilityChanged: vi.fn(async () => { }),
     setAsciiMode: vi.fn(async () => { }),
+    insertLiteral: vi.fn(async () => { }),
     fetchMoreCandidates: vi.fn(async () => { }),
     refreshContext: vi.fn(async () => { }),
     clearContext: vi.fn(async () => { }),
@@ -195,6 +196,20 @@ describe('inputview port message handling', () => {
 
     expect(mocks.controller.selectCandidate).not.toHaveBeenCalled();
     expect(mocks.controller.deleteCandidate).not.toHaveBeenCalled();
+  });
+
+  it('forwards literal inserts and drops malformed or oversized ones', async () => {
+    const { port } = await bootBackground();
+
+    port.emitMessage({ kind: 'insertLiteral', text: '，' });
+    port.emitMessage({ kind: 'insertLiteral', text: '' });
+    port.emitMessage({ kind: 'insertLiteral', text: 42 });
+    port.emitMessage({ kind: 'insertLiteral', text: 'x'.repeat(65) });
+    port.emitMessage({ kind: 'insertLiteral' });
+    await flush();
+
+    expect(mocks.controller.insertLiteral).toHaveBeenCalledTimes(1);
+    expect(mocks.controller.insertLiteral).toHaveBeenCalledWith('，');
   });
 
   it('ignores non-finite, fractional, and non-positive pagination counts', async () => {

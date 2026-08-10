@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RealHost } from '../entrypoints/inputview/chrome-shim';
-import { allLayouts, bottomRow, getLayerLayout } from '../entrypoints/inputview/layouts';
-import type { KeyDef, KeyStroke } from '../entrypoints/inputview/layouts/types';
+import { allLayouts, bottomRow } from '../entrypoints/inputview/layouts';
+import { charStroke, type KeyDef, type KeyStroke } from '../entrypoints/inputview/layouts/types';
 
 interface SentKey { type: string; charValue: number; keyCode: number; keyName: string; modifiers: number }
 
@@ -60,12 +60,15 @@ function strokesOf(key: KeyDef): KeyStroke[] {
     if (!action) continue;
     if (action.type === 'stroke') out.push(action.stroke);
     if (action.type === 'strokes') out.push(...action.strokes);
+    // A char key's stroke branch synthesizes its keystroke at tap time;
+    // that stroke must satisfy the same system-identifiability contract.
+    if (action.type === 'char' && action.ascii) out.push(charStroke(action.ascii).stroke);
   }
   return out;
 }
 
 function everyStroke(): Array<{ layout: string; id: string; stroke: KeyStroke }> {
-  const layouts = [...allLayouts(), getLayerLayout('sym'), getLayerLayout('sym2')];
+  const layouts = allLayouts();
   const out: Array<{ layout: string; id: string; stroke: KeyStroke }> = [];
   for (const layout of layouts) {
     for (const row of layout.rows) {

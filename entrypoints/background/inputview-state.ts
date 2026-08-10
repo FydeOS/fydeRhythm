@@ -68,6 +68,7 @@ export async function buildFastInputViewState(
     script: guessScriptForSchema(schemaId, undefined, layout),
     schemaId,
     schemaName: schemaId,
+    alphabet: controller?.schemaAlphabet ?? '',
     numericField: numericFieldFor(controller?.context?.type),
   };
 }
@@ -97,6 +98,8 @@ export async function refineInputViewState(
     asciiMode: await readAsciiMode(controller),
     schemaName,
     script: guessScriptForSchema(base.schemaId, schemaName, base.layout),
+    // Re-read: the engine may have finished loading since the fast pass.
+    alphabet: controller?.schemaAlphabet ?? base.alphabet,
   };
 }
 

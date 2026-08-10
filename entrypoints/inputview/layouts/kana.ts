@@ -1,5 +1,5 @@
 import { enterKey } from './frame';
-import { type AltDef, backspaceKey, charStroke, codeForChar, commit, type FlickDef, type KeyAction, type KeyboardLayout, type KeyDef, stroke } from './types';
+import { type AltDef, backspaceKey, char, codeForChar, type FlickDef, type KeyAction, type KeyboardLayout, type KeyDef, stroke } from './types';
 
 // 12-key kana per the Keyline spec (§02): five uniform columns, function keys
 // down both edges, flick input on the kana cells — self-contained, so App does
@@ -61,9 +61,9 @@ function seq(kana: string): KeyAction {
 }
 
 // A flick petal: kana type their romaji; anything else (brackets, dots)
-// commits directly.
+// inserts literally.
 function petal(label: string): AltDef {
-  return { label, action: kKanaRomaji[label] ? seq(label) : commit(label) };
+  return { label, action: kKanaRomaji[label] ? seq(label) : char(label) };
 }
 
 // A 12-key kana cell: tap = the column head, flick left/up/right/down = the
@@ -85,9 +85,9 @@ function kanaCell(center: string, petals: [string?, string?, string?, string?]):
   };
 }
 
-// The punctuation cells work the same way but send engine strokes (the ASCII
-// key under the CJK cap), so the schema picks the width and composition
-// commits first.
+// The punctuation cells carry the CJK glyph plus its ASCII keystroke;
+// classifyChar picks stroke (romaji schemas — the punctuator maps , to 、)
+// or literal per schema, with the composition flushed first either way.
 function punctCell(center: string, centerAction: KeyAction, petals: Array<[string, KeyAction]>): KeyDef {
   const alts: AltDef[] = petals.map(([label, action]) => ({ label, action }));
   const dir: (keyof FlickDef)[] = ['up', 'left', 'right', 'down'];
@@ -135,9 +135,9 @@ export const kanaLayout: KeyboardLayout = {
     ],
     [
       fn('kana-modify', '小゛゜', { type: 'kanaModify' }),
-      punctCell('、', stroke(',', 'Comma'), [['。', stroke('.', 'Period')], ['・', commit('・')], ['…', commit('…')]]),
+      punctCell('、', char('、', ','), [['。', char('。', '.')], ['・', char('・')], ['…', char('…')]]),
       kanaCell('わ', ['を', 'ん', 'ー', undefined]),
-      punctCell('？', charStroke('?'), [['！', charStroke('!')]]),
+      punctCell('？', char('？', '?'), [['！', char('！', '!')]]),
       { ...enterKey, width: 1 },
     ],
   ],

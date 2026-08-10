@@ -431,6 +431,11 @@ export default defineBackground({
               void postSchemaList(self.controller, postToPort)
                 .catch((error: unknown) => reportInputViewError('getSchemaList', error));
               break;
+            case 'insertLiteral':
+              if (typeof msg.text !== 'string' || msg.text.length === 0 || msg.text.length > 64) break;
+              void self.controller.insertLiteral(msg.text)
+                .catch((error: unknown) => reportInputViewError('insertLiteral', error));
+              break;
           }
         });
 

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { strokeForChar } from '@/lib/latin-remap';
-import { type InputViewCandidate, type InputViewState, type InputViewToBackground, kLatinLayoutIds, type LatinLayoutId } from '@/lib/shared-types';
+import { type InputViewCandidate, type InputViewState, type InputViewToBackground, isScriptLayout, kLatinLayoutIds, type LatinLayoutId } from '@/lib/shared-types';
 
 import { acceptCandidatePacket, type CandidateOrder } from './candidate-order';
+import { classifyChar } from './char-policy';
 import { createHost } from './chrome-shim';
 import type { ClipboardHistoryItem, ClipboardReadResult } from './clipboard';
 import { AltBubble } from './components/AltBubble';
@@ -17,7 +18,7 @@ import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popove
 import { t } from './i18n';
 import { bottomRow, getLayerLayout, getLayout, numpadLayout } from './layouts';
 import { kanaModifyNext } from './layouts/kana';
-import { type AltDef, codeForChar, type KeyAction, type KeyDef, type LayerId } from './layouts/types';
+import { type AltDef, charStroke, codeForChar, type KeyAction, type KeyDef, type LayerId } from './layouts/types';
 import {
   type KeyboardMode,
   kFloatingScaleMax,
@@ -51,6 +52,7 @@ const kFallbackState: InputViewState = {
   script: 'zh',
   schemaId: '',
   schemaName: '',
+  alphabet: '',
   numericField: null,
 };
 
@@ -194,7 +196,7 @@ export default function App() {
     const numpad = layer === 'main' && vk.numericField && !numericLetters ? numpadLayout(vk.numericField) : null;
     const layout = numpad || (layer === 'main'
       ? getLayout(activeLayoutId, vk.asciiMode)
-      : getLayerLayout(layer));
+      : getLayerLayout(layer, vk.script, vk.asciiMode));
     let bottom = bottomRow({
       layer,
       asciiMode: vk.asciiMode,
@@ -315,10 +317,22 @@ export default function App() {
       case 'emoji':
         setPanel('emoji');
         break;
-      case 'commit':
-        host.insertText(action.text);
+      case 'char': {
+        const verdict = classifyChar(action.ascii, {
+          scriptLayout: !!vk && isScriptLayout(vk.layout),
+          alphabet: vk?.alphabet ?? '',
+          asciiMode: !!vk?.asciiMode,
+          numpad: layer === 'main' && !!vk?.numericField && !numericLetters,
+        });
+        if (verdict === 'literal') {
+          post({ kind: 'insertLiteral', text: action.glyph });
+        }
+        else {
+          host.typeStroke(layoutStroke(charStroke(action.ascii).stroke));
+        }
         finishTyping();
         break;
+      }
       case 'shift': {
         const now = Date.now();
         const next = tapShift({ mode: shift, lastTap: lastShiftTap.current }, now);
@@ -516,7 +530,7 @@ export default function App() {
       <div className="kb-keys">
         {panel === 'emoji' ? (
           <EmojiPanel
-            onInsert={emoji => host.insertText(emoji)}
+            onInsert={emoji => post({ kind: 'insertLiteral', text: emoji })}
             onBack={closePanel}
             onBackspace={() => host.typeStroke({ key: 'Backspace', code: 'Backspace' })}
           />

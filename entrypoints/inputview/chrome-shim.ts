@@ -553,6 +553,9 @@ class MockHost implements VkHost {
         script: layout === 'kana' ? 'ja' : layout === 'hangul' ? 'ko' : 'zh',
         schemaId: 'aurora_pinyin',
         schemaName: '极光拼音',
+        // ?layout=zhuyin previews the 大千 classification (digits and
+        // ，。 literal); everything else uses the letters-only default.
+        alphabet: layout === 'zhuyin' ? 'abcdefghijklmnopqrstuvwxyz1234567890-;,./' : '',
         numericField,
       },
     });
@@ -687,6 +690,13 @@ class MockHost implements VkHost {
           break;
         case 'loadMoreCandidates':
           this.candidateTotal += msg.count;
+          this.postCandidates();
+          break;
+        case 'insertLiteral':
+          // Mirror the controller: flush the open composition, then insert.
+          this.setComposition('');
+          this.candidateTotal = 0;
+          this.candidateHighlight = -1;
           this.postCandidates();
           break;
         case 'switchSchema':

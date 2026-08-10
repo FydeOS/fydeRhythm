@@ -7,7 +7,9 @@
 // remaps which letter is painted in which cell; the frame never reflows.
 // Every row totals kFrameUnits so the unit grid lines up across rows.
 
-import { backspaceKey, charAlts, charKey, type KeyboardLayout, type KeyDef, letterKey, shiftKey, stroke, withSymbolHints } from './types';
+import type { ScriptId } from '@/lib/shared-types';
+
+import { backspaceKey, char, charAlts, charKey, type KeyboardLayout, type KeyDef, letterKey, shiftKey, stroke, withSymbolHints } from './types';
 
 export const kFrameUnits = 10;
 
@@ -56,26 +58,37 @@ export interface LatinFrameSpec {
   rows: [string, string, string];
 }
 
-// Chinese/ASCII punctuation pair on the bottom row. Taps send plain
-// keystrokes — the engine picks half/full width; bubbles carry the direct
-// CJK marks.
-function commaKey(ascii: boolean): KeyDef {
+// Punctuation pair on the bottom row. The cap shows the script's glyph and
+// the action carries both identities (glyph + ASCII keystroke); classifyChar
+// picks the branch per schema, so 大千 gets a literal ，while pinyin keeps
+// the punctuator. Bubbles carry the direct CJK marks.
+function commaKey(ascii: boolean, script: ScriptId): KeyDef {
+  // Korean writes with Western punctuation (Gboard ko shows , . too), so the
+  // ko caps stay ASCII even in 한 mode.
+  if (ascii || script === 'ko') {
+    return { id: 'Comma', label: ',', action: char(','), hint: '!', alts: charAlts(['!', ';', ':', '-', '@']) };
+  }
+  const ja = script === 'ja';
   return {
     id: 'Comma',
-    label: ascii ? ',' : '，',
-    action: stroke(',', 'Comma'),
-    hint: ascii ? '!' : '、',
-    alts: ascii ? charAlts(['!', ';', ':', '-', '@']) : charAlts(['、', '！', '；', '：', '…']),
+    label: ja ? '、' : '，',
+    action: char(ja ? '、' : '，', ','),
+    hint: ja ? '・' : '、',
+    alts: ja ? charAlts(['・', '，', '。', '…']) : charAlts(['、', '！', '；', '：', '…']),
   };
 }
 
-function periodKey(ascii: boolean): KeyDef {
+function periodKey(ascii: boolean, script: ScriptId): KeyDef {
+  if (ascii || script === 'ko') {
+    return { id: 'Period', label: '.', action: char('.'), hint: '?', alts: charAlts(['?', '"', "'", '(', ')', '/']) };
+  }
+  const ja = script === 'ja';
   return {
     id: 'Period',
-    label: ascii ? '.' : '。',
-    action: stroke('.', 'Period'),
-    hint: ascii ? '?' : '？',
-    alts: ascii ? charAlts(['?', '"', "'", '(', ')', '/']) : charAlts(['？', '“', '”', '《', '》', '（', '）']),
+    label: '。',
+    action: char('。', '.'),
+    hint: '？',
+    alts: ja ? charAlts(['？', '！', '「', '」', '…']) : charAlts(['？', '“', '”', '《', '》', '（', '）']),
   };
 }
 
