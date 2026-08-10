@@ -6,7 +6,9 @@
 
 import {
   type BackgroundToInputView,
+  clampCandidateWindow,
   type InputViewToBackground,
+  kDefaultCandidateWindow,
   kInputViewPortName,
   type LayoutId,
 } from '@/lib/shared-types';
@@ -529,6 +531,10 @@ class MockHost implements VkHost {
   private onMessage: ((msg: BackgroundToInputView) => void) | null = null;
   private composition = '';
   private candidateTotal = 0;
+  // Seed size per composition; the bar overwrites it once measured. Shares
+  // the controller's default and clamp, so dev matches device by
+  // construction rather than by hand-mirrored constants.
+  private candidateWindow = kDefaultCandidateWindow;
   private candidateHighlight = -1;
   private asciiMode = false;
   private candidateSequence = 0;
@@ -589,13 +595,13 @@ class MockHost implements VkHost {
     if (this.asciiMode) return;
     if (/^[a-z]$/.test(s.key)) {
       this.setComposition(this.composition + s.key);
-      this.candidateTotal = 21;
+      this.candidateTotal = this.candidateWindow;
       this.candidateHighlight = 0;
       this.postCandidates();
     }
     else if (s.code === 'Backspace' && this.composition.length > 0) {
       this.setComposition(this.composition.slice(0, -1));
-      this.candidateTotal = this.composition.length > 0 ? 21 : 0;
+      this.candidateTotal = this.composition.length > 0 ? this.candidateWindow : 0;
       this.candidateHighlight = this.candidateTotal > 0 ? 0 : -1;
       this.postCandidates();
     }
@@ -675,6 +681,9 @@ class MockHost implements VkHost {
     return (msg) => {
       console.log('[mock] toBackground', msg);
       switch (msg.kind) {
+        // A plain tab has no IME container, so there is no visibility to track.
+        case 'visibility':
+          break;
         case 'setAsciiMode':
           this.asciiMode = msg.asciiMode;
           this.setComposition('');
@@ -691,6 +700,14 @@ class MockHost implements VkHost {
         case 'loadMoreCandidates':
           this.candidateTotal += msg.count;
           this.postCandidates();
+          break;
+        case 'setCandidateWindow':
+          this.candidateWindow = clampCandidateWindow(msg.count);
+          // Fill a widened viewport now, not on the next keystroke.
+          if (this.candidateTotal > 0 && this.candidateWindow > this.candidateTotal) {
+            this.candidateTotal = this.candidateWindow;
+            this.postCandidates();
+          }
           break;
         case 'insertLiteral':
           // Mirror the controller: flush the open composition, then insert.
