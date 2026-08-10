@@ -138,46 +138,48 @@ body {
   white-space: nowrap;
 }
 
-/* Hover feedback for pointer-fine users (ChromeOS mice/touchpads click the
-   VK too); guarded so touch devices don't get sticky hover fills. */
-@media (hover: hover) {
-  .kb-key:not(.pressed):not(.spacer):not(.enter):hover {
-    background: var(--kb-surface-variant);
-  }
+/* Hover feedback for pointer-fine users (ChromeOS mice/touchpads click the VK
+   too), gated on the pointer behind the current event — pointer-modality.ts
+   drops the class on touch/pen. `hover: hover` only describes the device set,
+   so it stays true on a touchscreen with a trackpad while Chrome parks :hover
+   on the finger-tapped key. :where() holds the gate at zero specificity, so
+   later same-weight rules like .icon-btn.selected still win. */
+:where(.kb-pointer-mouse) .kb-key:not(.pressed):not(.spacer):not(.enter):hover {
+  background: var(--kb-surface-variant);
+}
 
-  .kb-key.enter:not(.pressed):hover {
-    background: var(--kb-primary-variant);
-  }
+:where(.kb-pointer-mouse) .kb-key.enter:not(.pressed):hover {
+  background: var(--kb-primary-variant);
+}
 
-  .icon-btn:hover,
-  .kb-candidate:hover,
-  .kb-emoji-cell:hover {
-    background: var(--kb-surface);
-  }
+:where(.kb-pointer-mouse) .icon-btn:hover,
+:where(.kb-pointer-mouse) .kb-candidate:hover,
+:where(.kb-pointer-mouse) .kb-emoji-cell:hover {
+  background: var(--kb-surface);
+}
 
-  .kb-clipboard-tile:hover,
-  .kb-clipboard-delete:hover,
-  .kb-clipboard-retry:hover,
-  .kb-clipboard-close:hover {
-    background: var(--kb-popup-focused);
-  }
+:where(.kb-pointer-mouse) .kb-clipboard-tile:hover,
+:where(.kb-pointer-mouse) .kb-clipboard-delete:hover,
+:where(.kb-pointer-mouse) .kb-clipboard-retry:hover,
+:where(.kb-pointer-mouse) .kb-clipboard-close:hover {
+  background: var(--kb-popup-focused);
+}
 
-  .kb-menu .item:hover {
-    background: var(--kb-popup-focused);
-  }
+:where(.kb-pointer-mouse) .kb-menu .item:hover {
+  background: var(--kb-popup-focused);
+}
 
-  /* Floating is the mouse-driven placement; its one control needs an affordance. */
-  .kb-resize-grip:hover {
-    background: var(--kb-surface);
-  }
+/* Floating is the mouse-driven placement; its one control needs an affordance. */
+:where(.kb-pointer-mouse) .kb-resize-grip:hover {
+  background: var(--kb-surface);
+}
 
-  .kb-emoji-tabs .tab:hover {
-    filter: grayscale(1) opacity(0.85);
-  }
+:where(.kb-pointer-mouse) .kb-emoji-tabs .tab:hover {
+  filter: grayscale(1) opacity(0.85);
+}
 
-  .kb-emoji-tabs .tab.active:hover {
-    filter: none;
-  }
+:where(.kb-pointer-mouse) .kb-emoji-tabs .tab.active:hover {
+  filter: none;
 }
 
 /* Web Interface Guidelines: keyboard-focus visibility + reduced motion */

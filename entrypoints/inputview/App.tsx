@@ -26,6 +26,7 @@ import {
   kOneHandRows,
   type OneHandSide,
 } from './placement';
+import { installPointerModality } from './pointer-modality';
 import { tapShift, typeWithShift } from './shift-state';
 import { type FloatingPos, VkContainer } from './vk-container';
 
@@ -59,6 +60,12 @@ const kFallbackState: InputViewState = {
 export default function App() {
   const host = useMemo(createHost, []);
   const postRef = useRef<((msg: InputViewToBackground) => void) | null>(null);
+
+  // `hover: hover` describes the device set, not the pointer behind the
+  // current event. On a touch display with an external keyboard/touchpad it is
+  // true, and Chrome leaves :hover stuck on the last finger-tapped key. Gate
+  // hover paint by the actual pointer modality instead.
+  useEffect(() => installPointerModality(), []);
 
   const [vk, setVk] = useState<InputViewState | null>(null);
   const [candidates, setCandidates] = useState<InputViewCandidate[]>([]);
