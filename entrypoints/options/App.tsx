@@ -40,6 +40,7 @@ import { SegmentedPill } from './SegmentedPill';
 import styles from './styles.module.less';
 import theme from './theme';
 import Animation from './utils/animation';
+import { VoiceSection } from './VoiceSection';
 
 const kFuzzyMap = [
   {
@@ -112,6 +113,10 @@ function OptionsPage() {
   // response can overwrite the terminal "Ready" response.
   const engineStatusRequestId = useRef(0);
   const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
+  // Present only in a build made with FYDE_ASR_KEY, and only where the keyboard
+  // exists to host the button.
+  const voiceConfigured = Boolean(import.meta.env.FYDE_ASR_KEY)
+    && Boolean(chrome.runtime.getManifest().input_components?.[0]?.input_view);
   enum SettingsDirtyStatus {
     NotDirty = 0,
     Dirty = 1,
@@ -704,6 +709,15 @@ function OptionsPage() {
           onRepoSchemaIdChange={setPersonalRepoSchemaId}
           onImportCompiledSchema={importCompiledSchema}
         />
+        {/* Voice input needs a build that carries an ASR key and a keyboard to
+            put the microphone button on — the Web Store build has neither, so
+            the section would be a switch that does nothing. */}
+        {voiceConfigured && (
+          <VoiceSection
+            enabled={imeSettings.voiceInput ?? false}
+            onChange={enabled => changeSettings({ voiceInput: enabled })}
+          />
+        )}
         <div className={styles.formGroup}>
           <div className={styles.formBox} style={{ padding: '8px 0' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4, py: 2.5 }}>

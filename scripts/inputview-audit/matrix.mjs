@@ -92,6 +92,19 @@ export const states = [
     { sel: '.kb-bar .icon-btn:nth-child(2)', expect: '.kb-emoji-tabs .tab svg' },
   ] },
   { name: 'clipboard', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-tile' }] },
+  // The voice panel only exists while a session is live, which the audit cannot
+  // drive — ?voice= renders each state directly (chrome-shim's MockHost). The
+  // microphone is the 4th toolbar button.
+  { name: 'voice-listening', query: '?voice=listening', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-meter-bar' }] },
+  { name: 'voice-empty', query: '?voice=empty', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-hint' }] },
+  { name: 'voice-starting', query: '?voice=starting', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-gap' }] },
+  { name: 'voice-finalizing', query: '?voice=finalizing', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-action-btn:disabled' }] },
+  { name: 'voice-idle', query: '?voice=idle', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-action-btn' }] },
+  { name: 'voice-long', query: '?voice=long', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-transcript' }] },
+  { name: 'voice-latin', query: '?voice=latin', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-transcript' }] },
+  { name: 'voice-consent', query: '?voice=consent', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-action.primary' }] },
+  { name: 'voice-permission', query: '?voice=permission', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-card-icon' }] },
+  { name: 'voice-error', query: '?voice=error', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-card-body' }] },
   { name: 'clipboard-loading', query: '?clipboard=loading', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-spinner' }] },
   { name: 'clipboard-empty', query: '?clipboard=empty', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-retry' }] },
   { name: 'clipboard-delete-pending', query: '?clipboard=delete-pending', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)' }, { sel: '.kb-clipboard-delete', expect: '.kb-clipboard-delete:disabled' }] },

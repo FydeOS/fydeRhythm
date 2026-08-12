@@ -1,456 +1,531 @@
 {
-    "extension_name": {
-        "message": "真文韵输入法"
-    },
-    "description": {
-        "message": "适用于 ChromeOS 和 FydeOS 系统的输入法，由 FydeOS 团队基于 RIME 引擎定制。"
-    },
-    "input_method_name": {
-        "message": "真文韵输入法"
-    },
-    "setting_page": {
-        "message": "真文韵输入法设置"
-    },
-    "loading_engine": {
-        "message": "正在载入 RIME 引擎…"
-    },
-    "candidate_page": {
-        "message": "第 $PAGE$ 页",
-        "placeholders": {
-            "page": {
-                "content": "$1"
-            }
-        }
-    },
-    "candidate_page_last": {
-        "message": " (末)"
-    },
-    "rime_engine_logs": {
-        "message": "RIME 服务日志"
-    },
-    "rime_engine_not_started": {
-        "message": "未启动"
-    },
-    "rime_engine_starting": {
-        "message": "启动中"
-    },
-    "rime_engine_ready": {
-        "message": "就绪"
-    },
-    "rime_engine_starting_button": {
-        "message": "正在重启 RIME"
-    },
-    "save_settings_and_apply_button": {
-        "message": "保存并应用"
-    },
-    "select_schema": {
-        "message": "选择输入方案"
-    },
-    "fetching_schema_list": {
-        "message": "（正在刷新列表）"
-    },
-    "candidate_count": {
-        "message": "单页候选词数量"
-    },
-    "schema_switch_key": {
-        "message": "方案切换快捷键"
-    },
-    "schema_switch_key_hint": {
-        "message": "切换到下一个已启用的方案。"
-    },
-    "schema_switch_key_hint_recording": {
-        "message": "请按下新的组合键，按 Esc 取消。"
-    },
-    "schema_switch_key_hint_disabled": {
-        "message": "快捷键已禁用。点击“设置快捷键”并按下组合键即可重新启用。"
-    },
-    "schema_switch_key_recording": {
-        "message": "请按下按键…"
-    },
-    "schema_switch_key_set": {
-        "message": "设置快捷键"
-    },
-    "schema_switch_key_disable": {
-        "message": "禁用"
-    },
-    "schema_switch_key_reset": {
-        "message": "恢复默认"
-    },
-    "schema_switch_key_invalid": {
-        "message": "请包含 Ctrl 或 Alt，或使用功能键。仅 Shift 或搜索键会干扰正常输入。"
-    },
-    "fuzzy_pinyin": {
-        "message": "模糊音"
-    },
-    "settings_changed_snackbar": {
-        "message": "设置已更改。"
-    },
-    "error_downloading_schema": {
-        "message": "下载方案时发生错误："
-    },
-    "error_removing_schema": {
-        "message": "删除方案时发生错误："
-    },
-    "error_last_schema": {
-        "message": "无法删除最后一个方案，必须至少保留一个方案。"
-    },
-    "error_importing_schema": {
-        "message": "导入方案时发生错误"
-    },
-    "import_compiled_schema": {
-        "message": "从 ZIP 导入"
-    },
-    "import_compiled_schema_hint": {
-        "message": "导入预编译方案（.zip 文件）"
-    },
-    "import_predefined_schema_confirm": {
-        "message": "方案“$1”已包含在预定义方案列表中，是否改为导入预定义方案？"
-    },
-    "error_form": {
-        "message": "请填写 GitHub 仓库 URL 和 Schema Id。"
-    },
-    "error_fetch_schema_list": {
-        "message": "获取方案列表时发生错误："
-    },
-    "schema_home_page": {
-        "message": "方案主页"
-    },
-    "privacy_statement": {
-        "message": "隐私声明"
-    },
-    "privacy_statement_url": {
-        "message": "https://fydeos.com/privacy/fyderhythm/"
-    },
-    "edit_rime_config": {
-        "message": "编辑 RIME 配置文件（仅供熟悉 RIME 引擎的用户使用）"
-    },
-    "open_source": {
-        "message": "源代码"
-    },
-    "add_schema": {
-        "message": "添加"
-    },
-    "update_schema": {
-        "message": "更新"
-    },
-    "remove_schema": {
-        "message": "移除"
-    },
-    "enable_schema_hint": {
-        "message": "在输入法托盘菜单中显示此方案"
-    },
-    "cannot_edit_this_file": {
-        "message": "请选择一个文本文件"
-    },
-    "loading_editor": {
-        "message": "正在加载编辑器…"
-    },
-    "config_editor_title": {
-        "message": "RIME 配置编辑器"
-    },
-    "remove_schema_confirm_title": {
-        "message": "移除输入方案"
-    },
-    "remove_schema_confirm_body": {
-        "message": "确定要移除“$SCHEMA$”吗？方案文件将被删除，如需再次使用须重新下载。",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "cancel_button": {
-        "message": "取消"
-    },
-    "download_schema": {
-        "message": "下载方案"
-    },
-    "decrease_candidate_count": {
-        "message": "减少候选词数量"
-    },
-    "increase_candidate_count": {
-        "message": "增加候选词数量"
-    },
-    "import_predefined_schema_title": {
-        "message": "导入预定义方案"
-    },
-    "import_button": {
-        "message": "导入"
-    },
-    "appearance": {
-        "message": "外观"
-    },
-    "theme_light": {
-        "message": "浅色"
-    },
-    "theme_system": {
-        "message": "跟随系统"
-    },
-    "theme_dark": {
-        "message": "深色"
-    },
-    "dict_pack_section_title": {
-        "message": "字典包"
-    },
-    "dict_pack_hint": {
-        "message": "导入 .txt、.tsv、.dict.yaml 文件，或搜狗（.scel）、百度（.bdict/.bcd）、QQ 拼音（.qpyd/.qcel）词库以编译字典包。与词库不同，编译式字典包支持前缀匹配与基于权重的排名。"
-    },
-    "dict_pack_import_button": {
-        "message": "导入字典包"
-    },
-    "dict_pack_empty": {
-        "message": "文件中没有有效词条。"
-    },
-    "dict_pack_import_error": {
-        "message": "导入字典包时出错："
-    },
-    "dict_pack_compile_error": {
-        "message": "编译失败："
-    },
-    "dict_pack_entry_count": {
-        "message": "$COUNT$ 个词条",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_enabled": {
-        "message": "已启用"
-    },
-    "dict_pack_disabled": {
-        "message": "已停用"
-    },
-    "dict_pack_remove_button": {
-        "message": "删除"
-    },
-    "dict_pack_empty_list": {
-        "message": "尚未安装任何字典包。导入文件或从目录安装。"
-    },
-    "dict_pack_active_entry_count": {
-        "message": "已启用 $COUNT$ 个词条",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_compiling": {
-        "message": "编译中…"
-    },
-    "dict_pack_duplicates_merged": {
-        "message": "已合并导入文件中的 $COUNT$ 条重复词条。",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_import_warning_summary": {
-        "message": "导入完成，但有 $COUNT$ 条警告：",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_more_warnings": {
-        "message": "…及另外 $COUNT$ 条（完整列表见浏览器控制台）",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "layout_zhuyin": {
-        "message": "注音"
-    },
-    "layout_kana": {
-        "message": "假名"
-    },
-    "layout_hangul": {
-        "message": "谚文"
-    },
-    "vk_delete_word_confirm": {
-        "message": "删除「$1」?"
-    },
-    "vk_delete": {
-        "message": "删除"
-    },
-    "vk_cancel": {
-        "message": "取消"
-    },
-    "vk_candidates_announce": {
-        "message": "$1 个候选"
-    },
-    "vk_alt_characters": {
-        "message": "候选字符"
-    },
-    "vk_settings": {
-        "message": "设置"
-    },
-    "vk_emoji": {
-        "message": "表情符号"
-    },
-    "vk_clipboard": {
-        "message": "剪贴板"
-    },
-    "vk_clipboard_current": {
-        "message": "当前剪贴板"
-    },
-    "vk_clipboard_paste_short": {
-        "message": "粘贴"
-    },
-    "vk_clipboard_loading": {
-        "message": "正在读取剪贴板…"
-    },
-    "vk_clipboard_empty": {
-        "message": "剪贴板中没有文本"
-    },
-    "vk_clipboard_unavailable": {
-        "message": "剪贴板不可用"
-    },
-    "vk_clipboard_error": {
-        "message": "无法读取剪贴板"
-    },
-    "vk_clipboard_retry": {
-        "message": "重试"
-    },
-    "vk_clipboard_paste": {
-        "message": "粘贴剪贴板文本"
-    },
-    "vk_clipboard_close": {
-        "message": "关闭剪贴板"
-    },
-    "vk_clipboard_delete": {
-        "message": "删除剪贴板项目"
-    },
-    "vk_clipboard_delete_error": {
-        "message": "未能删除，请重试"
-    },
-    "vk_switch_schema": {
-        "message": "切换方案"
-    },
-    "vk_prev_page": {
-        "message": "上一页"
-    },
-    "vk_next_page": {
-        "message": "下一页"
-    },
-    "vk_expand_candidates": {
-        "message": "展开候选"
-    },
-    "vk_collapse_candidates": {
-        "message": "收起候选"
-    },
-    "vk_recent_emoji": {
-        "message": "最近使用"
-    },
-    "vk_back_to_keyboard": {
-        "message": "返回键盘"
-    },
-    "vk_key_shift": {
-        "message": "Shift"
-    },
-    "vk_key_backspace": {
-        "message": "退格"
-    },
-    "vk_key_enter": {
-        "message": "回车"
-    },
-    "vk_key_space": {
-        "message": "空格"
-    },
-    "vk_key_hide": {
-        "message": "收起键盘"
-    },
-    "vk_kbmode_docked": {
-        "message": "停靠键盘"
-    },
-    "vk_kbmode_floating": {
-        "message": "浮动键盘"
-    },
-    "vk_kbmode_onehand": {
-        "message": "单手键盘"
-    },
-    "vk_resize_keyboard": {
-        "message": "调整键盘大小"
-    },
-    "vk_pin_left": {
-        "message": "固定到左下角"
-    },
-    "vk_pin_right": {
-        "message": "固定到右下角"
-    },
-    "vk_exit_onehand": {
-        "message": "退出单手模式"
-    },
-    "vk_key_symbols": {
-        "message": "符号键盘"
-    },
-    "vk_key_more_symbols": {
-        "message": "更多符号"
-    },
-    "vk_key_letters": {
-        "message": "字母键盘"
-    },
-    "vk_key_toggle_language": {
-        "message": "中英切换"
-    },
-    "vk_emoji_smileys": {
-        "message": "表情"
-    },
-    "vk_emoji_gestures": {
-        "message": "手势"
-    },
-    "vk_emoji_people": {
-        "message": "人物"
-    },
-    "vk_emoji_hearts": {
-        "message": "心形"
-    },
-    "vk_emoji_animals": {
-        "message": "动物"
-    },
-    "vk_emoji_food": {
-        "message": "食物"
-    },
-    "vk_emoji_activities": {
-        "message": "活动"
-    },
-    "vk_emoji_travel": {
-        "message": "旅行"
-    },
-    "vk_emoji_objects": {
-        "message": "物品"
-    },
-    "vk_emoji_symbols": {
-        "message": "符号"
-    },
-    "vk_emoji_flags": {
-        "message": "旗帜"
-    },
-    "keyboard_arrangement": {
-        "message": "字母排列"
-    },
-    "keyboard_arrangement_hint": {
-        "message": "同时用于外接键盘、屏幕键盘和英文模式。"
-    },
-    "keyboard_arrangement_hint_physical": {
-        "message": "用于外接键盘和英文模式。"
-    },
-    "keyboard_script_note": {
-        "message": "$1 使用自己的按键；字母排列仍用于英文模式。",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "vk_keys": {
-        "message": "屏幕按键"
-    },
-    "layout_letters": {
-        "message": "字母"
+  "extension_name": {
+    "message": "真文韵输入法"
+  },
+  "description": {
+    "message": "适用于 ChromeOS 和 FydeOS 系统的输入法，由 FydeOS 团队基于 RIME 引擎定制。"
+  },
+  "input_method_name": {
+    "message": "真文韵输入法"
+  },
+  "setting_page": {
+    "message": "真文韵输入法设置"
+  },
+  "loading_engine": {
+    "message": "正在载入 RIME 引擎…"
+  },
+  "candidate_page": {
+    "message": "第 $PAGE$ 页",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      }
     }
+  },
+  "candidate_page_last": {
+    "message": " (末)"
+  },
+  "rime_engine_logs": {
+    "message": "RIME 服务日志"
+  },
+  "rime_engine_not_started": {
+    "message": "未启动"
+  },
+  "rime_engine_starting": {
+    "message": "启动中"
+  },
+  "rime_engine_ready": {
+    "message": "就绪"
+  },
+  "rime_engine_starting_button": {
+    "message": "正在重启 RIME"
+  },
+  "save_settings_and_apply_button": {
+    "message": "保存并应用"
+  },
+  "select_schema": {
+    "message": "选择输入方案"
+  },
+  "fetching_schema_list": {
+    "message": "（正在刷新列表）"
+  },
+  "candidate_count": {
+    "message": "单页候选词数量"
+  },
+  "schema_switch_key": {
+    "message": "方案切换快捷键"
+  },
+  "schema_switch_key_hint": {
+    "message": "切换到下一个已启用的方案。"
+  },
+  "schema_switch_key_hint_recording": {
+    "message": "请按下新的组合键，按 Esc 取消。"
+  },
+  "schema_switch_key_hint_disabled": {
+    "message": "快捷键已禁用。点击“设置快捷键”并按下组合键即可重新启用。"
+  },
+  "schema_switch_key_recording": {
+    "message": "请按下按键…"
+  },
+  "schema_switch_key_set": {
+    "message": "设置快捷键"
+  },
+  "schema_switch_key_disable": {
+    "message": "禁用"
+  },
+  "schema_switch_key_reset": {
+    "message": "恢复默认"
+  },
+  "schema_switch_key_invalid": {
+    "message": "请包含 Ctrl 或 Alt，或使用功能键。仅 Shift 或搜索键会干扰正常输入。"
+  },
+  "fuzzy_pinyin": {
+    "message": "模糊音"
+  },
+  "settings_changed_snackbar": {
+    "message": "设置已更改。"
+  },
+  "error_downloading_schema": {
+    "message": "下载方案时发生错误："
+  },
+  "error_removing_schema": {
+    "message": "删除方案时发生错误："
+  },
+  "error_last_schema": {
+    "message": "无法删除最后一个方案，必须至少保留一个方案。"
+  },
+  "error_importing_schema": {
+    "message": "导入方案时发生错误"
+  },
+  "import_compiled_schema": {
+    "message": "从 ZIP 导入"
+  },
+  "import_compiled_schema_hint": {
+    "message": "导入预编译方案（.zip 文件）"
+  },
+  "import_predefined_schema_confirm": {
+    "message": "方案“$1”已包含在预定义方案列表中，是否改为导入预定义方案？"
+  },
+  "error_form": {
+    "message": "请填写 GitHub 仓库 URL 和 Schema Id。"
+  },
+  "error_fetch_schema_list": {
+    "message": "获取方案列表时发生错误："
+  },
+  "schema_home_page": {
+    "message": "方案主页"
+  },
+  "privacy_statement": {
+    "message": "隐私声明"
+  },
+  "privacy_statement_url": {
+    "message": "https://fydeos.com/privacy/fyderhythm/"
+  },
+  "edit_rime_config": {
+    "message": "编辑 RIME 配置文件（仅供熟悉 RIME 引擎的用户使用）"
+  },
+  "open_source": {
+    "message": "源代码"
+  },
+  "add_schema": {
+    "message": "添加"
+  },
+  "update_schema": {
+    "message": "更新"
+  },
+  "remove_schema": {
+    "message": "移除"
+  },
+  "enable_schema_hint": {
+    "message": "在输入法托盘菜单中显示此方案"
+  },
+  "cannot_edit_this_file": {
+    "message": "请选择一个文本文件"
+  },
+  "loading_editor": {
+    "message": "正在加载编辑器…"
+  },
+  "config_editor_title": {
+    "message": "RIME 配置编辑器"
+  },
+  "remove_schema_confirm_title": {
+    "message": "移除输入方案"
+  },
+  "remove_schema_confirm_body": {
+    "message": "确定要移除“$SCHEMA$”吗？方案文件将被删除，如需再次使用须重新下载。",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "cancel_button": {
+    "message": "取消"
+  },
+  "download_schema": {
+    "message": "下载方案"
+  },
+  "decrease_candidate_count": {
+    "message": "减少候选词数量"
+  },
+  "increase_candidate_count": {
+    "message": "增加候选词数量"
+  },
+  "import_predefined_schema_title": {
+    "message": "导入预定义方案"
+  },
+  "import_button": {
+    "message": "导入"
+  },
+  "appearance": {
+    "message": "外观"
+  },
+  "theme_light": {
+    "message": "浅色"
+  },
+  "theme_system": {
+    "message": "跟随系统"
+  },
+  "theme_dark": {
+    "message": "深色"
+  },
+  "dict_pack_section_title": {
+    "message": "字典包"
+  },
+  "dict_pack_hint": {
+    "message": "导入 .txt、.tsv、.dict.yaml 文件，或搜狗（.scel）、百度（.bdict/.bcd）、QQ 拼音（.qpyd/.qcel）词库以编译字典包。与词库不同，编译式字典包支持前缀匹配与基于权重的排名。"
+  },
+  "dict_pack_import_button": {
+    "message": "导入字典包"
+  },
+  "dict_pack_empty": {
+    "message": "文件中没有有效词条。"
+  },
+  "dict_pack_import_error": {
+    "message": "导入字典包时出错："
+  },
+  "dict_pack_compile_error": {
+    "message": "编译失败："
+  },
+  "dict_pack_entry_count": {
+    "message": "$COUNT$ 个词条",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_enabled": {
+    "message": "已启用"
+  },
+  "dict_pack_disabled": {
+    "message": "已停用"
+  },
+  "dict_pack_remove_button": {
+    "message": "删除"
+  },
+  "dict_pack_empty_list": {
+    "message": "尚未安装任何字典包。导入文件或从目录安装。"
+  },
+  "dict_pack_active_entry_count": {
+    "message": "已启用 $COUNT$ 个词条",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_compiling": {
+    "message": "编译中…"
+  },
+  "dict_pack_duplicates_merged": {
+    "message": "已合并导入文件中的 $COUNT$ 条重复词条。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_import_warning_summary": {
+    "message": "导入完成，但有 $COUNT$ 条警告：",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_more_warnings": {
+    "message": "…及另外 $COUNT$ 条（完整列表见浏览器控制台）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "layout_zhuyin": {
+    "message": "注音"
+  },
+  "layout_kana": {
+    "message": "假名"
+  },
+  "layout_hangul": {
+    "message": "谚文"
+  },
+  "vk_delete_word_confirm": {
+    "message": "删除「$1」?"
+  },
+  "vk_delete": {
+    "message": "删除"
+  },
+  "vk_cancel": {
+    "message": "取消"
+  },
+  "vk_candidates_announce": {
+    "message": "$1 个候选"
+  },
+  "vk_alt_characters": {
+    "message": "候选字符"
+  },
+  "vk_settings": {
+    "message": "设置"
+  },
+  "vk_emoji": {
+    "message": "表情符号"
+  },
+  "vk_clipboard": {
+    "message": "剪贴板"
+  },
+  "vk_clipboard_current": {
+    "message": "当前剪贴板"
+  },
+  "vk_clipboard_paste_short": {
+    "message": "粘贴"
+  },
+  "vk_clipboard_loading": {
+    "message": "正在读取剪贴板…"
+  },
+  "vk_clipboard_empty": {
+    "message": "剪贴板中没有文本"
+  },
+  "vk_clipboard_unavailable": {
+    "message": "剪贴板不可用"
+  },
+  "vk_clipboard_error": {
+    "message": "无法读取剪贴板"
+  },
+  "vk_clipboard_retry": {
+    "message": "重试"
+  },
+  "vk_clipboard_paste": {
+    "message": "粘贴剪贴板文本"
+  },
+  "vk_clipboard_close": {
+    "message": "关闭剪贴板"
+  },
+  "vk_clipboard_delete": {
+    "message": "删除剪贴板项目"
+  },
+  "vk_clipboard_delete_error": {
+    "message": "未能删除，请重试"
+  },
+  "vk_switch_schema": {
+    "message": "切换方案"
+  },
+  "vk_prev_page": {
+    "message": "上一页"
+  },
+  "vk_next_page": {
+    "message": "下一页"
+  },
+  "vk_expand_candidates": {
+    "message": "展开候选"
+  },
+  "vk_collapse_candidates": {
+    "message": "收起候选"
+  },
+  "vk_recent_emoji": {
+    "message": "最近使用"
+  },
+  "vk_back_to_keyboard": {
+    "message": "返回键盘"
+  },
+  "vk_key_shift": {
+    "message": "Shift"
+  },
+  "vk_key_backspace": {
+    "message": "退格"
+  },
+  "vk_key_enter": {
+    "message": "回车"
+  },
+  "vk_key_space": {
+    "message": "空格"
+  },
+  "vk_key_hide": {
+    "message": "收起键盘"
+  },
+  "vk_kbmode_docked": {
+    "message": "停靠键盘"
+  },
+  "vk_kbmode_floating": {
+    "message": "浮动键盘"
+  },
+  "vk_kbmode_onehand": {
+    "message": "单手键盘"
+  },
+  "vk_resize_keyboard": {
+    "message": "调整键盘大小"
+  },
+  "vk_pin_left": {
+    "message": "固定到左下角"
+  },
+  "vk_pin_right": {
+    "message": "固定到右下角"
+  },
+  "vk_exit_onehand": {
+    "message": "退出单手模式"
+  },
+  "vk_key_symbols": {
+    "message": "符号键盘"
+  },
+  "vk_key_more_symbols": {
+    "message": "更多符号"
+  },
+  "vk_key_letters": {
+    "message": "字母键盘"
+  },
+  "vk_key_toggle_language": {
+    "message": "中英切换"
+  },
+  "vk_emoji_smileys": {
+    "message": "表情"
+  },
+  "vk_emoji_gestures": {
+    "message": "手势"
+  },
+  "vk_emoji_people": {
+    "message": "人物"
+  },
+  "vk_emoji_hearts": {
+    "message": "心形"
+  },
+  "vk_emoji_animals": {
+    "message": "动物"
+  },
+  "vk_emoji_food": {
+    "message": "食物"
+  },
+  "vk_emoji_activities": {
+    "message": "活动"
+  },
+  "vk_emoji_travel": {
+    "message": "旅行"
+  },
+  "vk_emoji_objects": {
+    "message": "物品"
+  },
+  "vk_emoji_symbols": {
+    "message": "符号"
+  },
+  "vk_emoji_flags": {
+    "message": "旗帜"
+  },
+  "keyboard_arrangement": {
+    "message": "字母排列"
+  },
+  "keyboard_arrangement_hint": {
+    "message": "同时用于外接键盘、屏幕键盘和英文模式。"
+  },
+  "keyboard_arrangement_hint_physical": {
+    "message": "用于外接键盘和英文模式。"
+  },
+  "keyboard_script_note": {
+    "message": "$1 使用自己的按键；字母排列仍用于英文模式。",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "vk_keys": {
+    "message": "屏幕按键"
+  },
+  "layout_letters": {
+    "message": "字母"
+  },
+  "vk_voice_hint": {
+    "message": "开始说话"
+  },
+  "vk_voice_recording": {
+    "message": "正在录音"
+  },
+  "vk_voice_connecting": {
+    "message": "正在连接…"
+  },
+  "vk_voice_finalizing": {
+    "message": "正在整理…"
+  },
+  "vk_voice_stop": {
+    "message": "停止"
+  },
+  "vk_voice_consent_title": {
+    "message": "语音输入"
+  },
+  "vk_voice_consent_body": {
+    "message": "你说的话会发送到火山引擎（北京字节跳动）的服务器进行识别。"
+  },
+  "vk_voice_consent_accept": {
+    "message": "同意并开始"
+  },
+  "vk_voice_permission_title": {
+    "message": "需要麦克风权限"
+  },
+  "vk_voice_permission_body": {
+    "message": "键盘里弹不出权限窗口。请到设置页开启语音输入并授权，选择“每次访问时允许”。"
+  },
+  "vk_voice_permission_open": {
+    "message": "前往设置"
+  },
+  "vk_voice_error_microphone": {
+    "message": "无法使用麦克风"
+  },
+  "vk_voice_error_network": {
+    "message": "网络连接中断"
+  },
+  "vk_voice_error_server": {
+    "message": "语音服务暂时不可用"
+  },
+  "vk_voice_error_unknown": {
+    "message": "语音输入出错了"
+  },
+  "vk_voice_error_body": {
+    "message": "可以先用键盘继续输入。"
+  },
+  "vk_voice": {
+    "message": "语音输入"
+  },
+  "voice_input": {
+    "message": "语音输入"
+  },
+  "voice_input_desc": {
+    "message": "点键盘上的麦克风说话，文字会直接输入。语音由火山引擎（字节跳动）识别。"
+  },
+  "voice_mic_needed": {
+    "message": "还缺麦克风权限。重新打开开关，并在弹窗中选择“每次访问时允许”——选“仅这一次”会在本页关闭后失效。"
+  },
+  "voice_mic_denied": {
+    "message": "麦克风权限已被拒绝。到浏览器的网站设置中允许后，再重新打开开关。"
+  },
+  "vk_voice_idle": {
+    "message": "已结束"
+  },
+  "vk_voice_again": {
+    "message": "轻触麦克风继续"
+  },
+  "voice_input_langs": {
+    "message": "支持普通话和英语，也支持粤语、上海话、闽南语、四川话等方言。"
+  },
+  "voice_mic_choose": {
+    "message": "开启时浏览器会请求麦克风权限，请选择“每次访问时允许”。"
+  }
 }

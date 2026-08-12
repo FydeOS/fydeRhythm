@@ -70,11 +70,16 @@ export async function buildFastInputViewState(
     schemaName: schemaId,
     alphabet: controller?.schemaAlphabet ?? '',
     numericField: numericFieldFor(controller?.context?.type),
+    passwordField: isPasswordField(controller?.context?.type),
   };
 }
 
 export function numericFieldFor(type: string | undefined): NumericFieldKind | null {
   return type === 'number' || type === 'tel' ? type : null;
+}
+
+export function isPasswordField(type: string | undefined): boolean {
+  return type === 'password';
 }
 
 export async function refineInputViewState(
@@ -115,6 +120,29 @@ function isCurrentRequest(post: (message: BackgroundToInputView) => void, reques
   return requestIds.get(post) === requestId;
 }
 
+/** Remembers the last state each connection was told about, so a security
+ *  change can be pushed on top of it without waiting for the slow reads. */
+const lastPosted = new WeakMap<(message: BackgroundToInputView) => void, InputViewState>();
+
+/** Publishes a field-type change on the spot.
+ *
+ *  The refined post behind it takes as long as schema enumeration and the
+ *  ascii-mode read allow — up to three seconds each. Whether the caret sits in
+ *  a password box decides whether the microphone is offered, and a session
+ *  already running keeps inserting text meanwhile, so that flag cannot wait for
+ *  a schema label. Everything else in the snapshot is carried over unchanged,
+ *  which is what keeps the label from flashing back to a raw schema id. */
+export function postFieldState(
+  post: (message: BackgroundToInputView) => void,
+  field: { numericField: NumericFieldKind | null; passwordField: boolean },
+): void {
+  const previous = lastPosted.get(post);
+  if (!previous) return;
+  const next: InputViewState = { ...previous, ...field };
+  lastPosted.set(post, next);
+  post({ kind: 'state', state: next });
+}
+
 export async function postInputViewState(
   controller: InputController | undefined,
   post: (message: BackgroundToInputView) => void,
@@ -122,10 +150,12 @@ export async function postInputViewState(
   const requestId = beginRequest(post);
   const fast = await buildFastInputViewState(controller);
   if (!isCurrentRequest(post, requestId)) return;
+  lastPosted.set(post, fast);
   post({ kind: 'state', state: fast });
   const refined = await refineInputViewState(controller, fast);
   if (isCurrentRequest(post, requestId)
     && JSON.stringify(refined) !== JSON.stringify(fast)) {
+    lastPosted.set(post, refined);
     post({ kind: 'state', state: refined });
   }
 }
@@ -138,6 +168,7 @@ export async function postRefinedInputViewState(
   const fast = await buildFastInputViewState(controller);
   const refined = await refineInputViewState(controller, fast);
   if (isCurrentRequest(post, requestId)) {
+    lastPosted.set(post, refined);
     post({ kind: 'state', state: refined });
   }
 }

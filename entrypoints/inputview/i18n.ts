@@ -56,7 +56,37 @@ const kFallbacks: Record<string, string> = {
   vk_emoji_objects: '物品',
   vk_emoji_symbols: '符号',
   vk_emoji_flags: '旗帜',
+  vk_voice: '语音输入',
+  vk_voice_hint: '开始说话',
+  vk_voice_idle: '已结束',
+  vk_voice_again: '轻触麦克风继续',
+  vk_voice_recording: '正在录音',
+  vk_voice_connecting: '正在连接…',
+  vk_voice_finalizing: '正在整理…',
+  vk_voice_stop: '停止',
+  vk_voice_consent_title: '语音输入',
+  vk_voice_consent_body: '你说的话会发送到火山引擎（北京字节跳动）的服务器进行识别。',
+  vk_voice_consent_accept: '同意并开始',
+  vk_voice_permission_title: '需要麦克风权限',
+  vk_voice_permission_body: '键盘里弹不出权限窗口。请到设置页开启语音输入并授权，选择“每次访问时允许”。',
+  vk_voice_permission_open: '前往设置',
+  vk_voice_error_microphone: '无法使用麦克风',
+  vk_voice_error_network: '网络连接中断',
+  vk_voice_error_server: '语音服务暂时不可用',
+  vk_voice_error_unknown: '语音输入出错了',
+  vk_voice_error_body: '可以先用键盘继续输入。',
 };
+
+/** The browser UI language, or an empty string in a dev tab. Callers treat an
+ *  unknown language as "no regional preference". */
+export function uiLanguage(): string {
+  try {
+    return chrome.i18n.getUILanguage();
+  }
+  catch {
+    return '';
+  }
+}
 
 export function t(key: string, substitutions?: string | string[]): string {
   try {

@@ -30,6 +30,7 @@ import {
   normalizePlacement,
   type Placement,
 } from './placement';
+import type { VoiceState } from './voice/session';
 import { windowCollapsed } from './window-state';
 
 export interface VkHost {
@@ -50,7 +51,19 @@ export interface VkHost {
   releaseContainer(): Promise<void>;
   readPlacement(): Promise<Placement>;
   writePlacement(placement: Placement): void;
+  /** The ChromeOS system input-method settings — NOT this extension's options
+   *  page. See openExtensionOptions for that. */
   openSettings(): void;
+  /** This extension's own options page, in a normal tab.
+   *
+   *  The distinction matters: the microphone grant can only be made from a page
+   *  that can show Chrome's permission prompt, and the system settings page is
+   *  not one — sending a user there to grant it strands them. */
+  openExtensionOptions(): void;
+  /** Mock only: `?voice=<state>` in a dev tab renders the voice panel in that
+   *  state without a live session, so the layout audit can reach selectors that
+   *  otherwise only exist while a microphone is open. Undefined on device. */
+  devVoiceState?(): VoiceState | null;
   // Connect the background port; returns the poster for VK→background messages.
   connect(onMessage: (msg: BackgroundToInputView) => void): (msg: InputViewToBackground) => void;
 }
@@ -420,6 +433,10 @@ export class RealHost implements VkHost {
     this.vk.openSettings();
   }
 
+  openExtensionOptions(): void {
+    void chrome.runtime.openOptionsPage();
+  }
+
   connect(onMessage: (msg: BackgroundToInputView) => void): (msg: InputViewToBackground) => void {
     let port: chrome.runtime.Port | null = null;
     let closed = false;
@@ -563,6 +580,7 @@ class MockHost implements VkHost {
         // ，。 literal); everything else uses the letters-only default.
         alphabet: layout === 'zhuyin' ? 'abcdefghijklmnopqrstuvwxyz1234567890-;,./' : '',
         numericField,
+        passwordField: type === 'password',
       },
     });
   }
@@ -622,6 +640,48 @@ class MockHost implements VkHost {
     console.log('[mock] insertText', text);
   }
 
+  devVoiceState(): VoiceState | null {
+    const wanted = new URLSearchParams(window.location.search).get('voice');
+    switch (wanted) {
+      case 'listening':
+        return { kind: 'listening', pending: '这是一段正在识别、还没有定稿的文字', level: 0.4 };
+      // Content stress: a paragraph that must scroll rather than push the
+      // status strip off the card.
+      case 'long':
+        return {
+          kind: 'listening',
+          level: 0.4,
+          pending: '这是一段很长的识别结果，用来检查转录区在卡片变矮变窄之后还能不能正常滚动，'
+            + '而不是把底部的状态条挤出卡片之外。语音听写本来就会产生长段落，所以这是常态而不是边缘情况。'
+            + '再来一句凑够足以溢出最小浮动键盘的长度，确认滚动条出现而布局不变形。',
+        };
+      // Latin has no break opportunity inside a long token, which is the only
+      // real source of horizontal overflow — CJK wraps anywhere.
+      case 'latin':
+        return {
+          kind: 'listening',
+          level: 0.4,
+          pending: 'https://openspeech.bytedance.com/api/v3/sauc/bigmodel_async?verylongquerystring=thatcannotbreak',
+        };
+      case 'empty':
+        return { kind: 'listening', pending: '', level: 0.02 };
+      case 'starting':
+        return { kind: 'starting' };
+      case 'finalizing':
+        return { kind: 'finalizing', pending: '最后半句还在整理', stopped: 'silence' };
+      case 'consent':
+        return { kind: 'blocked', reason: 'consent' };
+      case 'permission':
+        return { kind: 'blocked', reason: 'permission' };
+      case 'error':
+        return { kind: 'error', reason: 'network' };
+      case 'idle':
+        return { kind: 'idle' };
+      default:
+        return null;
+    }
+  }
+
   readClipboard(): Promise<ClipboardReadResult> {
     return import('./mock-clipboard').then(({ readMockClipboard }) => readMockClipboard());
   }
@@ -673,6 +733,10 @@ class MockHost implements VkHost {
 
   openSettings(): void {
     console.log('[mock] openSettings');
+  }
+
+  openExtensionOptions(): void {
+    console.log('[mock] openExtensionOptions');
   }
 
   connect(onMessage: (msg: BackgroundToInputView) => void): (msg: InputViewToBackground) => void {

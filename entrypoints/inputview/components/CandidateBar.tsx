@@ -4,7 +4,7 @@ import type { InputViewCandidate } from '@/lib/shared-types';
 
 import { candidateSeed, kMinBatch } from '../candidate-window';
 import { t } from '../i18n';
-import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, KeyboardHideIcon, LanguageIcon, MoodIcon, SettingsIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, ClipboardIcon, ExpandMoreIcon, KeyboardHideIcon, LanguageIcon, MicIcon, MoodIcon, SettingsIcon } from './icons';
 
 export interface CandidateBarProps {
   candidates: InputViewCandidate[];
@@ -17,7 +17,12 @@ export interface CandidateBarProps {
   onOpenSettings: () => void;
   onEmoji: () => void;
   onClipboard: () => void;
-  activeTool?: 'emoji' | 'clipboard';
+  /** Absent when voice input is unavailable — no credentials in the build, the
+   *  feature switched off, an unsupported script, or a password field — in
+   *  which case no microphone button is rendered at all. Hiding beats a button
+   *  that explains itself only after being pressed. */
+  onVoice?: () => void;
+  activeTool?: 'emoji' | 'clipboard' | 'voice';
   onHide: () => void;
   // Opens the placement menu anchored at the hide button (its long-press).
   onModeMenu: (anchor: DOMRect) => void;
@@ -180,6 +185,16 @@ export function CandidateBar(props: CandidateBarProps) {
           >
             <ClipboardIcon />
           </button>
+          {props.onVoice && (
+            <button
+              className={`icon-btn${props.activeTool === 'voice' ? ' selected' : ''}`}
+              aria-label={t('vk_voice')}
+              aria-pressed={props.activeTool === 'voice'}
+              onClick={props.onVoice}
+            >
+              <MicIcon />
+            </button>
+          )}
           <button
             className="icon-btn"
             aria-label={t('vk_switch_schema')}

@@ -22,7 +22,7 @@ import { chromium } from 'playwright';
 import Icons from 'unplugin-icons/vite';
 import { createServer } from 'vite';
 
-import { applyStep, inspectKeyboard, inspectPopovers, inspectPress, installInkHelpers, matchedSelectors, matchedWhilePressed } from './checks.mjs';
+import { applyStep, inspectKeyboard, inspectPopovers, inspectPress, inspectVoicePanel, installInkHelpers, matchedSelectors, matchedWhilePressed } from './checks.mjs';
 import { placements, screens, states } from './matrix.mjs';
 
 const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -91,6 +91,10 @@ async function inspectFeedback(page, label, report) {
     'space': '.kb-key.space',
     'enter': '.kb-key.enter',
     'emoji side': '.kb-emoji-side',
+    // Disabled is excluded: a control that is meant not to respond would
+    // otherwise be reported as a press that does nothing.
+    'voice action': '.kb-voice-action-btn:not(:disabled)',
+    'voice side': '.kb-voice-side',
   };
   for (const [kind, sel] of Object.entries(kinds)) {
     const el = await page.$(sel);
@@ -253,6 +257,7 @@ async function main() {
           metrics: kMetrics,
         });
         found.push(...await page.evaluate(inspectPopovers));
+        found.push(...(await page.evaluate(inspectVoicePanel)).findings);
 
         // Read-only, so it runs while the state is still the one the
         // matrix asked for: the emoji panel open, the menu up, the

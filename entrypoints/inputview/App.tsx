@@ -15,6 +15,7 @@ import { ExpandedPanel } from './components/ExpandedPanel';
 import { ChevronLeftIcon, ChevronRightIcon, ExpandKeyboardIcon, ResizeGripIcon } from './components/icons';
 import { Key, type ShiftState } from './components/Key';
 import { DeleteConfirm, KeyboardModeMenu, SchemaMenu } from './components/Popovers';
+import { VoicePanel } from './components/VoicePanel';
 import { t } from './i18n';
 import { bottomRow, getLayerLayout, getLayout, numpadLayout } from './layouts';
 import { kanaModifyNext } from './layouts/kana';
@@ -29,6 +30,10 @@ import {
 import { installPointerModality } from './pointer-modality';
 import { tapShift, typeWithShift } from './shift-state';
 import { type FloatingPos, VkContainer } from './vk-container';
+import { voiceAvailable } from './voice/availability';
+import { readCredentials } from './voice/credentials';
+import { kDefaultVoiceSettings, readVoiceSettings, readVoiceUid, watchVoiceSettings, writeVoiceConsent } from './voice/settings';
+import { useVoiceSession } from './voice/use-voice-session';
 
 type Popover
   = | { type: 'bubble'; alts: AltDef[]; anchor: DOMRect; pointerId: number }
@@ -37,16 +42,33 @@ type Popover
     | { type: 'kbmode'; anchor: DOMRect }
     | null;
 
-type InputPanel = 'emoji' | 'clipboard' | null;
+type InputPanel = 'emoji' | 'clipboard' | 'voice' | null;
 
 const kCandidatePageSize = 10;
+
+// Mock only: one second under the session cap — the widest the strip can ever
+// really get, and inside the near-limit styling, so the audit and any visual
+// review both see the worst case rather than 0:00.
+const kMockElapsedMs = 59_000;
+
+// Mock only: a fixed waveform. Without it the meter never renders in a dev tab —
+// no session runs, so no levels arrive — and both the layout audit and any
+// visual review would be looking at a panel missing one of its three parts.
+const kMockLevels = Array.from({ length: 24 }, (_, i) => 0.02 + 0.3 * Math.abs(Math.sin(i / 2.2)));
 
 // If the background can't produce a state at all (dead worker, first install),
 // render a plain QWERTY keyboard after this delay rather than staying blank.
 // A real state arriving later always wins.
 const kFallbackStateMs = 1500;
 
-const kFallbackState: InputViewState = {
+// Marks the guessed state apart from a reported one. The board it draws is a
+// complete keyboard, so nothing about it looks provisional — but every field in
+// it is a default, including the one that says whether the caret is in a
+// password box. Voice input has to be able to tell the difference.
+const kGuessed = Symbol('guessed');
+
+const kFallbackState: InputViewState & { [kGuessed]?: true } = {
+  [kGuessed]: true,
   asciiMode: false,
   layout: 'qwerty',
   latinLayout: 'qwerty',
@@ -55,6 +77,7 @@ const kFallbackState: InputViewState = {
   schemaName: '',
   alphabet: '',
   numericField: null,
+  passwordField: false,
 };
 
 export default function App() {
@@ -76,6 +99,8 @@ export default function App() {
   const [schemas, setSchemas] = useState<Array<{ id: string; label: string }>>([]);
   const [layer, setLayer] = useState<LayerId>('main');
   const [panel, setPanel] = useState<InputPanel>(null);
+  const [voiceSettings, setVoiceSettings] = useState(kDefaultVoiceSettings);
+  const [voiceUid, setVoiceUid] = useState('');
   const [clipboardRequest, setClipboardRequest] = useState<Promise<ClipboardReadResult> | null>(null);
   // On a numeric field, the user tapped ABC to see the letter keyboard.
   const [numericLetters, setNumericLetters] = useState(false);
@@ -416,6 +441,88 @@ export default function App() {
     setPanel('clipboard');
   };
 
+  // Voice input is offered only when the build carries credentials, the script
+  // is one the streaming endpoint can transcribe, and the focused field is not
+  // a password box. See voice/availability.ts for why each clause hides the
+  // button rather than showing one that fails when pressed.
+  // Mock only: ?voice=<state> renders the panel without a live session, which
+  // is how the layout audit reaches selectors that otherwise exist only while a
+  // microphone is open. Null on device.
+  const devVoice = host.devVoiceState?.() ?? null;
+
+  // Fails closed on an unknown field. Until the background has reported a
+  // state, `vk` is null and the fallback board is drawn — and the one thing we
+  // cannot infer is whether the caret sits in a password box. Offering
+  // dictation exactly when the security signal is missing is the wrong side to
+  // err on; the cost is that voice appears a moment after the keyboard does.
+  // Fails closed on anything we did not hear from the background: before the
+  // first state, and on the fallback board, the field type is a default rather
+  // than a fact.
+  const reported = vk !== null && !(kGuessed in vk);
+
+  const voiceOffered = devVoice !== null || (reported && voiceAvailable({
+    configured: readCredentials() !== null,
+    enabled: voiceSettings.enabled,
+    script: vk.script,
+    passwordField: vk.passwordField,
+  }));
+
+  const voice = useVoiceSession({
+    onCommit: text => host.insertText(text),
+    consent: voiceSettings.consent,
+    onConsentGiven: () => {
+      setVoiceSettings(previous => ({ ...previous, consent: true }));
+      void writeVoiceConsent(true);
+    },
+    uid: voiceUid,
+  });
+
+  // Settings live in storage.sync, so the options page can turn voice input off
+  // while the keyboard is open and the button has to go away with it.
+  useEffect(() => {
+    void readVoiceSettings().then(setVoiceSettings);
+    void readVoiceUid().then(setVoiceUid);
+    return watchVoiceSettings(setVoiceSettings);
+  }, []);
+
+  const closeVoice = () => {
+    voice.close();
+    setPanel(null);
+  };
+
+  const openVoice = () => {
+    if (panel === 'voice') {
+      closeVoice();
+      return;
+    }
+    dismissClipboard();
+    setPopover(null);
+    setPanel('voice');
+    // Opening is not recording — the round button in the panel starts that.
+    if (!devVoice) voice.prepare();
+  };
+
+  // The panel is the only place the session is visible, so leaving it — by any
+  // route — must stop the microphone rather than leave it recording behind a
+  // closed panel.
+  //
+  // Losing availability counts as leaving. Focus moving into a password field,
+  // the option being switched off, the schema changing to one we cannot
+  // transcribe: each of those only removes the toolbar button, and a session
+  // already running would keep inserting recognised text into whatever is now
+  // focused — a password box included.
+  useEffect(() => {
+    if (panel !== 'voice') {
+      voice.close();
+      return;
+    }
+    if (!voiceOffered) {
+      voice.close();
+      setPanel(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, voiceOffered]);
+
   // iPadOS-style: a long-press on the hide key opens the placement menu (a
   // plain tap still hides). Applies the chosen mode and persists it.
   const setKeyboardMode = (next: KeyboardMode) => {
@@ -529,6 +636,7 @@ export default function App() {
         onOpenSettings={() => { dismissClipboard(); host.openSettings(); }}
         onEmoji={() => { dismissClipboard(); setPanel('emoji'); }}
         onClipboard={openClipboard}
+        onVoice={voiceOffered ? openVoice : undefined}
         activeTool={panel ?? undefined}
         onHide={() => { dismissClipboard(); host.hideKeyboard(); }}
         onModeMenu={(anchor) => { dismissClipboard(); setPopover({ type: 'kbmode', anchor }); }}
@@ -540,6 +648,19 @@ export default function App() {
             onInsert={emoji => post({ kind: 'insertLiteral', text: emoji })}
             onBack={closePanel}
             onBackspace={() => host.typeStroke({ key: 'Backspace', code: 'Backspace' })}
+          />
+        ) : panel === 'voice' ? (
+          <VoicePanel
+            state={devVoice ?? voice.state}
+            elapsedMs={devVoice ? kMockElapsedMs : voice.elapsedMs}
+            levels={devVoice ? kMockLevels : voice.levels}
+            onStop={voice.stop}
+            onStart={voice.open}
+            onBackspace={() => host.typeStroke({ key: 'Backspace', code: 'Backspace' })}
+            onConsent={voice.consent}
+            onOpenSettings={() => { voice.close(); host.openExtensionOptions(); }}
+            onRetry={voice.retry}
+            onBack={closeVoice}
           />
         ) : panel === 'clipboard' && clipboardRequest ? (
           <ClipboardPanel

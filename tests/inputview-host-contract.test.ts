@@ -92,6 +92,28 @@ function everyStroke(): Array<{ layout: string; id: string; stroke: KeyStroke }>
   return out;
 }
 
+describe('settings routing', () => {
+  it('sends the toolbar gear to the system input-method settings', () => {
+    const { vk } = makeVk();
+    new RealHost(vk as never).openSettings();
+    expect(vk.openSettings).toHaveBeenCalledOnce();
+  });
+
+  it('sends the voice permission card to THIS extension\'s options page', () => {
+    // virtualKeyboardPrivate.openSettings opens the ChromeOS input-method
+    // settings, which cannot show a microphone prompt — routing the grant there
+    // strands the user on a page that has nothing to do with the extension.
+    const openOptionsPage = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('chrome', { ...globalThis.chrome, runtime: { openOptionsPage } });
+
+    const { vk } = makeVk();
+    new RealHost(vk as never).openExtensionOptions();
+
+    expect(openOptionsPage).toHaveBeenCalledOnce();
+    expect(vk.openSettings).not.toHaveBeenCalled();
+  });
+});
+
 describe('typeStroke — every key a layout can emit', () => {
   it('maps to a real virtual-key code', () => {
     const { sent, vk } = makeVk();

@@ -317,6 +317,11 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  /* A column flex item defaults to min-height:auto, so it refuses to shrink
+     below its content and pushes the card taller than the OS window it was
+     sized for. The key grid and the emoji/clipboard panels never showed it —
+     they scroll internally — but a long dictation transcript does. */
+  min-height: 0;
 }
 
 /* Huge screens: the WINDOW stays full-bleed (spec: total width = 100% of
@@ -1214,4 +1219,283 @@ body {
   inset: 0;
   z-index: 19;
   background: var(--kb-scrim);
+}
+
+/* ---- voice panel ---- */
+
+.kb-voice {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+/* No surface behind it. The transcript IS the panel while dictating, and a
+   card would only draw a box around four fifths of empty board. Type is sized
+   for reading across the room, not for fitting a form. */
+.kb-voice-transcript {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* `safe` matters: with plain centring, content taller than the box overflows
+     equally in both directions and the top becomes unreachable — which is the
+     normal case for a long dictation, not an edge case. */
+  align-items: safe center;
+  overflow-y: auto;
+  padding: calc(var(--kb-cell-pad) * 2) calc(var(--kb-cell-pad) * 3);
+  color: var(--kb-on-surface);
+  font-size: clamp(14px, 6.5cqh, 24px);
+  line-height: 1.45;
+  text-align: start;
+  /* Recognition output contains URLs and identifiers, and a long Latin token
+     has no break opportunity in it — CJK wraps anywhere, so this is the only
+     thing that can push the panel sideways. */
+  overflow-wrap: anywhere;
+
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.kb-voice-transcript.empty {
+  justify-content: center;
+}
+
+/* Only once something is actually out of view. Text is always scrolled to the
+   newest words, so the fade belongs at the top alone — a bottom fade would
+   promise more text below when there is none. */
+.kb-voice-transcript.overflowing {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.4em);
+}
+
+.kb-voice-hint {
+  color: var(--kb-on-surface-variant);
+  font-size: 0.75em;
+}
+
+/* Holds the meter's place so the action button stays at the right edge. */
+.kb-voice-gap {
+  flex: 1;
+}
+
+.kb-voice-bottom {
+  flex: none;
+  height: calc(100% / var(--kb-rows));
+  display: flex;
+  align-items: center;
+  gap: calc(var(--kb-cell-pad) * 2);
+  padding: 0 calc(var(--kb-cell-pad) * 3);
+  container-type: size;
+}
+
+/* Recording is signalled three ways because prefers-reduced-motion disables
+   the pulse with !important: this dot, the "Recording" label, and the running
+   timer. The last two are text and survive that setting. Colour deliberately
+   carries none of it — the brand accent is already red, so a red dot would say
+   nothing a candidate highlight does not. */
+.kb-voice-dot {
+  flex: none;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  background: var(--kb-on-surface-variant);
+  opacity: 0.4;
+  font-size: clamp(10px, 24cqh, 20px);
+}
+
+.kb-voice-dot.live {
+  background: var(--kb-primary);
+  opacity: 1;
+  animation: kb-voice-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes kb-voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Status and timer are secondary: while speaking, the words matter and the
+   chrome should not compete with them. */
+.kb-voice-status,
+.kb-voice-time {
+  flex: none;
+  color: var(--kb-on-surface-variant);
+  font-size: clamp(10px, 24cqh, 20px);
+}
+
+.kb-voice-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.kb-voice-meter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 44%;
+}
+
+/* Each bar grows from the middle out. --level is 0..1, set inline per bar from
+   meterLevel(); the default here is not decoration — without a declaration an
+   absent inline style makes `height` invalid at computed-value time, the whole
+   declaration is dropped, and the bars stretch to fill instead of flattening. */
+.kb-voice-meter-bar {
+  --level: 0;
+  flex: 1;
+  min-width: 1px;
+  max-width: 3px;
+  height: max(2px, calc(var(--level) * 100%));
+  border-radius: 1px;
+  background: var(--kb-primary);
+  opacity: calc(0.3 + var(--level) * 0.7);
+  transition: height 90ms linear;
+}
+
+/* Back-to-keyboard and backspace: the two things the key grid would offer if
+   the panel were not covering it. Quiet, because neither is the main action. */
+.kb-voice-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56cqh;
+  height: 56cqh;
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  border-radius: var(--kb-key-radius);
+  background: transparent;
+  color: var(--kb-on-surface-variant);
+  transition: background-color 90ms ease, transform 90ms ease;
+  cursor: pointer;
+}
+
+.kb-voice-side.pressed {
+  background: var(--kb-surface-variant);
+  transform: scale(0.98);
+}
+
+.kb-voice-side svg {
+  width: 55%;
+  height: 55%;
+}
+
+
+/* The cap, stated rather than sprung on the user when recording stops itself. */
+.kb-voice-limit {
+  opacity: 0.55;
+}
+
+.kb-voice-time.near-limit {
+  color: var(--kb-primary);
+  opacity: 1;
+}
+
+/* The one filled control on the panel. Round, because it is a single action
+   whose meaning is its icon — and because a pill with a word in it read as a
+   dialog button parked on a keyboard. */
+.kb-voice-action-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62cqh;
+  height: 62cqh;
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--kb-primary);
+  color: var(--kb-on-primary);
+  box-shadow: var(--kb-elev-key);
+  transition: background-color 90ms ease, box-shadow 90ms ease, transform 90ms ease;
+  cursor: pointer;
+}
+
+.kb-voice-action-btn svg {
+  width: 55%;
+  height: 55%;
+}
+
+/* Deeper than a key's 0.98: that is a 1px move on a 60px circle and reads as
+   nothing, while the same ratio across a wide key is plainly visible. */
+.kb-voice-action-btn.pressed {
+  background: var(--kb-primary-variant);
+  box-shadow: none;
+  transform: scale(0.93);
+}
+
+.kb-voice-action-btn:disabled {
+  background: var(--kb-surface-variant);
+  color: var(--kb-on-surface-variant);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* ---- voice panel cards (consent, permission, error) ---- */
+
+.kb-voice-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--kb-cell-pad) * 1.5);
+  padding: calc(var(--kb-cell-pad) * 2);
+  overflow-y: auto;
+  text-align: center;
+  container-type: size;
+}
+
+.kb-voice-card-icon {
+  display: flex;
+  color: var(--kb-on-surface-variant);
+  font-size: clamp(18px, 11cqh, 26px);
+}
+
+.kb-voice-card-title {
+  color: var(--kb-on-surface);
+  font-size: clamp(12px, 6.5cqh, 17px);
+  font-weight: 500;
+}
+
+/* The consent copy is the longest string on the board and the one that must
+   not be skimmed past, so it gets a measure rather than the full width. */
+.kb-voice-card-body {
+  max-width: 46ch;
+  color: var(--kb-on-surface-variant);
+  font-size: clamp(10px, 4.6cqh, 13px);
+  line-height: 1.55;
+}
+
+.kb-voice-card-actions {
+  display: flex;
+  gap: calc(var(--kb-cell-pad) * 2);
+}
+
+.kb-voice-action {
+  padding: 0.6em 1.4em;
+  border: none;
+  border-radius: var(--kb-key-radius);
+  background: var(--kb-surface);
+  color: var(--kb-on-surface);
+  font-family: inherit;
+  font-size: clamp(10px, 4.8cqh, 14px);
+  cursor: pointer;
+}
+
+.kb-voice-action.primary {
+  background: var(--kb-primary);
+  color: var(--kb-on-primary);
+}
+
+.kb-voice-action:active {
+  background: var(--kb-surface-variant);
+}
+
+.kb-voice-action.primary:active {
+  background: var(--kb-primary-variant);
 }

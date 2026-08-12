@@ -31,7 +31,16 @@ export default defineConfig({
         'input',
         'virtualKeyboardPrivate',
         'inputMethodPrivate',
+        // Voice input authenticates in the WebSocket handshake headers, which a
+        // browser cannot set; a dynamic rule injects them. Measured working for
+        // an extension's own request on device (ADR 0002, V1).
+        'declarativeNetRequestWithHostAccess',
       ],
+
+      // modifyHeaders only applies to hosts the extension already has access
+      // to. wss:// is the request's own scheme — the probe confirmed a ws://
+      // host permission is honoured for a WebSocket rule.
+      host_permissions: ['wss://openspeech.bytedance.com/*'],
 
       input_components: [
         {

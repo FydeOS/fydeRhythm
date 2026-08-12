@@ -7,7 +7,9 @@ import { getFs, type ImeSettings, kDefaultSettings, migrateLayoutSettings } from
 
 import { InputController } from './controller';
 import {
+  isPasswordField,
   numericFieldFor,
+  postFieldState,
   postInputViewState,
   postRefinedInputViewState,
   readInputViewSettings,
@@ -140,6 +142,7 @@ function setInputViewConnectionVisible(connection: symbol, visible: boolean): vo
 // text fields must NOT re-push state (it would flash the schema label); we only
 // re-push when the numeric routing actually flips (text↔number/tel).
 let lastNumericField: NumericFieldKind | null = null;
+let lastPasswordField = false;
 
 // Change the active schema and reload the engine. Shared by the IME tray menu
 // and the InputView's long-press schema menu.
@@ -181,12 +184,21 @@ export default defineBackground({
         self.controller.setContext(context);
 
         // Swap the keyboard into (or out of) the numberpad when the focused
-        // field's numeric-ness changes. Refined state carries the correct
-        // schema label alongside the new routing.
+        // field's numeric-ness changes, and withdraw the microphone when focus
+        // moves into a password box. Both are derived from the same context
+        // type, so one re-post covers them — but the password half must be in
+        // the condition, or moving from a text field to a password field would
+        // leave the voice button on screen.
         const nf = numericFieldFor(context.type);
-        if (nf !== lastNumericField) {
+        const password = isPasswordField(context.type);
+        if (nf !== lastNumericField || password !== lastPasswordField) {
           lastNumericField = nf;
+          lastPasswordField = password;
           for (const poster of inputViewPosters) {
+            // The security half goes out now; the refined snapshot behind it
+            // waits on reads that can take seconds, and a running dictation
+            // would keep inserting into the newly focused password box.
+            postFieldState(poster, { numericField: nf, passwordField: password });
             void postRefinedInputViewState(self.controller, poster)
               .catch((error: unknown) => reportInputViewError('focusStateChanged', error));
           }

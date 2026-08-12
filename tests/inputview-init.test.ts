@@ -109,6 +109,7 @@ describe('buildFastInputViewState', () => {
       schemaName: '',
       alphabet: '',
       numericField: null,
+      passwordField: false,
     });
   });
 
@@ -136,6 +137,16 @@ describe('buildFastInputViewState', () => {
     expect((await withField('text')).numericField).toBeNull();
     expect((await withField('password')).numericField).toBeNull();
     expect((await withField(undefined)).numericField).toBeNull();
+  });
+
+  it('flags a password field, which is what withholds voice input there', async () => {
+    const withField = (type: string | undefined) =>
+      buildFastInputViewState({ session: null, context: type ? { type } : null } as never);
+    expect((await withField('password')).passwordField).toBe(true);
+    expect((await withField('text')).passwordField).toBe(false);
+    // A numeric field is not sensitive: dictating a phone number is a good use.
+    expect((await withField('tel')).passwordField).toBe(false);
+    expect((await withField(undefined)).passwordField).toBe(false);
   });
 
   it('draws a script schema with its own keys, in the chosen arrangement for English', async () => {

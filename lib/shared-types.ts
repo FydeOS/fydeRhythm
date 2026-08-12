@@ -126,6 +126,11 @@ export interface InputViewState {
   /** Set when the focused field is numeric — the keyboard renders a
      *  numberpad rather than letters. `null` for ordinary text fields. */
   numericField: NumericFieldKind | null;
+  /** Focused field is a password box. Voice input is withheld there: the
+   *  transcript would be spoken aloud and uploaded to a third party, and
+   *  insertText bypasses the sendKeyEvent path that ADR 0001 records as the
+   *  reason password fields behave correctly at all. */
+  passwordField: boolean;
 }
 
 export type BackgroundToInputView

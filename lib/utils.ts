@@ -71,6 +71,13 @@ export interface ImeSettings {
   keyboardLayout?: LatinLayoutId;
   // Corrections to guessSchemaKeys(). Only the InputView reads these.
   schemaKeys?: Record<string, SchemaKeys>;
+  // Voice input master switch. Undefined = off: dictation uploads audio to a
+  // third party, so it is never on by default.
+  voiceInput?: boolean;
+  // The user agreed that audio may be sent to Volcano Engine. Separate from the
+  // switch because Chrome's microphone prompt covers the microphone, not where
+  // the audio goes — that consent is ours to obtain and ours to record.
+  voiceConsent?: boolean;
   /** @deprecated Read once by migrateLayoutSettings, then dropped. */
   latinLayout?: LatinLayoutId | 'follow';
   /** @deprecated Read once by migrateLayoutSettings, then dropped. */

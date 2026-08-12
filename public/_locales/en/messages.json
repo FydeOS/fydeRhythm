@@ -1,456 +1,531 @@
 {
-    "extension_name": {
-        "message": "FydeRhythm IME"
-    },
-    "description": {
-        "message": "Input Method Editor(IME) for ChromeOS and FydeOS, powered by RIME engine, developed by FydeOS team."
-    },
-    "input_method_name": {
-        "message": "FydeRhythm IME"
-    },
-    "setting_page": {
-        "message": "FydeRhythm Settings"
-    },
-    "loading_engine": {
-        "message": "Loading RIME Engine…"
-    },
-    "candidate_page": {
-        "message": "Page $PAGE$",
-        "placeholders": {
-            "page": {
-                "content": "$1"
-            }
-        }
-    },
-    "candidate_page_last": {
-        "message": " (Last)"
-    },
-    "rime_engine_logs": {
-        "message": "RIME Engine Logs"
-    },
-    "rime_engine_not_started": {
-        "message": "Not Started"
-    },
-    "rime_engine_starting": {
-        "message": "Starting"
-    },
-    "rime_engine_ready": {
-        "message": "Ready"
-    },
-    "rime_engine_starting_button": {
-        "message": "Restarting RIME Engine"
-    },
-    "save_settings_and_apply_button": {
-        "message": "Save and Apply"
-    },
-    "select_schema": {
-        "message": "Select Input Schema"
-    },
-    "fetching_schema_list": {
-        "message": " (Refreshing List)"
-    },
-    "candidate_count": {
-        "message": "Candidates per Page"
-    },
-    "schema_switch_key": {
-        "message": "Schema Switch Shortcut"
-    },
-    "schema_switch_key_hint": {
-        "message": "Cycle to the next enabled schema."
-    },
-    "schema_switch_key_hint_recording": {
-        "message": "Press the new key combination. Press Esc to cancel."
-    },
-    "schema_switch_key_hint_disabled": {
-        "message": "Shortcut is disabled. Click \"Set shortcut\" and press a key combination to re-enable it."
-    },
-    "schema_switch_key_recording": {
-        "message": "Press keys…"
-    },
-    "schema_switch_key_set": {
-        "message": "Set shortcut"
-    },
-    "schema_switch_key_disable": {
-        "message": "Disable"
-    },
-    "schema_switch_key_reset": {
-        "message": "Reset to default"
-    },
-    "schema_switch_key_invalid": {
-        "message": "Include Ctrl or Alt, or use a function key. Shift or Search alone would interfere with typing."
-    },
-    "fuzzy_pinyin": {
-        "message": "Fuzzy Pinyin"
-    },
-    "settings_changed_snackbar": {
-        "message": "Settings Changed."
-    },
-    "error_downloading_schema": {
-        "message": "Error while downloading schema: "
-    },
-    "error_removing_schema": {
-        "message": "Error while removing schema: "
-    },
-    "error_last_schema": {
-        "message": "Cannot remove the last schema. At least one schema must remain installed."
-    },
-    "error_importing_schema": {
-        "message": "Error while importing schema"
-    },
-    "import_compiled_schema": {
-        "message": "Import from ZIP"
-    },
-    "import_compiled_schema_hint": {
-        "message": "Import pre-compiled schema (.zip file)"
-    },
-    "import_predefined_schema_confirm": {
-        "message": "Schema \"$1\" is already included in the predefined schema list. Import the predefined schema instead?"
-    },
-    "error_form": {
-        "message": "Enter both the GitHub repo URL and the Schema Id."
-    },
-    "error_fetch_schema_list": {
-        "message": "Error while fetching schema list:"
-    },
-    "schema_home_page": {
-        "message": "Schema Homepage"
-    },
-    "privacy_statement": {
-        "message": "Privacy Statement"
-    },
-    "privacy_statement_url": {
-        "message": "https://fydeos.io/privacy/fyderhythm/"
-    },
-    "edit_rime_config": {
-        "message": "Edit RIME config (only for advanced users)"
-    },
-    "open_source": {
-        "message": "View on GitHub"
-    },
-    "add_schema": {
-        "message": "Add"
-    },
-    "update_schema": {
-        "message": "Update"
-    },
-    "remove_schema": {
-        "message": "Remove"
-    },
-    "enable_schema_hint": {
-        "message": "Show this schema in the IME tray menu"
-    },
-    "cannot_edit_this_file": {
-        "message": "Please choose a text file"
-    },
-    "loading_editor": {
-        "message": "Loading editor…"
-    },
-    "config_editor_title": {
-        "message": "RIME Config Editor"
-    },
-    "remove_schema_confirm_title": {
-        "message": "Remove Input Schema"
-    },
-    "remove_schema_confirm_body": {
-        "message": "Remove “$SCHEMA$”? Its files will be deleted, and you will need to download it again to use it.",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "cancel_button": {
-        "message": "Cancel"
-    },
-    "download_schema": {
-        "message": "Download schema"
-    },
-    "decrease_candidate_count": {
-        "message": "Decrease candidate count"
-    },
-    "increase_candidate_count": {
-        "message": "Increase candidate count"
-    },
-    "import_predefined_schema_title": {
-        "message": "Import Predefined Schema"
-    },
-    "import_button": {
-        "message": "Import"
-    },
-    "appearance": {
-        "message": "Appearance"
-    },
-    "theme_light": {
-        "message": "Light"
-    },
-    "theme_system": {
-        "message": "System"
-    },
-    "theme_dark": {
-        "message": "Dark"
-    },
-    "dict_pack_section_title": {
-        "message": "Dictionary Packs"
-    },
-    "dict_pack_hint": {
-        "message": "Import a .txt, .tsv or .dict.yaml file, or a Sogou (.scel), Baidu (.bdict/.bcd) or QQ Pinyin (.qpyd/.qcel) lexicon to compile a dictionary pack. Unlike word packs, compiled packs support prefix matching and proper weight-based ranking."
-    },
-    "dict_pack_import_button": {
-        "message": "Import Dict Pack"
-    },
-    "dict_pack_empty": {
-        "message": "The file contains no valid entries."
-    },
-    "dict_pack_import_error": {
-        "message": "Error importing dict pack: "
-    },
-    "dict_pack_compile_error": {
-        "message": "Compilation failed: "
-    },
-    "dict_pack_entry_count": {
-        "message": "$COUNT$ entries",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_enabled": {
-        "message": "Enabled"
-    },
-    "dict_pack_disabled": {
-        "message": "Disabled"
-    },
-    "dict_pack_remove_button": {
-        "message": "Remove"
-    },
-    "dict_pack_empty_list": {
-        "message": "No dictionary packs installed yet. Import a file or install from catalog."
-    },
-    "dict_pack_active_entry_count": {
-        "message": "$COUNT$ entries active",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_compiling": {
-        "message": "Compiling…"
-    },
-    "dict_pack_duplicates_merged": {
-        "message": "Merged $COUNT$ duplicate entries from the imported file.",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_import_warning_summary": {
-        "message": "Imported with $COUNT$ warnings:",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_more_warnings": {
-        "message": "…and $COUNT$ more (see the browser console for the full list)",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "layout_zhuyin": {
-        "message": "Zhuyin"
-    },
-    "layout_kana": {
-        "message": "Kana"
-    },
-    "layout_hangul": {
-        "message": "Hangul"
-    },
-    "vk_delete_word_confirm": {
-        "message": "Delete “$1”?"
-    },
-    "vk_delete": {
-        "message": "Delete"
-    },
-    "vk_cancel": {
-        "message": "Cancel"
-    },
-    "vk_candidates_announce": {
-        "message": "$1 candidates"
-    },
-    "vk_alt_characters": {
-        "message": "Alternate characters"
-    },
-    "vk_settings": {
-        "message": "Settings"
-    },
-    "vk_emoji": {
-        "message": "Emoji"
-    },
-    "vk_clipboard": {
-        "message": "Clipboard"
-    },
-    "vk_clipboard_current": {
-        "message": "Current clipboard"
-    },
-    "vk_clipboard_paste_short": {
-        "message": "Paste"
-    },
-    "vk_clipboard_loading": {
-        "message": "Reading clipboard…"
-    },
-    "vk_clipboard_empty": {
-        "message": "Clipboard has no text"
-    },
-    "vk_clipboard_unavailable": {
-        "message": "Clipboard isn’t available"
-    },
-    "vk_clipboard_error": {
-        "message": "Couldn’t read the clipboard"
-    },
-    "vk_clipboard_retry": {
-        "message": "Try again"
-    },
-    "vk_clipboard_paste": {
-        "message": "Paste clipboard text"
-    },
-    "vk_clipboard_close": {
-        "message": "Close clipboard"
-    },
-    "vk_clipboard_delete": {
-        "message": "Delete clipboard item"
-    },
-    "vk_clipboard_delete_error": {
-        "message": "Couldn’t delete. Try again"
-    },
-    "vk_switch_schema": {
-        "message": "Switch schema"
-    },
-    "vk_prev_page": {
-        "message": "Previous page"
-    },
-    "vk_next_page": {
-        "message": "Next page"
-    },
-    "vk_expand_candidates": {
-        "message": "Expand candidates"
-    },
-    "vk_collapse_candidates": {
-        "message": "Collapse candidates"
-    },
-    "vk_recent_emoji": {
-        "message": "Recently used"
-    },
-    "vk_back_to_keyboard": {
-        "message": "Back to keyboard"
-    },
-    "vk_key_shift": {
-        "message": "Shift"
-    },
-    "vk_key_backspace": {
-        "message": "Backspace"
-    },
-    "vk_key_enter": {
-        "message": "Enter"
-    },
-    "vk_key_space": {
-        "message": "Space"
-    },
-    "vk_key_hide": {
-        "message": "Hide keyboard"
-    },
-    "vk_kbmode_docked": {
-        "message": "Dock keyboard"
-    },
-    "vk_kbmode_floating": {
-        "message": "Floating keyboard"
-    },
-    "vk_kbmode_onehand": {
-        "message": "One-handed keyboard"
-    },
-    "vk_resize_keyboard": {
-        "message": "Resize keyboard"
-    },
-    "vk_pin_left": {
-        "message": "Pin to left corner"
-    },
-    "vk_pin_right": {
-        "message": "Pin to right corner"
-    },
-    "vk_exit_onehand": {
-        "message": "Exit one-handed mode"
-    },
-    "vk_key_symbols": {
-        "message": "Symbols"
-    },
-    "vk_key_more_symbols": {
-        "message": "More symbols"
-    },
-    "vk_key_letters": {
-        "message": "Letters"
-    },
-    "vk_key_toggle_language": {
-        "message": "Toggle language"
-    },
-    "vk_emoji_smileys": {
-        "message": "Smileys"
-    },
-    "vk_emoji_gestures": {
-        "message": "Gestures"
-    },
-    "vk_emoji_people": {
-        "message": "People"
-    },
-    "vk_emoji_hearts": {
-        "message": "Hearts"
-    },
-    "vk_emoji_animals": {
-        "message": "Animals"
-    },
-    "vk_emoji_food": {
-        "message": "Food"
-    },
-    "vk_emoji_activities": {
-        "message": "Activities"
-    },
-    "vk_emoji_travel": {
-        "message": "Travel"
-    },
-    "vk_emoji_objects": {
-        "message": "Objects"
-    },
-    "vk_emoji_symbols": {
-        "message": "Symbols"
-    },
-    "vk_emoji_flags": {
-        "message": "Flags"
-    },
-    "keyboard_arrangement": {
-        "message": "Letter arrangement"
-    },
-    "keyboard_arrangement_hint": {
-        "message": "Applies to your keyboard, the on-screen keyboard, and English mode."
-    },
-    "keyboard_arrangement_hint_physical": {
-        "message": "Applies to your keyboard, and to English mode."
-    },
-    "keyboard_script_note": {
-        "message": "$1 draws its own keys. Your arrangement still applies in English mode.",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "vk_keys": {
-        "message": "On-screen keys"
-    },
-    "layout_letters": {
-        "message": "Letters"
+  "extension_name": {
+    "message": "FydeRhythm IME"
+  },
+  "description": {
+    "message": "Input Method Editor(IME) for ChromeOS and FydeOS, powered by RIME engine, developed by FydeOS team."
+  },
+  "input_method_name": {
+    "message": "FydeRhythm IME"
+  },
+  "setting_page": {
+    "message": "FydeRhythm Settings"
+  },
+  "loading_engine": {
+    "message": "Loading RIME Engine…"
+  },
+  "candidate_page": {
+    "message": "Page $PAGE$",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      }
     }
+  },
+  "candidate_page_last": {
+    "message": " (Last)"
+  },
+  "rime_engine_logs": {
+    "message": "RIME Engine Logs"
+  },
+  "rime_engine_not_started": {
+    "message": "Not Started"
+  },
+  "rime_engine_starting": {
+    "message": "Starting"
+  },
+  "rime_engine_ready": {
+    "message": "Ready"
+  },
+  "rime_engine_starting_button": {
+    "message": "Restarting RIME Engine"
+  },
+  "save_settings_and_apply_button": {
+    "message": "Save and Apply"
+  },
+  "select_schema": {
+    "message": "Select Input Schema"
+  },
+  "fetching_schema_list": {
+    "message": " (Refreshing List)"
+  },
+  "candidate_count": {
+    "message": "Candidates per Page"
+  },
+  "schema_switch_key": {
+    "message": "Schema Switch Shortcut"
+  },
+  "schema_switch_key_hint": {
+    "message": "Cycle to the next enabled schema."
+  },
+  "schema_switch_key_hint_recording": {
+    "message": "Press the new key combination. Press Esc to cancel."
+  },
+  "schema_switch_key_hint_disabled": {
+    "message": "Shortcut is disabled. Click \"Set shortcut\" and press a key combination to re-enable it."
+  },
+  "schema_switch_key_recording": {
+    "message": "Press keys…"
+  },
+  "schema_switch_key_set": {
+    "message": "Set shortcut"
+  },
+  "schema_switch_key_disable": {
+    "message": "Disable"
+  },
+  "schema_switch_key_reset": {
+    "message": "Reset to default"
+  },
+  "schema_switch_key_invalid": {
+    "message": "Include Ctrl or Alt, or use a function key. Shift or Search alone would interfere with typing."
+  },
+  "fuzzy_pinyin": {
+    "message": "Fuzzy Pinyin"
+  },
+  "settings_changed_snackbar": {
+    "message": "Settings Changed."
+  },
+  "error_downloading_schema": {
+    "message": "Error while downloading schema: "
+  },
+  "error_removing_schema": {
+    "message": "Error while removing schema: "
+  },
+  "error_last_schema": {
+    "message": "Cannot remove the last schema. At least one schema must remain installed."
+  },
+  "error_importing_schema": {
+    "message": "Error while importing schema"
+  },
+  "import_compiled_schema": {
+    "message": "Import from ZIP"
+  },
+  "import_compiled_schema_hint": {
+    "message": "Import pre-compiled schema (.zip file)"
+  },
+  "import_predefined_schema_confirm": {
+    "message": "Schema \"$1\" is already included in the predefined schema list. Import the predefined schema instead?"
+  },
+  "error_form": {
+    "message": "Enter both the GitHub repo URL and the Schema Id."
+  },
+  "error_fetch_schema_list": {
+    "message": "Error while fetching schema list:"
+  },
+  "schema_home_page": {
+    "message": "Schema Homepage"
+  },
+  "privacy_statement": {
+    "message": "Privacy Statement"
+  },
+  "privacy_statement_url": {
+    "message": "https://fydeos.io/privacy/fyderhythm/"
+  },
+  "edit_rime_config": {
+    "message": "Edit RIME config (only for advanced users)"
+  },
+  "open_source": {
+    "message": "View on GitHub"
+  },
+  "add_schema": {
+    "message": "Add"
+  },
+  "update_schema": {
+    "message": "Update"
+  },
+  "remove_schema": {
+    "message": "Remove"
+  },
+  "enable_schema_hint": {
+    "message": "Show this schema in the IME tray menu"
+  },
+  "cannot_edit_this_file": {
+    "message": "Please choose a text file"
+  },
+  "loading_editor": {
+    "message": "Loading editor…"
+  },
+  "config_editor_title": {
+    "message": "RIME Config Editor"
+  },
+  "remove_schema_confirm_title": {
+    "message": "Remove Input Schema"
+  },
+  "remove_schema_confirm_body": {
+    "message": "Remove “$SCHEMA$”? Its files will be deleted, and you will need to download it again to use it.",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "cancel_button": {
+    "message": "Cancel"
+  },
+  "download_schema": {
+    "message": "Download schema"
+  },
+  "decrease_candidate_count": {
+    "message": "Decrease candidate count"
+  },
+  "increase_candidate_count": {
+    "message": "Increase candidate count"
+  },
+  "import_predefined_schema_title": {
+    "message": "Import Predefined Schema"
+  },
+  "import_button": {
+    "message": "Import"
+  },
+  "appearance": {
+    "message": "Appearance"
+  },
+  "theme_light": {
+    "message": "Light"
+  },
+  "theme_system": {
+    "message": "System"
+  },
+  "theme_dark": {
+    "message": "Dark"
+  },
+  "dict_pack_section_title": {
+    "message": "Dictionary Packs"
+  },
+  "dict_pack_hint": {
+    "message": "Import a .txt, .tsv or .dict.yaml file, or a Sogou (.scel), Baidu (.bdict/.bcd) or QQ Pinyin (.qpyd/.qcel) lexicon to compile a dictionary pack. Unlike word packs, compiled packs support prefix matching and proper weight-based ranking."
+  },
+  "dict_pack_import_button": {
+    "message": "Import Dict Pack"
+  },
+  "dict_pack_empty": {
+    "message": "The file contains no valid entries."
+  },
+  "dict_pack_import_error": {
+    "message": "Error importing dict pack: "
+  },
+  "dict_pack_compile_error": {
+    "message": "Compilation failed: "
+  },
+  "dict_pack_entry_count": {
+    "message": "$COUNT$ entries",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_enabled": {
+    "message": "Enabled"
+  },
+  "dict_pack_disabled": {
+    "message": "Disabled"
+  },
+  "dict_pack_remove_button": {
+    "message": "Remove"
+  },
+  "dict_pack_empty_list": {
+    "message": "No dictionary packs installed yet. Import a file or install from catalog."
+  },
+  "dict_pack_active_entry_count": {
+    "message": "$COUNT$ entries active",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_compiling": {
+    "message": "Compiling…"
+  },
+  "dict_pack_duplicates_merged": {
+    "message": "Merged $COUNT$ duplicate entries from the imported file.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_import_warning_summary": {
+    "message": "Imported with $COUNT$ warnings:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_more_warnings": {
+    "message": "…and $COUNT$ more (see the browser console for the full list)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "layout_zhuyin": {
+    "message": "Zhuyin"
+  },
+  "layout_kana": {
+    "message": "Kana"
+  },
+  "layout_hangul": {
+    "message": "Hangul"
+  },
+  "vk_delete_word_confirm": {
+    "message": "Delete “$1”?"
+  },
+  "vk_delete": {
+    "message": "Delete"
+  },
+  "vk_cancel": {
+    "message": "Cancel"
+  },
+  "vk_candidates_announce": {
+    "message": "$1 candidates"
+  },
+  "vk_alt_characters": {
+    "message": "Alternate characters"
+  },
+  "vk_settings": {
+    "message": "Settings"
+  },
+  "vk_emoji": {
+    "message": "Emoji"
+  },
+  "vk_clipboard": {
+    "message": "Clipboard"
+  },
+  "vk_clipboard_current": {
+    "message": "Current clipboard"
+  },
+  "vk_clipboard_paste_short": {
+    "message": "Paste"
+  },
+  "vk_clipboard_loading": {
+    "message": "Reading clipboard…"
+  },
+  "vk_clipboard_empty": {
+    "message": "Clipboard has no text"
+  },
+  "vk_clipboard_unavailable": {
+    "message": "Clipboard isn’t available"
+  },
+  "vk_clipboard_error": {
+    "message": "Couldn’t read the clipboard"
+  },
+  "vk_clipboard_retry": {
+    "message": "Try again"
+  },
+  "vk_clipboard_paste": {
+    "message": "Paste clipboard text"
+  },
+  "vk_clipboard_close": {
+    "message": "Close clipboard"
+  },
+  "vk_clipboard_delete": {
+    "message": "Delete clipboard item"
+  },
+  "vk_clipboard_delete_error": {
+    "message": "Couldn’t delete. Try again"
+  },
+  "vk_switch_schema": {
+    "message": "Switch schema"
+  },
+  "vk_prev_page": {
+    "message": "Previous page"
+  },
+  "vk_next_page": {
+    "message": "Next page"
+  },
+  "vk_expand_candidates": {
+    "message": "Expand candidates"
+  },
+  "vk_collapse_candidates": {
+    "message": "Collapse candidates"
+  },
+  "vk_recent_emoji": {
+    "message": "Recently used"
+  },
+  "vk_back_to_keyboard": {
+    "message": "Back to keyboard"
+  },
+  "vk_key_shift": {
+    "message": "Shift"
+  },
+  "vk_key_backspace": {
+    "message": "Backspace"
+  },
+  "vk_key_enter": {
+    "message": "Enter"
+  },
+  "vk_key_space": {
+    "message": "Space"
+  },
+  "vk_key_hide": {
+    "message": "Hide keyboard"
+  },
+  "vk_kbmode_docked": {
+    "message": "Dock keyboard"
+  },
+  "vk_kbmode_floating": {
+    "message": "Floating keyboard"
+  },
+  "vk_kbmode_onehand": {
+    "message": "One-handed keyboard"
+  },
+  "vk_resize_keyboard": {
+    "message": "Resize keyboard"
+  },
+  "vk_pin_left": {
+    "message": "Pin to left corner"
+  },
+  "vk_pin_right": {
+    "message": "Pin to right corner"
+  },
+  "vk_exit_onehand": {
+    "message": "Exit one-handed mode"
+  },
+  "vk_key_symbols": {
+    "message": "Symbols"
+  },
+  "vk_key_more_symbols": {
+    "message": "More symbols"
+  },
+  "vk_key_letters": {
+    "message": "Letters"
+  },
+  "vk_key_toggle_language": {
+    "message": "Toggle language"
+  },
+  "vk_emoji_smileys": {
+    "message": "Smileys"
+  },
+  "vk_emoji_gestures": {
+    "message": "Gestures"
+  },
+  "vk_emoji_people": {
+    "message": "People"
+  },
+  "vk_emoji_hearts": {
+    "message": "Hearts"
+  },
+  "vk_emoji_animals": {
+    "message": "Animals"
+  },
+  "vk_emoji_food": {
+    "message": "Food"
+  },
+  "vk_emoji_activities": {
+    "message": "Activities"
+  },
+  "vk_emoji_travel": {
+    "message": "Travel"
+  },
+  "vk_emoji_objects": {
+    "message": "Objects"
+  },
+  "vk_emoji_symbols": {
+    "message": "Symbols"
+  },
+  "vk_emoji_flags": {
+    "message": "Flags"
+  },
+  "keyboard_arrangement": {
+    "message": "Letter arrangement"
+  },
+  "keyboard_arrangement_hint": {
+    "message": "Applies to your keyboard, the on-screen keyboard, and English mode."
+  },
+  "keyboard_arrangement_hint_physical": {
+    "message": "Applies to your keyboard, and to English mode."
+  },
+  "keyboard_script_note": {
+    "message": "$1 draws its own keys. Your arrangement still applies in English mode.",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "vk_keys": {
+    "message": "On-screen keys"
+  },
+  "layout_letters": {
+    "message": "Letters"
+  },
+  "vk_voice_hint": {
+    "message": "Start speaking"
+  },
+  "vk_voice_recording": {
+    "message": "Recording"
+  },
+  "vk_voice_connecting": {
+    "message": "Connecting…"
+  },
+  "vk_voice_finalizing": {
+    "message": "Finishing up…"
+  },
+  "vk_voice_stop": {
+    "message": "Stop"
+  },
+  "vk_voice_consent_title": {
+    "message": "Voice input"
+  },
+  "vk_voice_consent_body": {
+    "message": "What you say is sent to Volcano Engine (Beijing ByteDance) servers for recognition."
+  },
+  "vk_voice_consent_accept": {
+    "message": "Agree and start"
+  },
+  "vk_voice_permission_title": {
+    "message": "Microphone access needed"
+  },
+  "vk_voice_permission_body": {
+    "message": "The keyboard cannot show a permission prompt. Turn voice input on in settings and allow the microphone there, choosing “Allow on every visit”."
+  },
+  "vk_voice_permission_open": {
+    "message": "Open settings"
+  },
+  "vk_voice_error_microphone": {
+    "message": "Cannot use the microphone"
+  },
+  "vk_voice_error_network": {
+    "message": "Connection lost"
+  },
+  "vk_voice_error_server": {
+    "message": "Speech service unavailable"
+  },
+  "vk_voice_error_unknown": {
+    "message": "Voice input failed"
+  },
+  "vk_voice_error_body": {
+    "message": "You can keep typing in the meantime."
+  },
+  "vk_voice": {
+    "message": "Voice input"
+  },
+  "voice_input": {
+    "message": "Voice input"
+  },
+  "voice_input_desc": {
+    "message": "Tap the microphone on the keyboard and speak; the text is entered directly. Recognition is done by Volcano Engine (ByteDance)."
+  },
+  "voice_mic_needed": {
+    "message": "Microphone access is still missing. Turn the switch on again and choose “Allow on every visit” — “Allow this time” stops working once this page closes."
+  },
+  "voice_mic_denied": {
+    "message": "Microphone access was denied. Allow it in the browser’s site settings, then turn the switch on again."
+  },
+  "vk_voice_idle": {
+    "message": "Finished"
+  },
+  "vk_voice_again": {
+    "message": "Tap the microphone to continue"
+  },
+  "voice_input_langs": {
+    "message": "Mandarin and English, plus Cantonese, Shanghainese, Hokkien and Sichuanese."
+  },
+  "voice_mic_choose": {
+    "message": "Turning it on asks the browser for the microphone — choose “Allow on every visit”."
+  }
 }

@@ -1,456 +1,531 @@
 {
-    "extension_name": {
-        "message": "真文韻入力法"
-    },
-    "description": {
-        "message": "ChromeOS および FydeOS 向けの入力法、RIME に基づき、FydeOS チームによって開発されました。"
-    },
-    "input_method_name": {
-        "message": "真文韻入力法"
-    },
-    "setting_page": {
-        "message": "真文韻設定"
-    },
-    "loading_engine": {
-        "message": "RIME エンジンを読み込み中…"
-    },
-    "candidate_page": {
-        "message": "ページ $PAGE$",
-        "placeholders": {
-            "page": {
-                "content": "$1"
-            }
-        }
-    },
-    "candidate_page_last": {
-        "message": "（最後）"
-    },
-    "rime_engine_logs": {
-        "message": "RIME エンジンログ"
-    },
-    "rime_engine_not_started": {
-        "message": "開始されていません"
-    },
-    "rime_engine_starting": {
-        "message": "開始中"
-    },
-    "rime_engine_ready": {
-        "message": "準備完了"
-    },
-    "rime_engine_starting_button": {
-        "message": "RIME エンジンを再起動"
-    },
-    "save_settings_and_apply_button": {
-        "message": "保存して適用"
-    },
-    "select_schema": {
-        "message": "入力スキーマを選択"
-    },
-    "fetching_schema_list": {
-        "message": "（リストを更新中）"
-    },
-    "candidate_count": {
-        "message": "ページごとの候補数"
-    },
-    "schema_switch_key": {
-        "message": "スキーマ切り替えショートカット"
-    },
-    "schema_switch_key_hint": {
-        "message": "次の有効なスキーマに切り替えます。"
-    },
-    "schema_switch_key_hint_recording": {
-        "message": "新しいキーの組み合わせを押してください。Esc キーでキャンセルします。"
-    },
-    "schema_switch_key_hint_disabled": {
-        "message": "ショートカットは無効です。「ショートカットを設定」をクリックしてキーの組み合わせを押すと、再度有効になります。"
-    },
-    "schema_switch_key_recording": {
-        "message": "キーを押してください…"
-    },
-    "schema_switch_key_set": {
-        "message": "ショートカットを設定"
-    },
-    "schema_switch_key_disable": {
-        "message": "無効にする"
-    },
-    "schema_switch_key_reset": {
-        "message": "デフォルトに戻す"
-    },
-    "schema_switch_key_invalid": {
-        "message": "Ctrl または Alt を含めるか、ファンクションキーを使用してください。Shift や検索キーのみでは通常の入力を妨げます。"
-    },
-    "fuzzy_pinyin": {
-        "message": "あいまいピンイン"
-    },
-    "settings_changed_snackbar": {
-        "message": "設定が変更されました。"
-    },
-    "error_downloading_schema": {
-        "message": "スキーマのダウンロード中にエラー："
-    },
-    "error_removing_schema": {
-        "message": "スキーマの削除中にエラー："
-    },
-    "error_last_schema": {
-        "message": "最後のスキーマは削除できません。少なくとも 1 つのスキーマを残す必要があります。"
-    },
-    "error_importing_schema": {
-        "message": "スキーマのインポート中にエラー"
-    },
-    "import_compiled_schema": {
-        "message": "ZIP からインポート"
-    },
-    "import_compiled_schema_hint": {
-        "message": "コンパイル済みスキーマをインポート（.zip ファイル）"
-    },
-    "import_predefined_schema_confirm": {
-        "message": "スキーマ「$1」は定義済みスキーマ一覧に含まれています。定義済みスキーマをインポートしますか？"
-    },
-    "error_form": {
-        "message": "GitHub リポジトリの URL と Schema Id を入力してください。"
-    },
-    "error_fetch_schema_list": {
-        "message": "スキーマリストの取得中にエラー："
-    },
-    "schema_home_page": {
-        "message": "スキーマのホームページ"
-    },
-    "privacy_statement": {
-        "message": "プライバシーに関する声明"
-    },
-    "privacy_statement_url": {
-        "message": "https://fydeos.io/privacy/fyderhythm/"
-    },
-    "edit_rime_config": {
-        "message": "RIME 設定を編集（上級ユーザーのみ）"
-    },
-    "open_source": {
-        "message": "GitHubで見る"
-    },
-    "add_schema": {
-        "message": "追加"
-    },
-    "update_schema": {
-        "message": "更新"
-    },
-    "remove_schema": {
-        "message": "削除"
-    },
-    "enable_schema_hint": {
-        "message": "IME トレイメニューにこの方式を表示する"
-    },
-    "cannot_edit_this_file": {
-        "message": "テキストファイルを選択してください"
-    },
-    "loading_editor": {
-        "message": "エディターを読み込み中…"
-    },
-    "config_editor_title": {
-        "message": "RIME 設定エディター"
-    },
-    "remove_schema_confirm_title": {
-        "message": "入力スキーマを削除"
-    },
-    "remove_schema_confirm_body": {
-        "message": "「$SCHEMA$」を削除しますか？スキーマのファイルは削除され、再度使用するには再ダウンロードが必要です。",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "cancel_button": {
-        "message": "キャンセル"
-    },
-    "download_schema": {
-        "message": "スキーマをダウンロード"
-    },
-    "decrease_candidate_count": {
-        "message": "候補数を減らす"
-    },
-    "increase_candidate_count": {
-        "message": "候補数を増やす"
-    },
-    "import_predefined_schema_title": {
-        "message": "定義済みスキーマをインポート"
-    },
-    "import_button": {
-        "message": "インポート"
-    },
-    "appearance": {
-        "message": "外観"
-    },
-    "theme_light": {
-        "message": "ライト"
-    },
-    "theme_system": {
-        "message": "システム"
-    },
-    "theme_dark": {
-        "message": "ダーク"
-    },
-    "dict_pack_section_title": {
-        "message": "辞書パック"
-    },
-    "dict_pack_hint": {
-        "message": ".txt、.tsv、.dict.yaml ファイル、または捜狗（.scel）・百度（.bdict/.bcd）・QQ拼音（.qpyd/.qcel）の辞書ファイルをインポートして辞書パックをコンパイルします。単語帳と異なり、前方一致と重み順の候補表示をサポートします。"
-    },
-    "dict_pack_import_button": {
-        "message": "辞書パックをインポート"
-    },
-    "dict_pack_empty": {
-        "message": "ファイルに有効なエントリがありません。"
-    },
-    "dict_pack_import_error": {
-        "message": "辞書パックのインポートエラー："
-    },
-    "dict_pack_compile_error": {
-        "message": "コンパイル失敗："
-    },
-    "dict_pack_entry_count": {
-        "message": "$COUNT$ 件",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_enabled": {
-        "message": "有効"
-    },
-    "dict_pack_disabled": {
-        "message": "無効"
-    },
-    "dict_pack_remove_button": {
-        "message": "削除"
-    },
-    "dict_pack_empty_list": {
-        "message": "辞書パックがまだインストールされていません。ファイルをインポートするかカタログからインストールしてください。"
-    },
-    "dict_pack_active_entry_count": {
-        "message": "$COUNT$ 件が有効",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_compiling": {
-        "message": "コンパイル中…"
-    },
-    "dict_pack_duplicates_merged": {
-        "message": "インポートしたファイル内の重複エントリ $COUNT$ 件を統合しました。",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_import_warning_summary": {
-        "message": "インポートは完了しましたが、$COUNT$ 件の警告があります：",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_more_warnings": {
-        "message": "…ほか $COUNT$ 件（完全なリストはブラウザのコンソールを参照）",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "layout_zhuyin": {
-        "message": "注音"
-    },
-    "layout_kana": {
-        "message": "かな"
-    },
-    "layout_hangul": {
-        "message": "ハングル"
-    },
-    "vk_delete_word_confirm": {
-        "message": "「$1」を削除しますか?"
-    },
-    "vk_delete": {
-        "message": "削除"
-    },
-    "vk_cancel": {
-        "message": "キャンセル"
-    },
-    "vk_candidates_announce": {
-        "message": "候補 $1 件"
-    },
-    "vk_alt_characters": {
-        "message": "代替文字"
-    },
-    "vk_settings": {
-        "message": "設定"
-    },
-    "vk_emoji": {
-        "message": "絵文字"
-    },
-    "vk_clipboard": {
-        "message": "クリップボード"
-    },
-    "vk_clipboard_current": {
-        "message": "現在のクリップボード"
-    },
-    "vk_clipboard_paste_short": {
-        "message": "貼り付け"
-    },
-    "vk_clipboard_loading": {
-        "message": "クリップボードを読み込んでいます…"
-    },
-    "vk_clipboard_empty": {
-        "message": "クリップボードにテキストがありません"
-    },
-    "vk_clipboard_unavailable": {
-        "message": "クリップボードを利用できません"
-    },
-    "vk_clipboard_error": {
-        "message": "クリップボードを読み込めませんでした"
-    },
-    "vk_clipboard_retry": {
-        "message": "再試行"
-    },
-    "vk_clipboard_paste": {
-        "message": "クリップボードのテキストを貼り付け"
-    },
-    "vk_clipboard_close": {
-        "message": "クリップボードを閉じる"
-    },
-    "vk_clipboard_delete": {
-        "message": "クリップボードの項目を削除"
-    },
-    "vk_clipboard_delete_error": {
-        "message": "削除できませんでした。もう一度お試しください"
-    },
-    "vk_switch_schema": {
-        "message": "スキーマ切り替え"
-    },
-    "vk_prev_page": {
-        "message": "前のページ"
-    },
-    "vk_next_page": {
-        "message": "次のページ"
-    },
-    "vk_expand_candidates": {
-        "message": "候補を展開"
-    },
-    "vk_collapse_candidates": {
-        "message": "候補を折りたたむ"
-    },
-    "vk_recent_emoji": {
-        "message": "最近使用した絵文字"
-    },
-    "vk_back_to_keyboard": {
-        "message": "キーボードに戻る"
-    },
-    "vk_key_shift": {
-        "message": "Shift"
-    },
-    "vk_key_backspace": {
-        "message": "バックスペース"
-    },
-    "vk_key_enter": {
-        "message": "Enter"
-    },
-    "vk_key_space": {
-        "message": "スペース"
-    },
-    "vk_key_hide": {
-        "message": "キーボードを隠す"
-    },
-    "vk_kbmode_docked": {
-        "message": "キーボードを固定"
-    },
-    "vk_kbmode_floating": {
-        "message": "フローティングキーボード"
-    },
-    "vk_kbmode_onehand": {
-        "message": "片手キーボード"
-    },
-    "vk_resize_keyboard": {
-        "message": "キーボードのサイズ変更"
-    },
-    "vk_pin_left": {
-        "message": "左下に固定"
-    },
-    "vk_pin_right": {
-        "message": "右下に固定"
-    },
-    "vk_exit_onehand": {
-        "message": "片手モードを終了"
-    },
-    "vk_key_symbols": {
-        "message": "記号"
-    },
-    "vk_key_more_symbols": {
-        "message": "その他の記号"
-    },
-    "vk_key_letters": {
-        "message": "文字"
-    },
-    "vk_key_toggle_language": {
-        "message": "言語切り替え"
-    },
-    "vk_emoji_smileys": {
-        "message": "顔文字"
-    },
-    "vk_emoji_gestures": {
-        "message": "ジェスチャー"
-    },
-    "vk_emoji_people": {
-        "message": "人物"
-    },
-    "vk_emoji_hearts": {
-        "message": "ハート"
-    },
-    "vk_emoji_animals": {
-        "message": "動物"
-    },
-    "vk_emoji_food": {
-        "message": "食べ物"
-    },
-    "vk_emoji_activities": {
-        "message": "アクティビティ"
-    },
-    "vk_emoji_travel": {
-        "message": "旅行"
-    },
-    "vk_emoji_objects": {
-        "message": "物"
-    },
-    "vk_emoji_symbols": {
-        "message": "記号"
-    },
-    "vk_emoji_flags": {
-        "message": "旗"
-    },
-    "keyboard_arrangement": {
-        "message": "文字配列"
-    },
-    "keyboard_arrangement_hint": {
-        "message": "外付けキーボード、画面キーボード、英字モードに適用されます。"
-    },
-    "keyboard_arrangement_hint_physical": {
-        "message": "外付けキーボードと英字モードに適用されます。"
-    },
-    "keyboard_script_note": {
-        "message": "$1 は専用のキーを表示します。文字配列は英字モードで有効です。",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "vk_keys": {
-        "message": "画面のキー"
-    },
-    "layout_letters": {
-        "message": "英字"
+  "extension_name": {
+    "message": "真文韻入力法"
+  },
+  "description": {
+    "message": "ChromeOS および FydeOS 向けの入力法、RIME に基づき、FydeOS チームによって開発されました。"
+  },
+  "input_method_name": {
+    "message": "真文韻入力法"
+  },
+  "setting_page": {
+    "message": "真文韻設定"
+  },
+  "loading_engine": {
+    "message": "RIME エンジンを読み込み中…"
+  },
+  "candidate_page": {
+    "message": "ページ $PAGE$",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      }
     }
+  },
+  "candidate_page_last": {
+    "message": "（最後）"
+  },
+  "rime_engine_logs": {
+    "message": "RIME エンジンログ"
+  },
+  "rime_engine_not_started": {
+    "message": "開始されていません"
+  },
+  "rime_engine_starting": {
+    "message": "開始中"
+  },
+  "rime_engine_ready": {
+    "message": "準備完了"
+  },
+  "rime_engine_starting_button": {
+    "message": "RIME エンジンを再起動"
+  },
+  "save_settings_and_apply_button": {
+    "message": "保存して適用"
+  },
+  "select_schema": {
+    "message": "入力スキーマを選択"
+  },
+  "fetching_schema_list": {
+    "message": "（リストを更新中）"
+  },
+  "candidate_count": {
+    "message": "ページごとの候補数"
+  },
+  "schema_switch_key": {
+    "message": "スキーマ切り替えショートカット"
+  },
+  "schema_switch_key_hint": {
+    "message": "次の有効なスキーマに切り替えます。"
+  },
+  "schema_switch_key_hint_recording": {
+    "message": "新しいキーの組み合わせを押してください。Esc キーでキャンセルします。"
+  },
+  "schema_switch_key_hint_disabled": {
+    "message": "ショートカットは無効です。「ショートカットを設定」をクリックしてキーの組み合わせを押すと、再度有効になります。"
+  },
+  "schema_switch_key_recording": {
+    "message": "キーを押してください…"
+  },
+  "schema_switch_key_set": {
+    "message": "ショートカットを設定"
+  },
+  "schema_switch_key_disable": {
+    "message": "無効にする"
+  },
+  "schema_switch_key_reset": {
+    "message": "デフォルトに戻す"
+  },
+  "schema_switch_key_invalid": {
+    "message": "Ctrl または Alt を含めるか、ファンクションキーを使用してください。Shift や検索キーのみでは通常の入力を妨げます。"
+  },
+  "fuzzy_pinyin": {
+    "message": "あいまいピンイン"
+  },
+  "settings_changed_snackbar": {
+    "message": "設定が変更されました。"
+  },
+  "error_downloading_schema": {
+    "message": "スキーマのダウンロード中にエラー："
+  },
+  "error_removing_schema": {
+    "message": "スキーマの削除中にエラー："
+  },
+  "error_last_schema": {
+    "message": "最後のスキーマは削除できません。少なくとも 1 つのスキーマを残す必要があります。"
+  },
+  "error_importing_schema": {
+    "message": "スキーマのインポート中にエラー"
+  },
+  "import_compiled_schema": {
+    "message": "ZIP からインポート"
+  },
+  "import_compiled_schema_hint": {
+    "message": "コンパイル済みスキーマをインポート（.zip ファイル）"
+  },
+  "import_predefined_schema_confirm": {
+    "message": "スキーマ「$1」は定義済みスキーマ一覧に含まれています。定義済みスキーマをインポートしますか？"
+  },
+  "error_form": {
+    "message": "GitHub リポジトリの URL と Schema Id を入力してください。"
+  },
+  "error_fetch_schema_list": {
+    "message": "スキーマリストの取得中にエラー："
+  },
+  "schema_home_page": {
+    "message": "スキーマのホームページ"
+  },
+  "privacy_statement": {
+    "message": "プライバシーに関する声明"
+  },
+  "privacy_statement_url": {
+    "message": "https://fydeos.io/privacy/fyderhythm/"
+  },
+  "edit_rime_config": {
+    "message": "RIME 設定を編集（上級ユーザーのみ）"
+  },
+  "open_source": {
+    "message": "GitHubで見る"
+  },
+  "add_schema": {
+    "message": "追加"
+  },
+  "update_schema": {
+    "message": "更新"
+  },
+  "remove_schema": {
+    "message": "削除"
+  },
+  "enable_schema_hint": {
+    "message": "IME トレイメニューにこの方式を表示する"
+  },
+  "cannot_edit_this_file": {
+    "message": "テキストファイルを選択してください"
+  },
+  "loading_editor": {
+    "message": "エディターを読み込み中…"
+  },
+  "config_editor_title": {
+    "message": "RIME 設定エディター"
+  },
+  "remove_schema_confirm_title": {
+    "message": "入力スキーマを削除"
+  },
+  "remove_schema_confirm_body": {
+    "message": "「$SCHEMA$」を削除しますか？スキーマのファイルは削除され、再度使用するには再ダウンロードが必要です。",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "cancel_button": {
+    "message": "キャンセル"
+  },
+  "download_schema": {
+    "message": "スキーマをダウンロード"
+  },
+  "decrease_candidate_count": {
+    "message": "候補数を減らす"
+  },
+  "increase_candidate_count": {
+    "message": "候補数を増やす"
+  },
+  "import_predefined_schema_title": {
+    "message": "定義済みスキーマをインポート"
+  },
+  "import_button": {
+    "message": "インポート"
+  },
+  "appearance": {
+    "message": "外観"
+  },
+  "theme_light": {
+    "message": "ライト"
+  },
+  "theme_system": {
+    "message": "システム"
+  },
+  "theme_dark": {
+    "message": "ダーク"
+  },
+  "dict_pack_section_title": {
+    "message": "辞書パック"
+  },
+  "dict_pack_hint": {
+    "message": ".txt、.tsv、.dict.yaml ファイル、または捜狗（.scel）・百度（.bdict/.bcd）・QQ拼音（.qpyd/.qcel）の辞書ファイルをインポートして辞書パックをコンパイルします。単語帳と異なり、前方一致と重み順の候補表示をサポートします。"
+  },
+  "dict_pack_import_button": {
+    "message": "辞書パックをインポート"
+  },
+  "dict_pack_empty": {
+    "message": "ファイルに有効なエントリがありません。"
+  },
+  "dict_pack_import_error": {
+    "message": "辞書パックのインポートエラー："
+  },
+  "dict_pack_compile_error": {
+    "message": "コンパイル失敗："
+  },
+  "dict_pack_entry_count": {
+    "message": "$COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_enabled": {
+    "message": "有効"
+  },
+  "dict_pack_disabled": {
+    "message": "無効"
+  },
+  "dict_pack_remove_button": {
+    "message": "削除"
+  },
+  "dict_pack_empty_list": {
+    "message": "辞書パックがまだインストールされていません。ファイルをインポートするかカタログからインストールしてください。"
+  },
+  "dict_pack_active_entry_count": {
+    "message": "$COUNT$ 件が有効",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_compiling": {
+    "message": "コンパイル中…"
+  },
+  "dict_pack_duplicates_merged": {
+    "message": "インポートしたファイル内の重複エントリ $COUNT$ 件を統合しました。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_import_warning_summary": {
+    "message": "インポートは完了しましたが、$COUNT$ 件の警告があります：",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_more_warnings": {
+    "message": "…ほか $COUNT$ 件（完全なリストはブラウザのコンソールを参照）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "layout_zhuyin": {
+    "message": "注音"
+  },
+  "layout_kana": {
+    "message": "かな"
+  },
+  "layout_hangul": {
+    "message": "ハングル"
+  },
+  "vk_delete_word_confirm": {
+    "message": "「$1」を削除しますか?"
+  },
+  "vk_delete": {
+    "message": "削除"
+  },
+  "vk_cancel": {
+    "message": "キャンセル"
+  },
+  "vk_candidates_announce": {
+    "message": "候補 $1 件"
+  },
+  "vk_alt_characters": {
+    "message": "代替文字"
+  },
+  "vk_settings": {
+    "message": "設定"
+  },
+  "vk_emoji": {
+    "message": "絵文字"
+  },
+  "vk_clipboard": {
+    "message": "クリップボード"
+  },
+  "vk_clipboard_current": {
+    "message": "現在のクリップボード"
+  },
+  "vk_clipboard_paste_short": {
+    "message": "貼り付け"
+  },
+  "vk_clipboard_loading": {
+    "message": "クリップボードを読み込んでいます…"
+  },
+  "vk_clipboard_empty": {
+    "message": "クリップボードにテキストがありません"
+  },
+  "vk_clipboard_unavailable": {
+    "message": "クリップボードを利用できません"
+  },
+  "vk_clipboard_error": {
+    "message": "クリップボードを読み込めませんでした"
+  },
+  "vk_clipboard_retry": {
+    "message": "再試行"
+  },
+  "vk_clipboard_paste": {
+    "message": "クリップボードのテキストを貼り付け"
+  },
+  "vk_clipboard_close": {
+    "message": "クリップボードを閉じる"
+  },
+  "vk_clipboard_delete": {
+    "message": "クリップボードの項目を削除"
+  },
+  "vk_clipboard_delete_error": {
+    "message": "削除できませんでした。もう一度お試しください"
+  },
+  "vk_switch_schema": {
+    "message": "スキーマ切り替え"
+  },
+  "vk_prev_page": {
+    "message": "前のページ"
+  },
+  "vk_next_page": {
+    "message": "次のページ"
+  },
+  "vk_expand_candidates": {
+    "message": "候補を展開"
+  },
+  "vk_collapse_candidates": {
+    "message": "候補を折りたたむ"
+  },
+  "vk_recent_emoji": {
+    "message": "最近使用した絵文字"
+  },
+  "vk_back_to_keyboard": {
+    "message": "キーボードに戻る"
+  },
+  "vk_key_shift": {
+    "message": "Shift"
+  },
+  "vk_key_backspace": {
+    "message": "バックスペース"
+  },
+  "vk_key_enter": {
+    "message": "Enter"
+  },
+  "vk_key_space": {
+    "message": "スペース"
+  },
+  "vk_key_hide": {
+    "message": "キーボードを隠す"
+  },
+  "vk_kbmode_docked": {
+    "message": "キーボードを固定"
+  },
+  "vk_kbmode_floating": {
+    "message": "フローティングキーボード"
+  },
+  "vk_kbmode_onehand": {
+    "message": "片手キーボード"
+  },
+  "vk_resize_keyboard": {
+    "message": "キーボードのサイズ変更"
+  },
+  "vk_pin_left": {
+    "message": "左下に固定"
+  },
+  "vk_pin_right": {
+    "message": "右下に固定"
+  },
+  "vk_exit_onehand": {
+    "message": "片手モードを終了"
+  },
+  "vk_key_symbols": {
+    "message": "記号"
+  },
+  "vk_key_more_symbols": {
+    "message": "その他の記号"
+  },
+  "vk_key_letters": {
+    "message": "文字"
+  },
+  "vk_key_toggle_language": {
+    "message": "言語切り替え"
+  },
+  "vk_emoji_smileys": {
+    "message": "顔文字"
+  },
+  "vk_emoji_gestures": {
+    "message": "ジェスチャー"
+  },
+  "vk_emoji_people": {
+    "message": "人物"
+  },
+  "vk_emoji_hearts": {
+    "message": "ハート"
+  },
+  "vk_emoji_animals": {
+    "message": "動物"
+  },
+  "vk_emoji_food": {
+    "message": "食べ物"
+  },
+  "vk_emoji_activities": {
+    "message": "アクティビティ"
+  },
+  "vk_emoji_travel": {
+    "message": "旅行"
+  },
+  "vk_emoji_objects": {
+    "message": "物"
+  },
+  "vk_emoji_symbols": {
+    "message": "記号"
+  },
+  "vk_emoji_flags": {
+    "message": "旗"
+  },
+  "keyboard_arrangement": {
+    "message": "文字配列"
+  },
+  "keyboard_arrangement_hint": {
+    "message": "外付けキーボード、画面キーボード、英字モードに適用されます。"
+  },
+  "keyboard_arrangement_hint_physical": {
+    "message": "外付けキーボードと英字モードに適用されます。"
+  },
+  "keyboard_script_note": {
+    "message": "$1 は専用のキーを表示します。文字配列は英字モードで有効です。",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "vk_keys": {
+    "message": "画面のキー"
+  },
+  "layout_letters": {
+    "message": "英字"
+  },
+  "vk_voice_hint": {
+    "message": "話しかけてください"
+  },
+  "vk_voice_recording": {
+    "message": "録音中"
+  },
+  "vk_voice_connecting": {
+    "message": "接続中…"
+  },
+  "vk_voice_finalizing": {
+    "message": "処理中…"
+  },
+  "vk_voice_stop": {
+    "message": "停止"
+  },
+  "vk_voice_consent_title": {
+    "message": "音声入力"
+  },
+  "vk_voice_consent_body": {
+    "message": "話した内容は火山引擎（北京字節跳動）のサーバーに送信されて認識されます。"
+  },
+  "vk_voice_consent_accept": {
+    "message": "同意して開始"
+  },
+  "vk_voice_permission_title": {
+    "message": "マイクの許可が必要です"
+  },
+  "vk_voice_permission_body": {
+    "message": "キーボードでは許可ダイアログを表示できません。設定ページで音声入力をオンにし、「毎回許可する」を選んで許可してください。"
+  },
+  "vk_voice_permission_open": {
+    "message": "設定を開く"
+  },
+  "vk_voice_error_microphone": {
+    "message": "マイクを使用できません"
+  },
+  "vk_voice_error_network": {
+    "message": "接続が切断されました"
+  },
+  "vk_voice_error_server": {
+    "message": "音声サービスを利用できません"
+  },
+  "vk_voice_error_unknown": {
+    "message": "音声入力に失敗しました"
+  },
+  "vk_voice_error_body": {
+    "message": "キーボードでの入力は続けられます。"
+  },
+  "vk_voice": {
+    "message": "音声入力"
+  },
+  "voice_input": {
+    "message": "音声入力"
+  },
+  "voice_input_desc": {
+    "message": "キーボードのマイクをタップして話すと、文字がそのまま入力されます。認識は火山引擎（字節跳動）が行います。"
+  },
+  "voice_mic_needed": {
+    "message": "マイクの許可がまだありません。スイッチをもう一度オンにし、ダイアログで「毎回許可する」を選んでください。「今回のみ許可」はこのページを閉じると無効になります。"
+  },
+  "voice_mic_denied": {
+    "message": "マイクの使用が拒否されました。ブラウザのサイト設定で許可してから、スイッチをオンにしてください。"
+  },
+  "vk_voice_idle": {
+    "message": "終了"
+  },
+  "vk_voice_again": {
+    "message": "マイクをタップして続ける"
+  },
+  "voice_input_langs": {
+    "message": "中国語（普通話）と英語のほか、広東語・上海語・閩南語・四川語などに対応します。"
+  },
+  "voice_mic_choose": {
+    "message": "オンにするとブラウザがマイクの許可を求めます。「毎回許可する」を選んでください。"
+  }
 }

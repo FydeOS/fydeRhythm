@@ -28,7 +28,7 @@ vi.mock('@/lib/schema-install', () => ({
   resolveInstalledSchemaId: vi.fn(),
 }));
 
-const { postInputViewState, postRefinedInputViewState }
+const { postFieldState, postInputViewState, postRefinedInputViewState }
   = await import('../entrypoints/background/inputview-state');
 const { listEnabledInstalledSchemas }
   = await import('../entrypoints/background/schemas');
@@ -79,5 +79,49 @@ describe('InputView state ordering', () => {
 
     expect(posted.at(-1)?.state.schemaId).toBe('schema_b');
     expect(posted.at(-1)?.state.schemaName).toBe('Schema B');
+  });
+});
+
+function fakeController() {
+  return {
+    activeSettings: { schema: 'schema_a', pageSize: 5, algebraList: [] },
+    context: null,
+    getAsciiMode: vi.fn(async () => false),
+  };
+}
+
+describe('postFieldState', () => {
+  it('publishes a field-type change without waiting for the slow reads', async () => {
+    // Whether the caret is in a password box decides whether the microphone is
+    // offered; the refined snapshot behind it waits on schema enumeration and
+    // the ascii-mode read, each with a three-second timeout, and a running
+    // dictation keeps inserting meanwhile.
+    const posts: unknown[] = [];
+    const post = (message: unknown) => posts.push(message);
+
+    await postInputViewState(fakeController() as never, post as never);
+    const before = posts.length;
+
+    postFieldState(post as never, { numericField: null, passwordField: true });
+
+    expect(posts).toHaveLength(before + 1);
+    expect(posts.at(-1)).toMatchObject({ state: { passwordField: true } });
+  });
+
+  it('carries the rest of the snapshot over, so the schema label does not flash', async () => {
+    const posts: { state: { schemaName: string } }[] = [];
+    const post = (message: unknown) => posts.push(message as { state: { schemaName: string } });
+
+    await postInputViewState(fakeController() as never, post as never);
+    const label = posts.at(-1)!.state.schemaName;
+
+    postFieldState(post as never, { numericField: 'tel', passwordField: false });
+    expect(posts.at(-1)!.state.schemaName).toBe(label);
+  });
+
+  it('says nothing to a connection that has never been told a state', () => {
+    const posts: unknown[] = [];
+    postFieldState(((m: unknown) => posts.push(m)) as never, { numericField: null, passwordField: true });
+    expect(posts).toHaveLength(0);
   });
 });

@@ -395,6 +395,11 @@ export async function matchedWhilePressed(selectors) {
     keys.find(k => k.querySelector('.glyph') && !k.classList.contains('fn') && !k.classList.contains('enter')),
     keys.find(k => k.classList.contains('enter')),
     keys.find(k => k.classList.contains('fn')),
+    // Panels put their own controls where the keys would be, and they drive
+    // .pressed from pointer events just as Key does — so their pressed rules
+    // are only reachable with one of them held down.
+    document.querySelector('.kb-voice-action-btn:not(:disabled)'),
+    document.querySelector('.kb-voice-side'),
   ];
 
   for (const key of kinds) {
@@ -462,4 +467,71 @@ export async function applyStep(step) {
     }
   }
   return null;
+}
+
+// The voice panel replaces the key grid, so inspectKeyboard measures nothing
+// there: it counts keys, and the panel has none. Without this the panel gets
+// only selector-liveness — proof that every rule rendered, not that it rendered
+// correctly. Serialized into the page alone, like the checks above.
+export function inspectVoicePanel() {
+  const kMinTarget = 32; // the same floor inspectKeyboard uses for keys
+
+  const findings = [];
+  const panel = document.querySelector('.kb-voice');
+  if (!panel) return { findings, present: false };
+
+  const rect = el => el.getBoundingClientRect();
+  const card = rect(document.querySelector('.kb-root'));
+  const bad = msg => findings.push(msg);
+
+  // Horizontal overflow. Only Latin can produce it — CJK breaks anywhere — so
+  // this is what the ?voice=latin state exists to provoke.
+  for (const [name, sel] of [['transcript', '.kb-voice-transcript'], ['status strip', '.kb-voice-bottom']]) {
+    const el = document.querySelector(sel);
+    if (el && el.scrollWidth > el.clientWidth + 1) {
+      bad(`the voice ${name} overflows sideways by ${(el.scrollWidth - el.clientWidth).toFixed(0)}px`);
+    }
+  }
+
+  // Squeezed to nothing. Flex resolves an over-full row by compressing items to
+  // zero rather than overflowing, so an overflow check alone passes while the
+  // user watches "Recording" and the timer disappear.
+  for (const [name, sel] of [['status', '.kb-voice-status'], ['timer', '.kb-voice-time']]) {
+    const el = document.querySelector(sel);
+    if (el && rect(el).width < 1) {
+      bad(`the voice ${name} was compressed to zero width — the strip has more in it than fits`);
+    }
+  }
+
+  // Every control on the panel has to stay hittable and stay on the card — the
+  // strip now carries back, backspace and the main action, and one-hand mode is
+  // where they run out of room first.
+  for (const el of document.querySelectorAll('.kb-voice-action-btn, .kb-voice-side')) {
+    const b = rect(el);
+    const what = el.classList.contains('kb-voice-action-btn') ? 'voice button' : 'voice side key';
+    if (b.width < kMinTarget || b.height < kMinTarget) {
+      bad(`the ${what} is ${b.width.toFixed(0)}x${b.height.toFixed(0)}, under the ${kMinTarget}px hit floor`);
+    }
+    if (b.right > card.right + 1 || b.bottom > card.bottom + 1 || b.left < card.left - 1) {
+      bad(`the ${what} hangs off the card`);
+    }
+  }
+
+  // Regions must not overlap: a transcript that grows into the strip hides the
+  // stop control, which is the one thing a recording user needs to reach.
+  const transcript = document.querySelector('.kb-voice-transcript');
+  const strip = document.querySelector('.kb-voice-bottom');
+  if (transcript && strip && rect(transcript).bottom > rect(strip).top + 1) {
+    bad('the voice transcript overlaps the status strip');
+  }
+
+  // Cards carry the longest copy in the keyboard; if one cannot fit, it must at
+  // least be scrollable rather than clipped.
+  const cardBody = document.querySelector('.kb-voice-card');
+  if (cardBody && cardBody.scrollHeight > cardBody.clientHeight + 1
+    && getComputedStyle(cardBody).overflowY === 'hidden') {
+    bad('the voice card is taller than its box and cannot be scrolled');
+  }
+
+  return { findings, present: true };
 }

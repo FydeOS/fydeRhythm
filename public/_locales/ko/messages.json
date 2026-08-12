@@ -1,456 +1,531 @@
 {
-    "extension_name": {
-        "message": "진문운 입력법"
-    },
-    "description": {
-        "message": "ChromeOS 및 FydeOS 용 입력 방식으로, RIME 를 기반으로 FydeOS 팀에서 개발하였습니다."
-    },
-    "input_method_name": {
-        "message": "진문운 입력법"
-    },
-    "setting_page": {
-        "message": "진문운 설정"
-    },
-    "loading_engine": {
-        "message": "RIME 엔진을 로딩 중…"
-    },
-    "candidate_page": {
-        "message": "페이지 $PAGE$",
-        "placeholders": {
-            "page": {
-                "content": "$1"
-            }
-        }
-    },
-    "candidate_page_last": {
-        "message": "(마지막)"
-    },
-    "rime_engine_logs": {
-        "message": "RIME 엔진 로그"
-    },
-    "rime_engine_not_started": {
-        "message": "시작되지 않음"
-    },
-    "rime_engine_starting": {
-        "message": "시작 중"
-    },
-    "rime_engine_ready": {
-        "message": "준비 완료"
-    },
-    "rime_engine_starting_button": {
-        "message": "RIME 엔진 다시 시작"
-    },
-    "save_settings_and_apply_button": {
-        "message": "저장 및 적용"
-    },
-    "select_schema": {
-        "message": "입력 스키마 선택"
-    },
-    "fetching_schema_list": {
-        "message": "(리스트 새로 고침 중)"
-    },
-    "candidate_count": {
-        "message": "페이지당 후보 수"
-    },
-    "schema_switch_key": {
-        "message": "스키마 전환 단축키"
-    },
-    "schema_switch_key_hint": {
-        "message": "다음 사용 설정된 스키마로 전환합니다."
-    },
-    "schema_switch_key_hint_recording": {
-        "message": "새 키 조합을 누르세요. Esc 키를 누르면 취소됩니다."
-    },
-    "schema_switch_key_hint_disabled": {
-        "message": "단축키가 사용 중지되었습니다. '단축키 설정'을 클릭하고 키 조합을 누르면 다시 사용 설정됩니다."
-    },
-    "schema_switch_key_recording": {
-        "message": "키를 누르세요…"
-    },
-    "schema_switch_key_set": {
-        "message": "단축키 설정"
-    },
-    "schema_switch_key_disable": {
-        "message": "사용 안 함"
-    },
-    "schema_switch_key_reset": {
-        "message": "기본값으로 재설정"
-    },
-    "schema_switch_key_invalid": {
-        "message": "Ctrl 또는 Alt를 포함하거나 기능 키를 사용하세요. Shift나 검색 키만으로는 일반 입력을 방해합니다."
-    },
-    "fuzzy_pinyin": {
-        "message": "모호한 병음"
-    },
-    "settings_changed_snackbar": {
-        "message": "설정이 변경되었습니다."
-    },
-    "error_downloading_schema": {
-        "message": "스키마 다운로드 중 오류 발생: "
-    },
-    "error_removing_schema": {
-        "message": "스키마 제거 중 오류 발생: "
-    },
-    "error_last_schema": {
-        "message": "마지막 스키마는 제거할 수 없습니다. 최소한 하나의 스키마는 유지되어야 합니다."
-    },
-    "error_importing_schema": {
-        "message": "스키마 가져오기 중 오류 발생"
-    },
-    "import_compiled_schema": {
-        "message": "ZIP에서 가져오기"
-    },
-    "import_compiled_schema_hint": {
-        "message": "컴파일된 스키마 가져오기 (.zip 파일)"
-    },
-    "import_predefined_schema_confirm": {
-        "message": "\"$1\" 스키마는 이미 미리 정의된 스키마 목록에 있습니다. 미리 정의된 스키마를 가져오시겠습니까?"
-    },
-    "error_form": {
-        "message": "GitHub 저장소 URL과 Schema Id를 모두 입력해 주세요."
-    },
-    "error_fetch_schema_list": {
-        "message": "스키마 리스트 가져오기 오류:"
-    },
-    "schema_home_page": {
-        "message": "스키마 홈페이지"
-    },
-    "privacy_statement": {
-        "message": "개인정보 보호 정책"
-    },
-    "privacy_statement_url": {
-        "message": "https://fydeos.io/privacy/fyderhythm/"
-    },
-    "edit_rime_config": {
-        "message": "RIME 설정 편집 (고급 사용자 전용)"
-    },
-    "open_source": {
-        "message": "GitHub 에서 보기"
-    },
-    "add_schema": {
-        "message": "추가"
-    },
-    "update_schema": {
-        "message": "업데이트"
-    },
-    "remove_schema": {
-        "message": "삭제"
-    },
-    "enable_schema_hint": {
-        "message": "IME 트레이 메뉴에 이 스키마 표시"
-    },
-    "cannot_edit_this_file": {
-        "message": "텍스트 파일을 선택하세요"
-    },
-    "loading_editor": {
-        "message": "에디터 로딩 중…"
-    },
-    "config_editor_title": {
-        "message": "RIME 설정 에디터"
-    },
-    "remove_schema_confirm_title": {
-        "message": "입력 스키마 제거"
-    },
-    "remove_schema_confirm_body": {
-        "message": "“$SCHEMA$”을(를) 제거하시겠습니까? 스키마 파일이 삭제되며, 다시 사용하려면 다시 다운로드해야 합니다.",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "cancel_button": {
-        "message": "취소"
-    },
-    "download_schema": {
-        "message": "스키마 다운로드"
-    },
-    "decrease_candidate_count": {
-        "message": "후보 수 줄이기"
-    },
-    "increase_candidate_count": {
-        "message": "후보 수 늘리기"
-    },
-    "import_predefined_schema_title": {
-        "message": "사전 정의된 스키마 가져오기"
-    },
-    "import_button": {
-        "message": "가져오기"
-    },
-    "appearance": {
-        "message": "화면 모드"
-    },
-    "theme_light": {
-        "message": "라이트"
-    },
-    "theme_system": {
-        "message": "시스템"
-    },
-    "theme_dark": {
-        "message": "다크"
-    },
-    "dict_pack_section_title": {
-        "message": "사전 팩"
-    },
-    "dict_pack_hint": {
-        "message": ".txt, .tsv, .dict.yaml 파일 또는 Sogou(.scel), Baidu(.bdict/.bcd), QQ 병음(.qpyd/.qcel) 사전 파일을 가져와 사전 팩을 컴파일합니다. 단어 팩과 달리 전방 일치와 가중치 기반 순위를 지원합니다."
-    },
-    "dict_pack_import_button": {
-        "message": "사전 팩 가져오기"
-    },
-    "dict_pack_empty": {
-        "message": "파일에 유효한 항목이 없습니다."
-    },
-    "dict_pack_import_error": {
-        "message": "사전 팩 가져오기 오류: "
-    },
-    "dict_pack_compile_error": {
-        "message": "컴파일 실패: "
-    },
-    "dict_pack_entry_count": {
-        "message": "$COUNT$ 개 항목",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_enabled": {
-        "message": "활성화"
-    },
-    "dict_pack_disabled": {
-        "message": "비활성화"
-    },
-    "dict_pack_remove_button": {
-        "message": "제거"
-    },
-    "dict_pack_empty_list": {
-        "message": "아직 설치된 사전 팩이 없습니다. 파일을 가져오거나 카탈로그에서 설치하세요."
-    },
-    "dict_pack_active_entry_count": {
-        "message": "$COUNT$ 개 항목 활성",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_compiling": {
-        "message": "컴파일 중…"
-    },
-    "dict_pack_duplicates_merged": {
-        "message": "가져온 파일에서 중복 항목 $COUNT$개를 병합했습니다.",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_import_warning_summary": {
-        "message": "가져오기가 완료되었지만 경고가 $COUNT$개 있습니다:",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "dict_pack_more_warnings": {
-        "message": "…외 $COUNT$개 (전체 목록은 브라우저 콘솔 참조)",
-        "placeholders": {
-            "count": {
-                "content": "$1"
-            }
-        }
-    },
-    "layout_zhuyin": {
-        "message": "주음"
-    },
-    "layout_kana": {
-        "message": "가나"
-    },
-    "layout_hangul": {
-        "message": "한글"
-    },
-    "vk_delete_word_confirm": {
-        "message": "“$1”을(를) 삭제할까요?"
-    },
-    "vk_delete": {
-        "message": "삭제"
-    },
-    "vk_cancel": {
-        "message": "취소"
-    },
-    "vk_candidates_announce": {
-        "message": "후보 $1개"
-    },
-    "vk_alt_characters": {
-        "message": "대체 문자"
-    },
-    "vk_settings": {
-        "message": "설정"
-    },
-    "vk_emoji": {
-        "message": "이모티콘"
-    },
-    "vk_clipboard": {
-        "message": "클립보드"
-    },
-    "vk_clipboard_current": {
-        "message": "현재 클립보드"
-    },
-    "vk_clipboard_paste_short": {
-        "message": "붙여넣기"
-    },
-    "vk_clipboard_loading": {
-        "message": "클립보드를 읽는 중…"
-    },
-    "vk_clipboard_empty": {
-        "message": "클립보드에 텍스트가 없습니다"
-    },
-    "vk_clipboard_unavailable": {
-        "message": "클립보드를 사용할 수 없습니다"
-    },
-    "vk_clipboard_error": {
-        "message": "클립보드를 읽을 수 없습니다"
-    },
-    "vk_clipboard_retry": {
-        "message": "다시 시도"
-    },
-    "vk_clipboard_paste": {
-        "message": "클립보드 텍스트 붙여넣기"
-    },
-    "vk_clipboard_close": {
-        "message": "클립보드 닫기"
-    },
-    "vk_clipboard_delete": {
-        "message": "클립보드 항목 삭제"
-    },
-    "vk_clipboard_delete_error": {
-        "message": "삭제하지 못했습니다. 다시 시도하세요"
-    },
-    "vk_switch_schema": {
-        "message": "스키마 전환"
-    },
-    "vk_prev_page": {
-        "message": "이전 페이지"
-    },
-    "vk_next_page": {
-        "message": "다음 페이지"
-    },
-    "vk_expand_candidates": {
-        "message": "후보 펼치기"
-    },
-    "vk_collapse_candidates": {
-        "message": "후보 접기"
-    },
-    "vk_recent_emoji": {
-        "message": "최근 사용"
-    },
-    "vk_back_to_keyboard": {
-        "message": "키보드로 돌아가기"
-    },
-    "vk_key_shift": {
-        "message": "Shift"
-    },
-    "vk_key_backspace": {
-        "message": "백스페이스"
-    },
-    "vk_key_enter": {
-        "message": "Enter"
-    },
-    "vk_key_space": {
-        "message": "스페이스"
-    },
-    "vk_key_hide": {
-        "message": "키보드 숨기기"
-    },
-    "vk_kbmode_docked": {
-        "message": "키보드 고정"
-    },
-    "vk_kbmode_floating": {
-        "message": "플로팅 키보드"
-    },
-    "vk_kbmode_onehand": {
-        "message": "한 손 키보드"
-    },
-    "vk_resize_keyboard": {
-        "message": "키보드 크기 조절"
-    },
-    "vk_pin_left": {
-        "message": "왼쪽 하단에 고정"
-    },
-    "vk_pin_right": {
-        "message": "오른쪽 하단에 고정"
-    },
-    "vk_exit_onehand": {
-        "message": "한 손 모드 종료"
-    },
-    "vk_key_symbols": {
-        "message": "기호"
-    },
-    "vk_key_more_symbols": {
-        "message": "더 많은 기호"
-    },
-    "vk_key_letters": {
-        "message": "문자"
-    },
-    "vk_key_toggle_language": {
-        "message": "언어 전환"
-    },
-    "vk_emoji_smileys": {
-        "message": "표정"
-    },
-    "vk_emoji_gestures": {
-        "message": "손동작"
-    },
-    "vk_emoji_people": {
-        "message": "인물"
-    },
-    "vk_emoji_hearts": {
-        "message": "하트"
-    },
-    "vk_emoji_animals": {
-        "message": "동물"
-    },
-    "vk_emoji_food": {
-        "message": "음식"
-    },
-    "vk_emoji_activities": {
-        "message": "활동"
-    },
-    "vk_emoji_travel": {
-        "message": "여행"
-    },
-    "vk_emoji_objects": {
-        "message": "사물"
-    },
-    "vk_emoji_symbols": {
-        "message": "기호"
-    },
-    "vk_emoji_flags": {
-        "message": "깃발"
-    },
-    "keyboard_arrangement": {
-        "message": "문자 배열"
-    },
-    "keyboard_arrangement_hint": {
-        "message": "외장 키보드, 화면 키보드, 영문 모드에 모두 적용됩니다."
-    },
-    "keyboard_arrangement_hint_physical": {
-        "message": "외장 키보드와 영문 모드에 적용됩니다."
-    },
-    "keyboard_script_note": {
-        "message": "$1 은(는) 고유한 키를 표시합니다. 문자 배열은 영문 모드에 계속 적용됩니다.",
-        "placeholders": {
-            "schema": {
-                "content": "$1"
-            }
-        }
-    },
-    "vk_keys": {
-        "message": "화면 키"
-    },
-    "layout_letters": {
-        "message": "영문"
+  "extension_name": {
+    "message": "진문운 입력법"
+  },
+  "description": {
+    "message": "ChromeOS 및 FydeOS 용 입력 방식으로, RIME 를 기반으로 FydeOS 팀에서 개발하였습니다."
+  },
+  "input_method_name": {
+    "message": "진문운 입력법"
+  },
+  "setting_page": {
+    "message": "진문운 설정"
+  },
+  "loading_engine": {
+    "message": "RIME 엔진을 로딩 중…"
+  },
+  "candidate_page": {
+    "message": "페이지 $PAGE$",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      }
     }
+  },
+  "candidate_page_last": {
+    "message": "(마지막)"
+  },
+  "rime_engine_logs": {
+    "message": "RIME 엔진 로그"
+  },
+  "rime_engine_not_started": {
+    "message": "시작되지 않음"
+  },
+  "rime_engine_starting": {
+    "message": "시작 중"
+  },
+  "rime_engine_ready": {
+    "message": "준비 완료"
+  },
+  "rime_engine_starting_button": {
+    "message": "RIME 엔진 다시 시작"
+  },
+  "save_settings_and_apply_button": {
+    "message": "저장 및 적용"
+  },
+  "select_schema": {
+    "message": "입력 스키마 선택"
+  },
+  "fetching_schema_list": {
+    "message": "(리스트 새로 고침 중)"
+  },
+  "candidate_count": {
+    "message": "페이지당 후보 수"
+  },
+  "schema_switch_key": {
+    "message": "스키마 전환 단축키"
+  },
+  "schema_switch_key_hint": {
+    "message": "다음 사용 설정된 스키마로 전환합니다."
+  },
+  "schema_switch_key_hint_recording": {
+    "message": "새 키 조합을 누르세요. Esc 키를 누르면 취소됩니다."
+  },
+  "schema_switch_key_hint_disabled": {
+    "message": "단축키가 사용 중지되었습니다. '단축키 설정'을 클릭하고 키 조합을 누르면 다시 사용 설정됩니다."
+  },
+  "schema_switch_key_recording": {
+    "message": "키를 누르세요…"
+  },
+  "schema_switch_key_set": {
+    "message": "단축키 설정"
+  },
+  "schema_switch_key_disable": {
+    "message": "사용 안 함"
+  },
+  "schema_switch_key_reset": {
+    "message": "기본값으로 재설정"
+  },
+  "schema_switch_key_invalid": {
+    "message": "Ctrl 또는 Alt를 포함하거나 기능 키를 사용하세요. Shift나 검색 키만으로는 일반 입력을 방해합니다."
+  },
+  "fuzzy_pinyin": {
+    "message": "모호한 병음"
+  },
+  "settings_changed_snackbar": {
+    "message": "설정이 변경되었습니다."
+  },
+  "error_downloading_schema": {
+    "message": "스키마 다운로드 중 오류 발생: "
+  },
+  "error_removing_schema": {
+    "message": "스키마 제거 중 오류 발생: "
+  },
+  "error_last_schema": {
+    "message": "마지막 스키마는 제거할 수 없습니다. 최소한 하나의 스키마는 유지되어야 합니다."
+  },
+  "error_importing_schema": {
+    "message": "스키마 가져오기 중 오류 발생"
+  },
+  "import_compiled_schema": {
+    "message": "ZIP에서 가져오기"
+  },
+  "import_compiled_schema_hint": {
+    "message": "컴파일된 스키마 가져오기 (.zip 파일)"
+  },
+  "import_predefined_schema_confirm": {
+    "message": "\"$1\" 스키마는 이미 미리 정의된 스키마 목록에 있습니다. 미리 정의된 스키마를 가져오시겠습니까?"
+  },
+  "error_form": {
+    "message": "GitHub 저장소 URL과 Schema Id를 모두 입력해 주세요."
+  },
+  "error_fetch_schema_list": {
+    "message": "스키마 리스트 가져오기 오류:"
+  },
+  "schema_home_page": {
+    "message": "스키마 홈페이지"
+  },
+  "privacy_statement": {
+    "message": "개인정보 보호 정책"
+  },
+  "privacy_statement_url": {
+    "message": "https://fydeos.io/privacy/fyderhythm/"
+  },
+  "edit_rime_config": {
+    "message": "RIME 설정 편집 (고급 사용자 전용)"
+  },
+  "open_source": {
+    "message": "GitHub 에서 보기"
+  },
+  "add_schema": {
+    "message": "추가"
+  },
+  "update_schema": {
+    "message": "업데이트"
+  },
+  "remove_schema": {
+    "message": "삭제"
+  },
+  "enable_schema_hint": {
+    "message": "IME 트레이 메뉴에 이 스키마 표시"
+  },
+  "cannot_edit_this_file": {
+    "message": "텍스트 파일을 선택하세요"
+  },
+  "loading_editor": {
+    "message": "에디터 로딩 중…"
+  },
+  "config_editor_title": {
+    "message": "RIME 설정 에디터"
+  },
+  "remove_schema_confirm_title": {
+    "message": "입력 스키마 제거"
+  },
+  "remove_schema_confirm_body": {
+    "message": "“$SCHEMA$”을(를) 제거하시겠습니까? 스키마 파일이 삭제되며, 다시 사용하려면 다시 다운로드해야 합니다.",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "cancel_button": {
+    "message": "취소"
+  },
+  "download_schema": {
+    "message": "스키마 다운로드"
+  },
+  "decrease_candidate_count": {
+    "message": "후보 수 줄이기"
+  },
+  "increase_candidate_count": {
+    "message": "후보 수 늘리기"
+  },
+  "import_predefined_schema_title": {
+    "message": "사전 정의된 스키마 가져오기"
+  },
+  "import_button": {
+    "message": "가져오기"
+  },
+  "appearance": {
+    "message": "화면 모드"
+  },
+  "theme_light": {
+    "message": "라이트"
+  },
+  "theme_system": {
+    "message": "시스템"
+  },
+  "theme_dark": {
+    "message": "다크"
+  },
+  "dict_pack_section_title": {
+    "message": "사전 팩"
+  },
+  "dict_pack_hint": {
+    "message": ".txt, .tsv, .dict.yaml 파일 또는 Sogou(.scel), Baidu(.bdict/.bcd), QQ 병음(.qpyd/.qcel) 사전 파일을 가져와 사전 팩을 컴파일합니다. 단어 팩과 달리 전방 일치와 가중치 기반 순위를 지원합니다."
+  },
+  "dict_pack_import_button": {
+    "message": "사전 팩 가져오기"
+  },
+  "dict_pack_empty": {
+    "message": "파일에 유효한 항목이 없습니다."
+  },
+  "dict_pack_import_error": {
+    "message": "사전 팩 가져오기 오류: "
+  },
+  "dict_pack_compile_error": {
+    "message": "컴파일 실패: "
+  },
+  "dict_pack_entry_count": {
+    "message": "$COUNT$ 개 항목",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_enabled": {
+    "message": "활성화"
+  },
+  "dict_pack_disabled": {
+    "message": "비활성화"
+  },
+  "dict_pack_remove_button": {
+    "message": "제거"
+  },
+  "dict_pack_empty_list": {
+    "message": "아직 설치된 사전 팩이 없습니다. 파일을 가져오거나 카탈로그에서 설치하세요."
+  },
+  "dict_pack_active_entry_count": {
+    "message": "$COUNT$ 개 항목 활성",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_compiling": {
+    "message": "컴파일 중…"
+  },
+  "dict_pack_duplicates_merged": {
+    "message": "가져온 파일에서 중복 항목 $COUNT$개를 병합했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_import_warning_summary": {
+    "message": "가져오기가 완료되었지만 경고가 $COUNT$개 있습니다:",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "dict_pack_more_warnings": {
+    "message": "…외 $COUNT$개 (전체 목록은 브라우저 콘솔 참조)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "layout_zhuyin": {
+    "message": "주음"
+  },
+  "layout_kana": {
+    "message": "가나"
+  },
+  "layout_hangul": {
+    "message": "한글"
+  },
+  "vk_delete_word_confirm": {
+    "message": "“$1”을(를) 삭제할까요?"
+  },
+  "vk_delete": {
+    "message": "삭제"
+  },
+  "vk_cancel": {
+    "message": "취소"
+  },
+  "vk_candidates_announce": {
+    "message": "후보 $1개"
+  },
+  "vk_alt_characters": {
+    "message": "대체 문자"
+  },
+  "vk_settings": {
+    "message": "설정"
+  },
+  "vk_emoji": {
+    "message": "이모티콘"
+  },
+  "vk_clipboard": {
+    "message": "클립보드"
+  },
+  "vk_clipboard_current": {
+    "message": "현재 클립보드"
+  },
+  "vk_clipboard_paste_short": {
+    "message": "붙여넣기"
+  },
+  "vk_clipboard_loading": {
+    "message": "클립보드를 읽는 중…"
+  },
+  "vk_clipboard_empty": {
+    "message": "클립보드에 텍스트가 없습니다"
+  },
+  "vk_clipboard_unavailable": {
+    "message": "클립보드를 사용할 수 없습니다"
+  },
+  "vk_clipboard_error": {
+    "message": "클립보드를 읽을 수 없습니다"
+  },
+  "vk_clipboard_retry": {
+    "message": "다시 시도"
+  },
+  "vk_clipboard_paste": {
+    "message": "클립보드 텍스트 붙여넣기"
+  },
+  "vk_clipboard_close": {
+    "message": "클립보드 닫기"
+  },
+  "vk_clipboard_delete": {
+    "message": "클립보드 항목 삭제"
+  },
+  "vk_clipboard_delete_error": {
+    "message": "삭제하지 못했습니다. 다시 시도하세요"
+  },
+  "vk_switch_schema": {
+    "message": "스키마 전환"
+  },
+  "vk_prev_page": {
+    "message": "이전 페이지"
+  },
+  "vk_next_page": {
+    "message": "다음 페이지"
+  },
+  "vk_expand_candidates": {
+    "message": "후보 펼치기"
+  },
+  "vk_collapse_candidates": {
+    "message": "후보 접기"
+  },
+  "vk_recent_emoji": {
+    "message": "최근 사용"
+  },
+  "vk_back_to_keyboard": {
+    "message": "키보드로 돌아가기"
+  },
+  "vk_key_shift": {
+    "message": "Shift"
+  },
+  "vk_key_backspace": {
+    "message": "백스페이스"
+  },
+  "vk_key_enter": {
+    "message": "Enter"
+  },
+  "vk_key_space": {
+    "message": "스페이스"
+  },
+  "vk_key_hide": {
+    "message": "키보드 숨기기"
+  },
+  "vk_kbmode_docked": {
+    "message": "키보드 고정"
+  },
+  "vk_kbmode_floating": {
+    "message": "플로팅 키보드"
+  },
+  "vk_kbmode_onehand": {
+    "message": "한 손 키보드"
+  },
+  "vk_resize_keyboard": {
+    "message": "키보드 크기 조절"
+  },
+  "vk_pin_left": {
+    "message": "왼쪽 하단에 고정"
+  },
+  "vk_pin_right": {
+    "message": "오른쪽 하단에 고정"
+  },
+  "vk_exit_onehand": {
+    "message": "한 손 모드 종료"
+  },
+  "vk_key_symbols": {
+    "message": "기호"
+  },
+  "vk_key_more_symbols": {
+    "message": "더 많은 기호"
+  },
+  "vk_key_letters": {
+    "message": "문자"
+  },
+  "vk_key_toggle_language": {
+    "message": "언어 전환"
+  },
+  "vk_emoji_smileys": {
+    "message": "표정"
+  },
+  "vk_emoji_gestures": {
+    "message": "손동작"
+  },
+  "vk_emoji_people": {
+    "message": "인물"
+  },
+  "vk_emoji_hearts": {
+    "message": "하트"
+  },
+  "vk_emoji_animals": {
+    "message": "동물"
+  },
+  "vk_emoji_food": {
+    "message": "음식"
+  },
+  "vk_emoji_activities": {
+    "message": "활동"
+  },
+  "vk_emoji_travel": {
+    "message": "여행"
+  },
+  "vk_emoji_objects": {
+    "message": "사물"
+  },
+  "vk_emoji_symbols": {
+    "message": "기호"
+  },
+  "vk_emoji_flags": {
+    "message": "깃발"
+  },
+  "keyboard_arrangement": {
+    "message": "문자 배열"
+  },
+  "keyboard_arrangement_hint": {
+    "message": "외장 키보드, 화면 키보드, 영문 모드에 모두 적용됩니다."
+  },
+  "keyboard_arrangement_hint_physical": {
+    "message": "외장 키보드와 영문 모드에 적용됩니다."
+  },
+  "keyboard_script_note": {
+    "message": "$1 은(는) 고유한 키를 표시합니다. 문자 배열은 영문 모드에 계속 적용됩니다.",
+    "placeholders": {
+      "schema": {
+        "content": "$1"
+      }
+    }
+  },
+  "vk_keys": {
+    "message": "화면 키"
+  },
+  "layout_letters": {
+    "message": "영문"
+  },
+  "vk_voice_hint": {
+    "message": "말씀해 주세요"
+  },
+  "vk_voice_recording": {
+    "message": "녹음 중"
+  },
+  "vk_voice_connecting": {
+    "message": "연결 중…"
+  },
+  "vk_voice_finalizing": {
+    "message": "정리 중…"
+  },
+  "vk_voice_stop": {
+    "message": "중지"
+  },
+  "vk_voice_consent_title": {
+    "message": "음성 입력"
+  },
+  "vk_voice_consent_body": {
+    "message": "말한 내용은 화산엔진(베이징 바이트댄스) 서버로 전송되어 인식됩니다."
+  },
+  "vk_voice_consent_accept": {
+    "message": "동의하고 시작"
+  },
+  "vk_voice_permission_title": {
+    "message": "마이크 권한이 필요합니다"
+  },
+  "vk_voice_permission_body": {
+    "message": "키보드에서는 권한 창을 표시할 수 없습니다. 설정 페이지에서 음성 입력을 켜고 “방문할 때마다 허용”을 선택해 허용하세요."
+  },
+  "vk_voice_permission_open": {
+    "message": "설정 열기"
+  },
+  "vk_voice_error_microphone": {
+    "message": "마이크를 사용할 수 없습니다"
+  },
+  "vk_voice_error_network": {
+    "message": "연결이 끊겼습니다"
+  },
+  "vk_voice_error_server": {
+    "message": "음성 서비스를 사용할 수 없습니다"
+  },
+  "vk_voice_error_unknown": {
+    "message": "음성 입력에 실패했습니다"
+  },
+  "vk_voice_error_body": {
+    "message": "그동안 키보드로 계속 입력할 수 있습니다."
+  },
+  "vk_voice": {
+    "message": "음성 입력"
+  },
+  "voice_input": {
+    "message": "음성 입력"
+  },
+  "voice_input_desc": {
+    "message": "키보드의 마이크를 눌러 말하면 문자가 바로 입력됩니다. 인식은 화산엔진(바이트댄스)이 처리합니다."
+  },
+  "voice_mic_needed": {
+    "message": "마이크 권한이 아직 없습니다. 스위치를 다시 켜고 창에서 “방문할 때마다 허용”을 선택하세요. “이번만 허용”은 이 페이지를 닫으면 사라집니다."
+  },
+  "voice_mic_denied": {
+    "message": "마이크 권한이 거부되었습니다. 브라우저 사이트 설정에서 허용한 뒤 스위치를 다시 켜세요."
+  },
+  "vk_voice_idle": {
+    "message": "완료"
+  },
+  "vk_voice_again": {
+    "message": "마이크를 눌러 계속하기"
+  },
+  "voice_input_langs": {
+    "message": "표준 중국어와 영어, 그리고 광둥어·상하이어·민난어·쓰촨어 등을 지원합니다."
+  },
+  "voice_mic_choose": {
+    "message": "켜면 브라우저가 마이크 권한을 요청합니다. “방문할 때마다 허용”을 선택하세요."
+  }
 }

@@ -14,7 +14,7 @@ import autoImports from './.wxt/eslint-auto-imports.mjs';
 const sourceFiles = [
   'entrypoints/**/*.{ts,tsx}',
   'lib/**/*.{ts,tsx}',
-  'tests/**/*.ts',
+  'tests/**/*.{ts,tsx}',
   // The audit's check functions are serialized into the browser, so these run
   // half in node and half in the page — they need both sets of globals. (The
   // other scripts/ files declare their own globals and are left alone.)
@@ -145,13 +145,16 @@ export default tseslint.config(
   },
   {
     // Vitest test-quality rules (stray .only, disabled tests, invalid expect).
-    files: ['tests/**/*.ts'],
+    files: ['tests/**/*.{ts,tsx}'],
     ...vitest.configs.recommended,
     rules: {
       ...vitest.configs.recommended.rules,
       // Asserting a discriminant then narrowing with `if (x.kind === ...)` to
       // reach variant fields is a safe TS idiom, not a vacuous conditional.
       'vitest/no-conditional-expect': 'off',
+      // expect(value, message) — the message names the loop iteration that
+      // failed, which assertions inside for-of loops depend on.
+      'vitest/valid-expect': ['error', { maxArgs: 2 }],
     },
   },
   {
