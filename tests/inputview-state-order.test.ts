@@ -57,7 +57,6 @@ describe('InputView state ordering', () => {
     const controller = {
       activeSettings: { schema: 'schema_a', pageSize: 5, algebraList: [] },
       context: null,
-      getAsciiMode: vi.fn(async () => false),
     };
     const posted: Array<{ kind: string; state: { schemaId: string; schemaName: string } }> = [];
     const post = (message: unknown) => posted.push(message as never);
@@ -86,9 +85,45 @@ function fakeController() {
   return {
     activeSettings: { schema: 'schema_a', pageSize: 5, algebraList: [] },
     context: null,
-    getAsciiMode: vi.fn(async () => false),
   };
 }
+
+describe('the fast snapshot and traditional output', () => {
+  it('repeats the engine’s last answer rather than asserting simplified', async () => {
+    // A fast post with the variant absent would route a traditional user's
+    // dictation through the simplified path until refinement lands.
+    const controller = {
+      ...fakeController(),
+      getEngineScriptState: vi.fn(async () => ({ asciiMode: false, zhVariant: 'traditional' as const })),
+    };
+    const posts: { state: { zhVariant?: string } }[] = [];
+    const post = (message: unknown) => posts.push(message as never);
+
+    await postInputViewState(controller as never, post as never);
+    expect(posts.at(-1)!.state.zhVariant).toBe('traditional');
+    const before = posts.length;
+
+    // A reconnect gets a fresh post function; the answer must survive that.
+    const reconnected = (message: unknown) => posts.push(message as never);
+    await postInputViewState(controller as never, reconnected as never);
+    expect(posts.length).toBeGreaterThan(before);
+    expect(posts.slice(before).map(({ state }) => state.zhVariant)).not.toContain(undefined);
+  });
+});
+
+describe('postRefinedInputViewState', () => {
+  it('says nothing when refinement changed nothing', async () => {
+    const controller = fakeController();
+    const posts: unknown[] = [];
+    const post = (message: unknown) => posts.push(message);
+
+    await postRefinedInputViewState(controller as never, post as never);
+    const before = posts.length;
+
+    await postRefinedInputViewState(controller as never, post as never);
+    expect(posts).toHaveLength(before);
+  });
+});
 
 describe('postFieldState', () => {
   it('publishes a field-type change without waiting for the slow reads', async () => {

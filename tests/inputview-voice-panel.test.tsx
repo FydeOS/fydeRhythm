@@ -8,6 +8,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VoicePanel, type VoicePanelProps } from '../entrypoints/inputview/components/VoicePanel';
+import { kDefaultPressTiming } from '../entrypoints/inputview/gestures/press';
 import type { VoiceState } from '../entrypoints/inputview/voice/session';
 
 // setup.ts stubs getMessage to echo the key back, which would make every
@@ -87,8 +88,29 @@ describe('voice panel controls', () => {
 
   it('offers a backspace, the one repair a dictating user needs', () => {
     const handlers = draw({ kind: 'listening', pending: '', level: 0.3 });
-    fireEvent.click(document.querySelectorAll('.kb-voice-side')[1]);
+    const backspace = document.querySelectorAll('.kb-voice-side')[1];
+    // Like the key grid's backspace, it acts on pointer-down, not release.
+    fireEvent.pointerDown(backspace);
+    fireEvent.pointerUp(backspace);
     expect(handlers.onBackspace).toHaveBeenCalledOnce();
+  });
+
+  it('repeats backspace while held, on the key grid’s own timing', () => {
+    vi.useFakeTimers();
+    try {
+      const handlers = draw({ kind: 'listening', pending: '', level: 0.3 });
+      const backspace = document.querySelectorAll('.kb-voice-side')[1];
+      fireEvent.pointerDown(backspace);
+      expect(handlers.onBackspace).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(kDefaultPressTiming.repeatInitialMs + 10 * kDefaultPressTiming.repeatIntervalMs);
+      expect(handlers.onBackspace).toHaveBeenCalledTimes(11);
+      fireEvent.pointerUp(backspace);
+      vi.advanceTimersByTime(1000);
+      expect(handlers.onBackspace).toHaveBeenCalledTimes(11);
+    }
+    finally {
+      vi.useRealTimers();
+    }
   });
 
   it('disables the control while connecting and while finalising', () => {

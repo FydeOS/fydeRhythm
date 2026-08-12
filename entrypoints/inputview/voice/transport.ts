@@ -7,6 +7,8 @@
 // async and sends have to be serialised or packets would race onto the wire out
 // of order.
 
+import type { ZhVariant } from '@/lib/shared-types';
+
 import {
   type AsrResult,
   decodeServerMessage,
@@ -60,20 +62,12 @@ export function buildSessionParams(uid: string, zhVariant?: ZhVariant): unknown 
   };
 }
 
-/** Server-side simplified→traditional conversion. `traditional` is mainland
- *  traditional; `tw` and `hk` use the regional character standards.
- *
- *  Nothing passes this yet, deliberately. The model only ever emits simplified,
- *  so a caller has to decide — and the only correct signal is what Rime is
- *  currently producing: the schema (bopomofo is traditional, luna_pinyin_simp
- *  is simplified) together with its `simplification` switch, which the user can
- *  flip mid-session. Neither reaches the InputView today.
- *
- *  It was briefly wired to the browser UI language. That is a different fact
- *  about a different thing: a zh-CN interface says nothing about whether the
- *  user is typing traditional, so voice output silently disagreed with typed
- *  output. Do not reintroduce that — expose Rime's state instead. */
-export type ZhVariant = 'traditional' | 'tw' | 'hk';
+/** Server-side simplified→traditional conversion. App passes
+ *  `InputViewState.zhVariant`, resolved from the schema's own simplifier
+ *  declarations — the only correct signal. It was briefly wired to the browser
+ *  UI language: a zh-CN interface says nothing about what is being typed, so
+ *  voice output silently disagreed with typed output. Do not reintroduce that. */
+export type { ZhVariant } from '@/lib/shared-types';
 
 /** The handshake headers, as a declarativeNetRequest modifyHeaders rule. */
 export function headerRule(

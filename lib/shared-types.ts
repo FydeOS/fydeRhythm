@@ -107,6 +107,11 @@ export type ScriptId = 'zh' | 'ja' | 'ko';
  *  decimal pad (.-,), `tel` a phone pad (*#+). */
 export type NumericFieldKind = 'number' | 'tel';
 
+/** Server-side output conversion for dictation: `traditional` is generic
+ *  (OpenCC `t`), `tw` and `hk` the regional standards. Matches Volcano's
+ *  `output_zh_variant` values. */
+export type ZhVariant = 'traditional' | 'tw' | 'hk';
+
 /** Everything the InputView needs to render the right keyboard. Sent as one
  *  atomic snapshot so the page never sees layout and ASCII state out of sync. */
 export interface InputViewState {
@@ -126,6 +131,14 @@ export interface InputViewState {
   /** Set when the focused field is numeric — the keyboard renders a
      *  numberpad rather than letters. `null` for ordinary text fields. */
   numericField: NumericFieldKind | null;
+  /** The script Rime is emitting, resolved from the schema's own simplifier
+   *  declarations — never from `RimeStatus.isTraditional`, which keys on an
+   *  option name (`traditional`) that no surveyed schema uses. Absent means
+   *  simplified.
+   *
+   *  Voice text bypasses Rime entirely, so without this it arrives simplified
+   *  into a document the user is otherwise typing in traditional. */
+  zhVariant?: ZhVariant;
   /** Focused field is a password box. Voice input is withheld there: the
    *  transcript would be spoken aloud and uploaded to a third party, and
    *  insertText bypasses the sendKeyEvent path that ADR 0001 records as the

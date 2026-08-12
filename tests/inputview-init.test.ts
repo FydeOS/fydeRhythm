@@ -48,8 +48,8 @@ function fakeController(session: unknown, activeSettings?: object) {
   return {
     session,
     activeSettings,
-    getAsciiMode: () => (session as { getOption?: (name: string) => Promise<boolean> } | null)
-      ?.getOption?.('ascii_mode') ?? Promise.resolve(false),
+    getEngineScriptState: () => (session as { getScriptState?: () => Promise<unknown> } | null)
+      ?.getScriptState?.() ?? Promise.resolve(undefined),
   };
 }
 
@@ -203,7 +203,7 @@ describe('refineInputViewState', () => {
       { id: 'aurora_pinyin', label: '极光拼音' },
     ]);
     const controller = fakeController(
-      { getOption: vi.fn(async () => true) },
+      { getScriptState: vi.fn(async () => ({ asciiMode: true })) },
       { schema: 'aurora_pinyin' },
     );
     const fast = await buildFastInputViewState(controller as never);
@@ -215,7 +215,7 @@ describe('refineInputViewState', () => {
   it('keeps the fast values when the engine/catalog fail or reject', async () => {
     vi.mocked(listEnabledInstalledSchemas).mockImplementation(async () => { throw new Error('fs not ready'); });
     const controller = fakeController(
-      { getOption: vi.fn(async () => { throw new Error('boom'); }) },
+      { getScriptState: vi.fn(async () => { throw new Error('boom'); }) },
       { schema: 'my_custom' },
     );
     const fast = await buildFastInputViewState(controller as never);
@@ -224,8 +224,8 @@ describe('refineInputViewState', () => {
     expect(refined.schemaName).toBe('my_custom');
   });
 
-  it('treats an undefined option value as false', async () => {
-    const controller = fakeController({ getOption: vi.fn(async () => undefined) });
+  it('treats a missing status as false', async () => {
+    const controller = fakeController({ getScriptState: vi.fn(async () => undefined) });
     const fast = await buildFastInputViewState(controller as never);
     expect((await refineInputViewState(controller as never, fast)).asciiMode).toBe(false);
   });
@@ -235,7 +235,7 @@ describe('postInputViewState', () => {
   it('posts the fast snapshot first, then the refined one when it differs', async () => {
     const posted: object[] = [];
     const controller = fakeController(
-      { getOption: vi.fn(async () => true) },
+      { getScriptState: vi.fn(async () => ({ asciiMode: true })) },
       { schema: 'aurora_pinyin' },
     );
     await postInputViewState(controller as never, msg => posted.push(msg));
@@ -256,7 +256,7 @@ describe('postRefinedInputViewState', () => {
   it('posts a single refined snapshot (no stale fast-first flash)', async () => {
     const posted: Array<{ state: { asciiMode: boolean } }> = [];
     const controller = fakeController(
-      { getOption: vi.fn(async () => true) },
+      { getScriptState: vi.fn(async () => ({ asciiMode: true })) },
       { schema: 'aurora_pinyin' },
     );
     await postRefinedInputViewState(controller as never, msg => posted.push(msg as never));

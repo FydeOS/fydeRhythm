@@ -2,6 +2,7 @@ import {
   type BackgroundToInputView,
   type InputViewState,
   type NumericFieldKind,
+  type ZhVariant,
 } from '@/lib/shared-types';
 import {
   guessScriptForSchema,
@@ -30,15 +31,48 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   });
 }
 
-async function readAsciiMode(controller: InputController | undefined): Promise<boolean> {
+/** One engine round-trip answering both asciiMode and the output script;
+ *  undefined when the engine is unavailable or wedged. */
+export async function readEngineScriptState(
+  controller: InputController | undefined,
+): Promise<{ asciiMode: boolean; zhVariant?: ZhVariant } | undefined> {
   try {
-    const read = controller?.getAsciiMode();
-    if (!read) return false;
-    return (await withTimeout(read, 3000)) ?? false;
+    const read = controller?.getEngineScriptState();
+    if (!read) return undefined;
+    return await withTimeout(read, 3000);
   }
   catch {
-    return false;
+    return undefined;
   }
+}
+
+/** The last resolved output script, repeated by snapshots built while the
+ *  engine cannot answer, so they never downgrade dictation to simplified.
+ *  Persisted per browser session because a fresh MV3 worker would otherwise
+ *  forget it exactly when the engine is slowest to answer. */
+let lastZhVariant: ZhVariant | undefined;
+let zhVariantResolved = false;
+const kZhVariantKey = 'inputviewZhVariant';
+
+function zhVariantStore(): chrome.storage.StorageArea | undefined {
+  try {
+    return chrome.storage?.session;
+  }
+  catch {
+    return undefined;
+  }
+}
+
+void zhVariantStore()?.get(kZhVariantKey).then((stored) => {
+  const value = (stored as Record<string, unknown>)[kZhVariantKey];
+  // A live engine answer beats the hydrated one if refinement won the race.
+  if (!zhVariantResolved && typeof value === 'string') lastZhVariant = value as ZhVariant;
+}).catch(() => {});
+
+function rememberZhVariant(variant: ZhVariant | undefined): void {
+  zhVariantResolved = true;
+  lastZhVariant = variant;
+  void zhVariantStore()?.set({ [kZhVariantKey]: variant ?? null })?.catch(() => {});
 }
 
 export async function readInputViewSettings(
@@ -98,9 +132,12 @@ export async function refineInputViewState(
   catch {
     // The Schema id remains a usable label while the VFS is unavailable.
   }
+  const engine = await readEngineScriptState(controller);
+  if (engine) rememberZhVariant(engine.zhVariant);
   return {
     ...base,
-    asciiMode: await readAsciiMode(controller),
+    asciiMode: engine?.asciiMode ?? false,
+    zhVariant: lastZhVariant,
     schemaName,
     script: guessScriptForSchema(base.schemaId, schemaName, base.layout),
     // Re-read: the engine may have finished loading since the fast pass.
@@ -150,6 +187,9 @@ export async function postInputViewState(
   const requestId = beginRequest(post);
   const fast = await buildFastInputViewState(controller);
   if (!isCurrentRequest(post, requestId)) return;
+  // The fast pass does not touch the engine; repeat its last known answer
+  // rather than asserting simplified for the seconds the refinement takes.
+  fast.zhVariant = lastZhVariant;
   lastPosted.set(post, fast);
   post({ kind: 'state', state: fast });
   const refined = await refineInputViewState(controller, fast);
@@ -167,7 +207,9 @@ export async function postRefinedInputViewState(
   const requestId = beginRequest(post);
   const fast = await buildFastInputViewState(controller);
   const refined = await refineInputViewState(controller, fast);
-  if (isCurrentRequest(post, requestId)) {
+  // Option changes re-publish freely, so most refinements change nothing.
+  if (isCurrentRequest(post, requestId)
+    && JSON.stringify(refined) !== JSON.stringify(lastPosted.get(post))) {
     lastPosted.set(post, refined);
     post({ kind: 'state', state: refined });
   }

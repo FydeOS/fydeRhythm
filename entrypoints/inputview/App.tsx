@@ -475,6 +475,9 @@ export default function App() {
       void writeVoiceConsent(true);
     },
     uid: voiceUid,
+    // Match what Rime is producing: voice text bypasses it, so a traditional
+    // document would otherwise get simplified insertions.
+    zhVariant: vk?.zhVariant,
   });
 
   // Settings live in storage.sync, so the options page can turn voice input off

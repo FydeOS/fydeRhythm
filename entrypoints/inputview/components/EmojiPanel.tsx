@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type EmojiDef, kEmojiCategories, skinVariants } from '../emoji/data';
+import { kDefaultPressTiming } from '../gestures/press';
 import { t } from '../i18n';
 import { char, type KeyAction } from '../layouts/types';
 import { AltBubble } from './AltBubble';
@@ -9,7 +10,7 @@ import { BackspaceIcon, ScheduleIcon } from './icons';
 const kRecentsKey = 'emojiRecents';
 const kMaxRecents = 40;
 // Match the letter keys' long-press timing so the gesture feels the same.
-const kLongPressMs = 300; // kDefaultPressTiming.longPressMs — the same gesture
+const kLongPressMs = kDefaultPressTiming.longPressMs;
 // Finger-jitter slop before a held press reads as a scroll (the keys use a
 // similar margin) — leaving the small cell alone must NOT cancel the press.
 const kPressSlopPx = 24;
@@ -168,8 +169,8 @@ function RepeatBackspace({ onBackspace }: { onBackspace: () => void }) {
       onPointerDown={() => {
         onBackspace();
         timer.current = window.setTimeout(() => {
-          interval.current = window.setInterval(onBackspace, 60);
-        }, 300);
+          interval.current = window.setInterval(onBackspace, kDefaultPressTiming.repeatIntervalMs);
+        }, kDefaultPressTiming.repeatInitialMs);
       }}
       onPointerUp={stop}
       onPointerCancel={stop}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+import { kDefaultPressTiming } from '../gestures/press';
 import { t } from '../i18n';
 import { kMaxSessionMs } from '../voice/capture-policy';
 import { formatElapsed, meterBars } from '../voice/panel-model';
@@ -59,16 +60,40 @@ function Card({ icon, title, body, actions }: {
  *  a control that does not visibly react is the whole complaint. The visual
  *  language is the board's — fill, hairline dropped, scale(0.98) — because a
  *  second press language on the same surface reads as a different app. */
-function PressButton({ className, children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function PressButton({ className, onRepeatPress, children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  /** Hold-to-repeat action on the keyboard's backspace timing. Like the key
+   *  grid, a repeating control activates on pointer-down, not release. */
+  onRepeatPress?: () => void;
+}) {
   const [pressed, setPressed] = useState(false);
-  const release = () => setPressed(false);
+  const delay = useRef<number | null>(null);
+  const repeat = useRef<number | null>(null);
+  const clear = () => {
+    if (delay.current !== null) window.clearTimeout(delay.current);
+    if (repeat.current !== null) window.clearInterval(repeat.current);
+    delay.current = null;
+    repeat.current = null;
+  };
+  useEffect(() => clear, []);
+  const release = () => {
+    setPressed(false);
+    clear();
+  };
   return (
     <button
       className={`${className}${pressed ? ' pressed' : ''}`}
-      onPointerDown={() => setPressed(true)}
+      onPointerDown={() => {
+        setPressed(true);
+        if (!onRepeatPress) return;
+        onRepeatPress();
+        delay.current = window.setTimeout(() => {
+          repeat.current = window.setInterval(onRepeatPress, kDefaultPressTiming.repeatIntervalMs);
+        }, kDefaultPressTiming.repeatInitialMs);
+      }}
       onPointerUp={release}
       onPointerCancel={release}
       onPointerLeave={release}
+      onContextMenu={event => event.preventDefault()}
       {...rest}
     >
       {children}
@@ -231,7 +256,7 @@ export function VoicePanel(props: VoicePanelProps) {
           ? <LevelMeter levels={props.levels} />
           : <span className="kb-voice-gap" />}
 
-        <PressButton className="kb-voice-side" aria-label={t('vk_key_backspace')} onClick={props.onBackspace}>
+        <PressButton className="kb-voice-side" aria-label={t('vk_key_backspace')} onRepeatPress={props.onBackspace}>
           <BackspaceOutlineIcon />
         </PressButton>
 

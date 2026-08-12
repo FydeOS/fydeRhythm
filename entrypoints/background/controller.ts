@@ -8,7 +8,8 @@ import {
   injectDictPacksIntoSchema,
 } from '@/lib/dict-packs';
 import { remapPhysicalKey } from '@/lib/latin-remap';
-import { clampCandidateWindow, kDefaultCandidateWindow, type LatinLayoutId, type RimeCandidate } from '@/lib/shared-types';
+import { extractScriptProfile, resolveZhVariant, type ScriptProfile } from '@/lib/schema-script';
+import { clampCandidateWindow, kDefaultCandidateWindow, type LatinLayoutId, type RimeCandidate, type ZhVariant } from '@/lib/shared-types';
 import { getFs, type ImeSettings, kDefaultSettings, matchesSchemaSwitchKey, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type SchemaSwitchKey } from '@/lib/utils';
 
 import { type RimeCandidateIterator, RimeEngine, type RimeSession } from './engine';
@@ -288,6 +289,7 @@ export class InputController extends EventEmitter {
     }
     const enabledDictPacks = await this.listEnabledDictPacks(fs, settings.schema);
     injectDictPacksIntoSchema(schemaConfig, enabledDictPacks);
+    this.scriptProfile = extractScriptProfile(schemaConfig);
     return stringify(schemaConfig);
   }
 
@@ -396,6 +398,11 @@ export class InputController extends EventEmitter {
               if (this.session !== installedSession) return;
               if (name == 'ascii_mode') {
                 this.onToggleLanguageState(val);
+              }
+              else if (this.scriptProfile?.conversions.some(c => c.optionName === name)) {
+                // Only the schema's declared script switches change what the
+                // InputView renders; other options need no re-publish.
+                this.emit('scriptChanged');
               }
               if (name == 'full_shape') {
                 this.fullShape = val;
@@ -1251,6 +1258,25 @@ export class InputController extends EventEmitter {
   async getRimeStatus() {
     return await this.sessionMutex.runExclusive(async () =>
       await this.session?.getStatus());
+  }
+
+  /** The active schema's declared script conversions; set whenever the schema
+   *  config is (re)parsed in loadRimeConfig. */
+  scriptProfile: ScriptProfile | null = null;
+
+  /** Everything a refined InputView snapshot needs from the engine, in one
+   *  mutex acquisition. undefined when there is no live session to ask. */
+  async getEngineScriptState(): Promise<{ asciiMode: boolean; zhVariant?: ZhVariant } | undefined> {
+    const profile = this.scriptProfile;
+    return await this.sessionMutex.runExclusive(async () => {
+      const session = this.session;
+      if (!session) return undefined;
+      const asciiMode = await session.getOption('ascii_mode');
+      const zhVariant = profile
+        ? await resolveZhVariant(profile, name => session.getOption(name))
+        : undefined;
+      return { asciiMode, zhVariant };
+    });
   }
 
   async handleInputViewVisibilityChanged(visible: boolean) {

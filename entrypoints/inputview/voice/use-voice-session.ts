@@ -14,7 +14,7 @@ import { pushLevel } from './panel-model';
 import { micPermission, watchMicPermission } from './permission';
 import type { AsrUtterance } from './protocol';
 import { kIdle, reduce, type VoiceEvent, type VoiceGate, type VoiceState } from './session';
-import { installHeaderRule, newSessionIds, openTransport, removeHeaderRule, type Transport } from './transport';
+import { installHeaderRule, newSessionIds, openTransport, removeHeaderRule, type Transport, type ZhVariant } from './transport';
 
 /** Level samples kept for the meter — one per 200 ms batch, so ~5 s of history. */
 const kLevelHistory = 24;
@@ -34,6 +34,8 @@ export interface VoiceSessionOptions {
   onConsentGiven: () => void;
   /** Stable per-installation id, for Volcano's server-side log filtering. */
   uid: string;
+  /** Set when Rime is emitting traditional Chinese, so voice output matches. */
+  zhVariant?: ZhVariant;
 }
 
 export function useVoiceSession(options: VoiceSessionOptions) {
@@ -174,6 +176,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
 
       transport.current = openTransport({
         uid: optionsRef.current.uid,
+        zhVariant: optionsRef.current.zhVariant,
         headerRuleToken: rule,
         callbacks: {
           onReady: () => {

@@ -39,27 +39,27 @@ describe('voice capture policy', () => {
   });
 
   it('stops after an unbroken silent run reaches the threshold', () => {
-    // 30 silent batches = 3000 ms.
-    const result = run([loud, ...Array.from({ length: 30 }, () => quiet)]);
+    // 45 silent batches = 4500 ms.
+    const result = run([loud, ...Array.from({ length: 45 }, () => quiet)]);
     expect(result.stop).toBe('silence');
-    expect(result.afterBatches).toBe(31);
+    expect(result.afterBatches).toBe(46);
   });
 
-  it('does not stop on a pause shorter than the threshold', () => {
-    // Breath-length pauses either side of speech, none of them long enough.
-    const pause = Array.from({ length: 20 }, () => quiet);
+  it('does not stop on a thinking pause of four seconds', () => {
+    const pause = Array.from({ length: 40 }, () => quiet);
     expect(run([loud, ...pause, loud, ...pause, loud]).stop).toBeNull();
   });
 
   it('resets the silent run when speech resumes', () => {
-    const almost = Array.from({ length: 29 }, () => quiet);
+    const almost = Array.from({ length: 44 }, () => quiet);
     const result = run([...almost, loud, ...almost]);
     expect(result.stop).toBeNull();
-    expect(result.progress.silentMs).toBe(2900);
+    expect(result.progress.silentMs).toBe(4400);
   });
 
   it('treats a batch exactly at the threshold as silence', () => {
-    const result = run(Array.from({ length: 30 }, () => kDefaultPolicy.silenceRms));
+    const threshold = kInitialProgress.noiseFloor * kDefaultPolicy.silenceMargin;
+    const result = run(Array.from({ length: 45 }, () => threshold));
     expect(result.stop).toBe('silence');
   });
 
@@ -73,7 +73,7 @@ describe('voice capture policy', () => {
 
   it('reports timeout rather than silence when both land on the same batch', () => {
     // Ceiling reached by a run of silence that also completes on that batch.
-    const policy: CapturePolicy = { silenceStopMs: 300, maxSessionMs: 300, silenceRms: 0.02 };
+    const policy: CapturePolicy = { ...kDefaultPolicy, silenceStopMs: 300, maxSessionMs: 300 };
     expect(run([quiet, quiet, quiet], policy).stop).toBe('timeout');
   });
 
@@ -85,8 +85,49 @@ describe('voice capture policy', () => {
   });
 
   it('honours a custom policy', () => {
-    const policy: CapturePolicy = { silenceStopMs: 500, maxSessionMs: 10000, silenceRms: 0.5 };
-    // 0.3 counts as silence under this threshold, though it is speech by default.
+    const policy: CapturePolicy = { ...kDefaultPolicy, silenceStopMs: 500, silenceRmsMin: 0.5 };
+    // 0.3 counts as silence under this floor, though it is speech by default.
     expect(run(Array.from({ length: 5 }, () => loud), policy).stop).toBe('silence');
+  });
+});
+
+describe('the adaptive noise floor', () => {
+  const quietTalker = 0.012; // silent under the old fixed 0.02 threshold
+
+  it('keeps hearing a quiet talker for a whole session', () => {
+    // The floor must hold during speech: if it drifted up it would eventually
+    // pull the threshold over this voice and cut the session mid-sentence.
+    const result = run(Array.from({ length: 400 }, () => quietTalker));
+    expect(result.stop).toBeNull();
+    expect(result.progress.noiseFloor).toBe(kInitialProgress.noiseFloor);
+  });
+
+  it('still ends the session when a quiet talker stops talking', () => {
+    const result = run([...Array.from({ length: 20 }, () => quietTalker), ...Array.from({ length: 45 }, () => quiet)]);
+    expect(result.stop).toBe('silence');
+  });
+
+  it('adopts a quieter room instantly, bounded below', () => {
+    let progress = kInitialProgress;
+    progress = advance(progress, batch(0.0008)).progress;
+    expect(progress.noiseFloor).toBe(0.0008);
+    progress = advance(progress, batch(0.0001)).progress;
+    expect(progress.noiseFloor).toBe(kDefaultPolicy.floorMinRms);
+  });
+
+  it('drifts up toward a louder ambient only while silent', () => {
+    // A hum above the seed but below the threshold is ambient, not speech.
+    let progress = kInitialProgress;
+    for (let i = 0; i < 20; i++) progress = advance(progress, batch(0.008)).progress;
+    expect(progress.noiseFloor).toBeGreaterThan(kInitialProgress.noiseFloor);
+    expect(progress.noiseFloor).toBeLessThanOrEqual(0.008);
+  });
+
+  it('never lets the threshold sink below the absolute minimum', () => {
+    // Floor at its lower bound: 0.004 is under the minimum threshold and must
+    // still read as silence rather than speech.
+    let progress = { ...kInitialProgress, noiseFloor: kDefaultPolicy.floorMinRms };
+    progress = advance(progress, batch(0.004)).progress;
+    expect(progress.silentMs).toBe(100);
   });
 });

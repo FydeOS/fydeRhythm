@@ -472,6 +472,7 @@ export default defineBackground({
         };
 
         self.controller.addListener('toggleLanguageState', onStateChanged);
+        self.controller.addListener('scriptChanged', onStateChanged);
         self.controller.addListener('candidatesBack', onCandidatesBack);
         self.controller.addListener('schemaSwitched', onStateChanged);
 
@@ -480,6 +481,7 @@ export default defineBackground({
           inputViewDisconnected = true;
           inputViewPosters.delete(postToPort);
           self.controller.removeListener('toggleLanguageState', onStateChanged);
+          self.controller.removeListener('scriptChanged', onStateChanged);
           self.controller.removeListener('candidatesBack', onCandidatesBack);
           self.controller.removeListener('schemaSwitched', onStateChanged);
           setInputViewConnectionVisible(connection, false);
