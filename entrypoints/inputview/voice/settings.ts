@@ -9,40 +9,26 @@ const kUidKey = 'voiceUid';
 
 export interface VoiceSettings {
   enabled: boolean;
-  consent: boolean;
 }
 
-export const kDefaultVoiceSettings: VoiceSettings = { enabled: false, consent: false };
+export const kDefaultVoiceSettings: VoiceSettings = { enabled: false };
 
 export async function readVoiceSettings(): Promise<VoiceSettings> {
   try {
     const got = await chrome.storage.sync.get(['settings']) as { settings?: ImeSettings };
-    return {
-      enabled: got.settings?.voiceInput ?? false,
-      consent: got.settings?.voiceConsent ?? false,
-    };
+    return { enabled: got.settings?.voiceInput ?? false };
   }
   catch {
     return kDefaultVoiceSettings;
   }
 }
 
-/** Records consent without disturbing the rest of the settings object, which
- *  the options page may be editing at the same time. */
-export async function writeVoiceConsent(consent: boolean): Promise<void> {
-  try {
-    const got = await chrome.storage.sync.get(['settings']) as { settings?: ImeSettings };
-    await chrome.storage.sync.set({ settings: { ...got.settings, voiceConsent: consent } });
-  }
-  catch { /* dev tab — consent lasts for this page only */ }
-}
-
-/** Fires when the options page changes either value. Returns an unsubscribe. */
+/** Fires when the options page changes the switch. Returns an unsubscribe. */
 export function watchVoiceSettings(onChange: (settings: VoiceSettings) => void): () => void {
   const listener = (changes: Record<string, chrome.storage.StorageChange>) => {
     if (!('settings' in changes)) return;
     const next = changes.settings.newValue as ImeSettings | undefined;
-    onChange({ enabled: next?.voiceInput ?? false, consent: next?.voiceConsent ?? false });
+    onChange({ enabled: next?.voiceInput ?? false });
   };
   try {
     chrome.storage.sync.onChanged.addListener(listener);

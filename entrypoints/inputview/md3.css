@@ -1434,7 +1434,7 @@ body {
   cursor: default;
 }
 
-/* ---- voice panel cards (consent, permission, error) ---- */
+/* ---- voice panel cards (permission, error) ---- */
 
 .kb-voice-card {
   flex: 1;
@@ -1462,8 +1462,8 @@ body {
   font-weight: 500;
 }
 
-/* The consent copy is the longest string on the board and the one that must
-   not be skimmed past, so it gets a measure rather than the full width. */
+/* Card copy is the longest text on the board and the one that must not be
+   skimmed past, so it gets a measure rather than the full width. */
 .kb-voice-card-body {
   max-width: 46ch;
   color: var(--kb-on-surface-variant);

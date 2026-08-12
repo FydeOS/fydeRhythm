@@ -4,7 +4,9 @@
 // pressed: a control that does nothing, or produces nonsense, costs more trust
 // than an absent one.
 
+import { kVoiceOffered } from './credentials';
 import { schemaDictatable } from './dictatable-schemas';
+import type { MicPermission } from './permission';
 
 export interface VoiceAvailability {
   /** Credentials exist — the user's stored key or one baked in at build time.
@@ -21,10 +23,14 @@ export interface VoiceAvailability {
   schemaId: string;
   /** Focused field is a password box. */
   passwordField: boolean;
+  /** Only 'denied' hides the button; 'prompt' still reaches a grant. */
+  permission: MicPermission;
 }
 
 export function voiceAvailable(state: VoiceAvailability): boolean {
+  if (!kVoiceOffered) return false;
   if (!state.configured || !state.enabled) return false;
+  if (state.permission === 'denied') return false;
   // Never in a password box: the user would speak their password aloud and the
   // audio would be uploaded to a third party.
   if (state.passwordField) return false;

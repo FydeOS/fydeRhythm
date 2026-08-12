@@ -34,7 +34,6 @@ function draw(state: VoiceState, overrides: Partial<VoicePanelProps> = {}) {
     onStop: vi.fn(),
     onStart: vi.fn(),
     onBackspace: vi.fn(),
-    onConsent: vi.fn(),
     onOpenSettings: vi.fn(),
     onRetry: vi.fn(),
     onBack: vi.fn(),
@@ -244,18 +243,8 @@ describe('voice panel states', () => {
 });
 
 describe('voice panel cards', () => {
-  it('asks for consent before anything else, and names who receives the audio', () => {
-    const handlers = draw({ kind: 'blocked', reason: 'consent' });
-    // Chrome's own prompt covers the microphone, not where the audio goes, so
-    // the recipient has to be named here.
-    expect(screen.getByText(/火山引擎/)).toBeTruthy();
-
-    fireEvent.click(primaryAction());
-    expect(handlers.onConsent).toHaveBeenCalledOnce();
-  });
-
   it('routes a missing grant to the options page, the only place that can prompt', () => {
-    const handlers = draw({ kind: 'blocked', reason: 'permission' });
+    const handlers = draw({ kind: 'blocked' });
     fireEvent.click(primaryAction());
 
     expect(handlers.onOpenSettings).toHaveBeenCalledOnce();
@@ -276,7 +265,7 @@ describe('voice panel cards', () => {
   it('routes a rejected key to the options page instead of a doomed retry', () => {
     const handlers = draw({ kind: 'error', reason: 'auth' });
     expect(screen.getByText('语音服务拒绝了连接')).toBeTruthy();
-    expect(screen.getByText('请在设置页检查 API Key。')).toBeTruthy();
+    expect(screen.getByText('请到设置页检查 API 密钥。')).toBeTruthy();
 
     fireEvent.click(primaryAction());
     expect(handlers.onOpenSettings).toHaveBeenCalledOnce();
@@ -284,22 +273,56 @@ describe('voice panel cards', () => {
     expect(handlers.onRetry).not.toHaveBeenCalled();
   });
 
+  it('sends a signed-in user to sign in again, not to look for a key', () => {
+    // There is no key on the options page for this user to check.
+    const handlers = draw({ kind: 'error', reason: 'auth' }, { source: 'gateway' });
+    expect(screen.getByText('请到设置页重新登录，或改用自己的密钥。')).toBeTruthy();
+    expect(screen.queryByText('请到设置页检查 API 密钥。')).toBeNull();
+
+    fireEvent.click(primaryAction());
+    expect(handlers.onOpenSettings).toHaveBeenCalledOnce();
+  });
+
+  it('calls spent quota what it is, and offers the way out', () => {
+    const handlers = draw({ kind: 'error', reason: 'quota' }, { source: 'gateway' });
+    expect(screen.getByText('语音服务额度已用完')).toBeTruthy();
+    expect(screen.getByText('可到设置页改用自己的密钥。')).toBeTruthy();
+
+    fireEvent.click(primaryAction());
+    expect(handlers.onOpenSettings).toHaveBeenCalledOnce();
+    // Retrying spends another quota reservation to be refused identically.
+    expect(handlers.onRetry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['auth', 'settings'],
+    ['quota', 'settings'],
+    ['microphone', 'retry'],
+    ['network', 'retry'],
+    ['server', 'retry'],
+    ['unknown', 'retry'],
+  ] as const)('offers %s the %s action', (reason, action) => {
+    const handlers = draw({ kind: 'error', reason });
+    fireEvent.click(primaryAction());
+    expect(handlers.onOpenSettings).toHaveBeenCalledTimes(action === 'settings' ? 1 : 0);
+    expect(handlers.onRetry).toHaveBeenCalledTimes(action === 'retry' ? 1 : 0);
+  });
+
   it('names the failure rather than reporting a generic error', () => {
     const seen = new Set<string>();
-    for (const reason of ['microphone', 'network', 'auth', 'server', 'unknown'] as const) {
+    for (const reason of ['microphone', 'network', 'auth', 'quota', 'server', 'unknown'] as const) {
       cleanup();
       draw({ kind: 'error', reason });
       seen.add(document.querySelector('.kb-voice-card-title')?.textContent ?? '');
     }
-    // 'permission' deliberately shares the microphone wording; the other five
+    // 'permission' deliberately shares the microphone wording; the other six
     // must stay distinguishable.
-    expect(seen.size).toBe(5);
+    expect(seen.size).toBe(6);
   });
 
   it('lets every card get back to the keyboard', () => {
     for (const state of [
-      { kind: 'blocked', reason: 'consent' } as const,
-      { kind: 'blocked', reason: 'permission' } as const,
+      { kind: 'blocked' } as const,
       { kind: 'error', reason: 'server' } as const,
     ]) {
       cleanup();

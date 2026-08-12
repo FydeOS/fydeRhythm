@@ -29,13 +29,33 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('reading the key', () => {
   it('reads the stored key, trimmed, on the default plan', async () => {
-    stubLocalStorage({ apiKey: ' user ' });
+    stubLocalStorage({ source: 'own', apiKey: ' user ' });
     const credentials = await load();
     await credentials.hydrateCredentials();
     expect(credentials.readCredentials()).toEqual({
+      mode: 'direct',
       apiKey: 'user',
       resourceId: credentials.kDefaultResourceId,
     });
+  });
+
+  it('uses the source the user chose, not whichever credential is present', async () => {
+    stubLocalStorage({ source: 'gateway', gatewayToken: ' sk-abc ', apiKey: 'volc' });
+    const credentials = await load();
+    await credentials.hydrateCredentials();
+    const expected = credentials.kVoiceOffered
+      ? { mode: 'gateway', token: 'sk-abc' }
+      // No gateway to honour the choice; the own key stands in.
+      : { mode: 'direct', apiKey: 'volc', resourceId: credentials.kDefaultResourceId };
+    expect(credentials.readCredentials()).toEqual(expected);
+  });
+
+  it('starts a fresh install on our own service', async () => {
+    // No key to respect, so the default is the service that needs none.
+    stubLocalStorage();
+    const credentials = await load();
+    const stored = await credentials.readStoredCredentials();
+    expect(stored.source).toBe(credentials.kVoiceOffered ? 'gateway' : 'own');
   });
 
   it('answers null when nothing is stored — no key is ever baked in', async () => {
@@ -46,11 +66,9 @@ describe('reading the key', () => {
   });
 
   it('answers null for a stored key that is only whitespace', async () => {
-    // writeStoredKey removes the entry instead of storing an empty key, so this
-    // guards the value arriving any other way — a hand-edited storage entry, or
-    // a future writer. Without it an empty key reads as configured, and the
-    // keyboard offers a microphone whose handshake cannot succeed.
-    stubLocalStorage({ apiKey: '   ' });
+    // Writing removes the record instead, so this guards the value arriving any
+    // other way; read as configured it offers a microphone that cannot connect.
+    stubLocalStorage({ source: 'own', apiKey: '   ' });
     const credentials = await load();
     await credentials.hydrateCredentials();
     expect(credentials.readCredentials()).toBeNull();
@@ -64,17 +82,20 @@ describe('reading the key', () => {
 });
 
 describe('storing the key', () => {
-  it('trims what it stores', async () => {
-    const { set } = stubLocalStorage();
+  it('keeps what it was not asked to change', async () => {
+    // Otherwise switching back means fetching a token or a key again.
+    const { set } = stubLocalStorage({ source: 'own', apiKey: 'volc', gatewayToken: 'sk-old' });
     const credentials = await load();
-    await credentials.writeStoredKey(' k ');
-    expect(set).toHaveBeenCalledWith({ voiceCredentials: { apiKey: 'k' } });
+    await credentials.writeStoredCredentials({ apiKey: 'volc2' });
+    expect(set).toHaveBeenCalledWith({
+      voiceCredentials: { source: 'own', apiKey: 'volc2', gatewayToken: 'sk-old', gatewayAccount: '' },
+    });
   });
 
-  it('removes the override when the key is emptied', async () => {
-    const { set, remove } = stubLocalStorage();
+  it('drops the record once nothing is left to remember', async () => {
+    const { set, remove } = stubLocalStorage({ source: 'own', apiKey: 'volc' });
     const credentials = await load();
-    await credentials.writeStoredKey('   ');
+    await credentials.writeStoredCredentials({ apiKey: '   ' });
     expect(remove).toHaveBeenCalledWith('voiceCredentials');
     expect(set).not.toHaveBeenCalled();
   });
@@ -88,9 +109,9 @@ describe('watching for changes', () => {
 
     const onChange = vi.fn();
     const unsubscribe = credentials.watchCredentials(onChange);
-    listeners[0]({ voiceCredentials: { newValue: { apiKey: 'user2' } } } as never);
+    listeners[0]({ voiceCredentials: { newValue: { source: 'own', apiKey: 'user2' } } } as never);
     expect(onChange).toHaveBeenCalledOnce();
-    expect(credentials.readCredentials()?.apiKey).toBe('user2');
+    expect(credentials.readCredentials()).toMatchObject({ mode: 'direct', apiKey: 'user2' });
 
     // Removal leaves no key at all.
     listeners[0]({ voiceCredentials: { newValue: undefined } } as never);

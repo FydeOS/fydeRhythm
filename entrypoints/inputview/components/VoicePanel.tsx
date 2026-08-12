@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { kDefaultPressTiming } from '../gestures/press';
 import { t } from '../i18n';
 import { kMaxSessionMs } from '../voice/capture-policy';
+import type { CredentialSource } from '../voice/credentials';
 import { formatElapsed, meterBars } from '../voice/panel-model';
 import type { VoiceErrorReason, VoiceState } from '../voice/session';
 import { BackspaceOutlineIcon, ErrorIcon, KeyboardIcon, MicIcon, SettingsIcon, StopIcon } from './icons';
@@ -15,12 +16,21 @@ const kErrorMessages: Record<VoiceErrorReason, string> = {
   microphone: 'vk_voice_error_microphone',
   network: 'vk_voice_error_network',
   auth: 'vk_voice_error_auth',
+  quota: 'vk_voice_error_quota',
   server: 'vk_voice_error_server',
   unknown: 'vk_voice_error_unknown',
 };
 
+/** A user can replace their own key; ours they can only sign in for again. */
+function refusalBody(reason: VoiceErrorReason, source: CredentialSource): string {
+  if (reason === 'quota') return 'vk_voice_error_quota_body';
+  return source === 'gateway' ? 'vk_voice_error_signin_body' : 'vk_voice_error_auth_body';
+}
+
 export interface VoicePanelProps {
   state: VoiceState;
+  /** Which credential this session used, so a refusal can name the fix. */
+  source?: CredentialSource;
   /** Audio captured so far, from the batches rather than a clock. */
   elapsedMs: number;
   /** Recent batch RMS values, oldest first. */
@@ -32,7 +42,6 @@ export interface VoicePanelProps {
   /** Begin a session — from an idle panel, which is where a finished one
    *  lands. Without it the panel is a dead end after the first dictation. */
   onStart: () => void;
-  onConsent: () => void;
   onOpenSettings: () => void;
   onRetry: () => void;
   onBack: () => void;
@@ -139,26 +148,6 @@ export function VoicePanel(props: VoicePanelProps) {
     </button>
   );
 
-  if (state.kind === 'blocked' && state.reason === 'consent') {
-    return (
-      <div className="kb-voice">
-        <Card
-          icon={<MicIcon />}
-          title={t('vk_voice_consent_title')}
-          body={t('vk_voice_consent_body')}
-          actions={(
-            <>
-              {back}
-              <button className="kb-voice-action primary" onClick={props.onConsent}>
-                {t('vk_voice_consent_accept')}
-              </button>
-            </>
-          )}
-        />
-      </div>
-    );
-  }
-
   if (state.kind === 'blocked') {
     // The keyboard cannot raise Chrome's permission bubble, so the only move
     // available here is to send the user somewhere that can.
@@ -182,19 +171,19 @@ export function VoicePanel(props: VoicePanelProps) {
   }
 
   if (state.kind === 'error') {
-    // A rejected key cannot be fixed from the keyboard, and a retry must fail
-    // the same way — this one card routes to the options page instead.
-    const auth = state.reason === 'auth';
+    // A refusal cannot be fixed from the keyboard, and a retry fails the same
+    // way, so this card routes to the options page instead.
+    const refused = state.reason === 'auth' || state.reason === 'quota';
     return (
       <div className="kb-voice">
         <Card
           icon={<ErrorIcon />}
           title={t(kErrorMessages[state.reason])}
-          body={t(auth ? 'vk_voice_error_auth_body' : 'vk_voice_error_body')}
+          body={t(refused ? refusalBody(state.reason, props.source ?? 'own') : 'vk_voice_error_body')}
           actions={(
             <>
               {back}
-              {auth
+              {refused
                 ? (
                     <button className="kb-voice-action primary" onClick={props.onOpenSettings}>
                       {t('vk_voice_permission_open')}

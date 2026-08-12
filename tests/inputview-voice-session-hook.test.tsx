@@ -64,20 +64,14 @@ const releaseRule = vi.fn();
 let captured: CaptureCallbacks;
 let transportCallbacks: TransportCallbacks;
 
-function setup(consent = true) {
+function setup() {
   const onCommit = vi.fn();
-  const onConsentGiven = vi.fn();
-  const view = renderHook(({ agreed }: { agreed: boolean }) => useVoiceSession({
-    onCommit,
-    consent: agreed,
-    onConsentGiven,
-    uid: 'uid',
-  }), { initialProps: { agreed: consent } });
-  return { ...view, onCommit, onConsentGiven };
+  const view = renderHook(() => useVoiceSession({ onCommit, uid: 'uid' }));
+  return { ...view, onCommit };
 }
 
 beforeEach(() => {
-  vi.mocked(readCredentials).mockReturnValue({ apiKey: 'k', resourceId: 'r' });
+  vi.mocked(readCredentials).mockReturnValue({ mode: 'direct', apiKey: 'k', resourceId: 'r' });
   vi.mocked(micPermission).mockResolvedValue('granted');
   vi.mocked(watchMicPermission).mockReturnValue(() => {});
   vi.mocked(acquireHeaderRule).mockResolvedValue({ release: releaseRule });
@@ -418,16 +412,36 @@ describe('transport failure recovery', () => {
     expect(result.current.state).toMatchObject({ kind: 'listening', pending: '' });
   });
 
-  it('does not retry a rejected key', async () => {
-    // The second handshake fails identically; the fix lives on the options
-    // page, and the silent retry would only double the wait before saying so.
+  it('keeps the source the session started on when options change under it', async () => {
+    // The running transport was handed its credentials at start and never
+    // re-reads them, so the failure card must name that route — not whatever
+    // the options page happens to hold when the card renders.
+    vi.mocked(readCredentials).mockReturnValue({ mode: 'gateway', token: 'sk-1' });
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+    expect(result.current.source).toBe('gateway');
+
+    vi.mocked(readCredentials).mockReturnValue({ mode: 'direct', apiKey: 'k', resourceId: 'r' });
+    act(() => { transportCallbacks.onError('auth', 'close 4401 credential_rejected'); });
+
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'auth' });
+    expect(result.current.source).toBe('gateway');
+
+    // The next session is the one that picks up the change.
+    await settled(() => { result.current.retry(); });
+    expect(result.current.source).toBe('own');
+  });
+
+  it.each(['auth', 'quota'] as const)('does not retry a %s refusal', async (reason) => {
+    // The second attempt is refused identically; the fix lives on the options
+    // page, and a quota retry also spends another reservation to hear it again.
     const { result } = setup();
     await settled(() => { result.current.open(); });
 
-    act(() => { transportCallbacks.onError('auth', 'websocket error'); });
+    act(() => { transportCallbacks.onError(reason, 'websocket error'); });
 
     expect(openTransport).toHaveBeenCalledOnce();
-    expect(result.current.state).toEqual({ kind: 'error', reason: 'auth' });
+    expect(result.current.state).toEqual({ kind: 'error', reason });
   });
 
   it('allows a manual retry after repeated failure and ignores the dead sockets afterward', async () => {
@@ -581,7 +595,7 @@ describe('an unqueryable permission state', () => {
     const { result } = setup();
     await settled(() => { result.current.open(); });
 
-    expect(result.current.state).toEqual({ kind: 'blocked', reason: 'permission' });
+    expect(result.current.state).toEqual({ kind: 'blocked' });
   });
 
   it('reports a genuinely unusable microphone as an error', async () => {
@@ -606,26 +620,10 @@ describe('a known-missing permission', () => {
       const { result, unmount } = setup();
       await settled(() => { result.current.open(); });
 
-      expect(result.current.state).toEqual({ kind: 'blocked', reason: 'permission' });
+      expect(result.current.state).toEqual({ kind: 'blocked' });
       expect(startCapture).not.toHaveBeenCalled();
       unmount();
     }
-  });
-});
-
-describe('consent', () => {
-  it('starts on the first press, without asking again', async () => {
-    // onConsentGiven only schedules the App's state update, so the options ref
-    // still reads consent: false. Starting without saying otherwise shows the
-    // consent card a second time on a user's very first attempt.
-    const { result, onConsentGiven } = setup(false);
-    await settled(() => { result.current.open(); });
-    expect(result.current.state).toEqual({ kind: 'blocked', reason: 'consent' });
-
-    await settled(() => { result.current.consent(); });
-
-    expect(onConsentGiven).toHaveBeenCalledOnce();
-    expect(result.current.state.kind).toBe('listening');
   });
 });
 

@@ -669,10 +669,8 @@ class MockHost implements VkHost {
         return { kind: 'starting' };
       case 'finalizing':
         return { kind: 'finalizing', pending: '最后半句还在整理', stopped: 'silence' };
-      case 'consent':
-        return { kind: 'blocked', reason: 'consent' };
       case 'permission':
-        return { kind: 'blocked', reason: 'permission' };
+        return { kind: 'blocked' };
       case 'error':
         return { kind: 'error', reason: 'network' };
       case 'idle':

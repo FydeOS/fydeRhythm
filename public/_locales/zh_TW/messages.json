@@ -468,20 +468,11 @@
   "vk_voice_stop": {
     "message": "停止"
   },
-  "vk_voice_consent_title": {
-    "message": "語音輸入"
-  },
-  "vk_voice_consent_body": {
-    "message": "你說的話會傳送到火山引擎（北京字節跳動）的伺服器進行辨識。"
-  },
-  "vk_voice_consent_accept": {
-    "message": "同意並開始"
-  },
   "vk_voice_permission_title": {
     "message": "需要麥克風權限"
   },
   "vk_voice_permission_body": {
-    "message": "鍵盤裡顯示不出權限視窗。請到設定頁開啟語音輸入並授權，選擇“每次造訪時允許”。"
+    "message": "要使用語音輸入，請到設定頁開啟並選擇「每次造訪時允許」。"
   },
   "vk_voice_permission_open": {
     "message": "前往設定"
@@ -502,7 +493,16 @@
     "message": "語音服務拒絕了連線"
   },
   "vk_voice_error_auth_body": {
-    "message": "請在設定頁檢查 API Key。"
+    "message": "請到設定頁檢查 API 金鑰。"
+  },
+  "vk_voice_error_signin_body": {
+    "message": "請到設定頁重新登入，或改用自己的金鑰。"
+  },
+  "vk_voice_error_quota": {
+    "message": "語音服務額度已用完"
+  },
+  "vk_voice_error_quota_body": {
+    "message": "可到設定頁改用自己的金鑰。"
   },
   "vk_voice_error_body": {
     "message": "可以先用鍵盤繼續輸入。"
@@ -514,13 +514,16 @@
     "message": "語音輸入"
   },
   "voice_input_desc": {
-    "message": "點鍵盤上的麥克風說話，文字會直接輸入。語音由火山引擎（字節跳動）辨識。"
+    "message": "點擊虛擬鍵盤上的麥克風圖示開始說話，語音將自動轉為文字。"
   },
   "voice_mic_needed": {
-    "message": "還缺麥克風權限。重新開啟開關，並在視窗中選擇“每次造訪時允許”——選“僅這一次”會在本頁關閉後失效。"
+    "message": "要使用語音輸入，請在瀏覽器彈出視窗中選擇「每次造訪時允許」。"
   },
   "voice_mic_denied": {
-    "message": "麥克風權限已遭拒絕。到瀏覽器的網站設定中允許後，再重新開啟開關。"
+    "message": "麥克風權限已被拒絕，請在瀏覽器的網站設定中允許。"
+  },
+  "voice_mic_retry": {
+    "message": "重試"
   },
   "vk_voice_idle": {
     "message": "已結束"
@@ -529,28 +532,37 @@
     "message": "輕觸麥克風繼續"
   },
   "voice_input_langs": {
-    "message": "支援普通話與英語，也支援粵語、上海話、閩南語、四川話等方言。"
-  },
-  "voice_mic_choose": {
-    "message": "開啟時瀏覽器會請求麥克風權限，請選擇“每次造訪時允許”。"
+    "message": "支援國語、英語，以及粵語、上海話、閩南語、四川話等方言。"
   },
   "voice_key_title": {
-    "message": "語音辨識憑證"
+    "message": "語音辨識服務"
   },
   "voice_key_desc": {
-    "message": "使用你自己的火山引擎金鑰。金鑰僅保存在本裝置上，不會同步。"
+    "message": "使用你自己的火山引擎金鑰，僅保存在本裝置。"
+  },
+  "voice_key_source_gateway": {
+    "message": "FydeOS 語音服務"
+  },
+  "voice_key_source_own": {
+    "message": "自己的金鑰"
+  },
+  "voice_key_desc_gateway": {
+    "message": "語音由火山引擎辨識，用量計入你的 FydeOS 帳號。"
+  },
+  "voice_key_signin": {
+    "message": "登入 FydeOS 帳號"
+  },
+  "voice_key_signin_failed": {
+    "message": "登入失敗，請重試。"
+  },
+  "voice_key_signout": {
+    "message": "登出"
   },
   "voice_key_api": {
     "message": "API 金鑰"
   },
   "voice_key_save": {
     "message": "儲存"
-  },
-  "voice_key_using_own": {
-    "message": "正在使用你的金鑰。"
-  },
-  "voice_key_missing": {
-    "message": "填寫火山引擎 API 金鑰後即可啟用語音輸入。"
   },
   "voice_key_checking": {
     "message": "已儲存，正在驗證金鑰…"
@@ -559,12 +571,21 @@
     "message": "金鑰驗證通過。"
   },
   "voice_key_invalid": {
-    "message": "伺服器拒絕了該金鑰，請移除後重新輸入。"
+    "message": "金鑰無效，請移除後重新輸入。"
   },
   "voice_key_unreachable": {
     "message": "已儲存，但無法連線伺服器完成驗證。"
   },
   "voice_key_remove": {
     "message": "移除金鑰"
+  },
+  "voice_key_signed_in_as": {
+    "message": "已登入："
+  },
+  "voice_key_signed_out": {
+    "message": "尚未登入"
+  },
+  "voice_key_signed_in": {
+    "message": "已登入"
   }
 }

@@ -23,6 +23,7 @@ describe.skipIf(!GATEWAY || !TOKEN || !WAV)('gateway integration', () => {
 
     const transport = openTransport({
       uid: 'gateway-integration-test',
+      credentials: { mode: 'gateway', token: TOKEN! },
       callbacks: {
         onReady: () => {},
         onResult: (result, last) => {
@@ -49,7 +50,6 @@ describe.skipIf(!GATEWAY || !TOKEN || !WAV)('gateway integration', () => {
     const final = results.at(-1)!;
     expect(final.last).toBe(true);
     expect(final.text.length).toBeGreaterThan(0);
-    // eslint-disable-next-line no-console
     console.log('gateway integration FINAL TEXT:', final.text);
   }, 60_000);
 });

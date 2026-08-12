@@ -5,7 +5,6 @@ import {
   readVoiceSettings,
   readVoiceUid,
   watchVoiceSettings,
-  writeVoiceConsent,
 } from '../entrypoints/inputview/voice/settings';
 
 type Listener = (changes: Record<string, { newValue?: unknown }>) => void;
@@ -60,30 +59,22 @@ describe('voice settings', () => {
   beforeEach(() => vi.unstubAllGlobals());
 
   it('is off until switched on — dictation never starts uploading by default', () => {
-    expect(kDefaultVoiceSettings).toEqual({ enabled: false, consent: false });
+    expect(kDefaultVoiceSettings).toEqual({ enabled: false });
   });
 
-  it('reads both flags out of the shared settings object', async () => {
-    stubStorage({ settings: { voiceInput: true, voiceConsent: true } });
-    expect(await readVoiceSettings()).toEqual({ enabled: true, consent: true });
+  it('reads the switch out of the shared settings object', async () => {
+    stubStorage({ settings: { voiceInput: true } });
+    expect(await readVoiceSettings()).toEqual({ enabled: true });
   });
 
-  it('treats missing flags as off rather than inheriting anything', async () => {
+  it('treats a missing switch as off rather than inheriting anything', async () => {
     stubStorage({ settings: { schema: 'aurora_pinyin' } });
-    expect(await readVoiceSettings()).toEqual({ enabled: false, consent: false });
+    expect(await readVoiceSettings()).toEqual({ enabled: false });
   });
 
   it('falls back to defaults where chrome.storage is unavailable', async () => {
     stubBrokenStorage();
     expect(await readVoiceSettings()).toEqual(kDefaultVoiceSettings);
-    // Must not throw: a dev tab is a supported way to run this page.
-    await expect(writeVoiceConsent(true)).resolves.toBeUndefined();
-  });
-
-  it('records consent without disturbing the rest of the settings', async () => {
-    const { sync } = stubStorage({ settings: { schema: 'aurora_pinyin', pageSize: 7 } });
-    await writeVoiceConsent(true);
-    expect(sync.settings).toEqual({ schema: 'aurora_pinyin', pageSize: 7, voiceConsent: true });
   });
 
   it('reports a change made by the options page', async () => {
@@ -91,8 +82,8 @@ describe('voice settings', () => {
     const seen: unknown[] = [];
     const stop = watchVoiceSettings(settings => seen.push(settings));
 
-    listeners[0]({ settings: { newValue: { voiceInput: true, voiceConsent: true } } });
-    expect(seen).toEqual([{ enabled: true, consent: true }]);
+    listeners[0]({ settings: { newValue: { voiceInput: true } } });
+    expect(seen).toEqual([{ enabled: true }]);
 
     // An unrelated key must not churn the keyboard's state.
     listeners[0]({ schemaList: { newValue: {} } });
@@ -106,8 +97,8 @@ describe('voice settings', () => {
     const { listeners } = stubStorage({});
     const seen: unknown[] = [];
     watchVoiceSettings(settings => seen.push(settings));
-    listeners[0]({ settings: { newValue: { voiceInput: false, voiceConsent: true } } });
-    expect(seen).toEqual([{ enabled: false, consent: true }]);
+    listeners[0]({ settings: { newValue: { voiceInput: false } } });
+    expect(seen).toEqual([{ enabled: false }]);
   });
 });
 

@@ -468,20 +468,11 @@
   "vk_voice_stop": {
     "message": "Stop"
   },
-  "vk_voice_consent_title": {
-    "message": "Voice input"
-  },
-  "vk_voice_consent_body": {
-    "message": "What you say is sent to Volcano Engine (Beijing ByteDance) servers for recognition."
-  },
-  "vk_voice_consent_accept": {
-    "message": "Agree and start"
-  },
   "vk_voice_permission_title": {
     "message": "Microphone access needed"
   },
   "vk_voice_permission_body": {
-    "message": "The keyboard cannot show a permission prompt. Turn voice input on in settings and allow the microphone there, choosing “Allow on every visit”."
+    "message": "To use voice input, turn it on in settings and choose “Allow on every visit”."
   },
   "vk_voice_permission_open": {
     "message": "Open settings"
@@ -502,7 +493,16 @@
     "message": "Voice service refused the connection"
   },
   "vk_voice_error_auth_body": {
-    "message": "Check your API key on the settings page."
+    "message": "Check your API key in settings."
+  },
+  "vk_voice_error_signin_body": {
+    "message": "Sign in again in settings, or switch to your own key."
+  },
+  "vk_voice_error_quota": {
+    "message": "Speech service quota used up"
+  },
+  "vk_voice_error_quota_body": {
+    "message": "You can switch to your own key in settings."
   },
   "vk_voice_error_body": {
     "message": "You can keep typing in the meantime."
@@ -514,13 +514,16 @@
     "message": "Voice input"
   },
   "voice_input_desc": {
-    "message": "Tap the microphone on the keyboard and speak; the text is entered directly. Recognition is done by Volcano Engine (ByteDance)."
+    "message": "Tap the microphone icon on the on-screen keyboard to start speaking, and your speech is turned into text automatically."
   },
   "voice_mic_needed": {
-    "message": "Microphone access is still missing. Turn the switch on again and choose “Allow on every visit” — “Allow this time” stops working once this page closes."
+    "message": "To use voice input, choose “Allow on every visit” in the browser’s prompt."
   },
   "voice_mic_denied": {
-    "message": "Microphone access was denied. Allow it in the browser’s site settings, then turn the switch on again."
+    "message": "Microphone access was blocked. Please allow it in the browser’s site settings."
+  },
+  "voice_mic_retry": {
+    "message": "Try again"
   },
   "vk_voice_idle": {
     "message": "Finished"
@@ -529,28 +532,37 @@
     "message": "Tap the microphone to continue"
   },
   "voice_input_langs": {
-    "message": "Mandarin and English, plus Cantonese, Shanghainese, Hokkien and Sichuanese."
-  },
-  "voice_mic_choose": {
-    "message": "Turning it on asks the browser for the microphone — choose “Allow on every visit”."
+    "message": "Supports Mandarin and English, plus Cantonese, Shanghainese, Hokkien and Sichuanese."
   },
   "voice_key_title": {
-    "message": "Speech recognition credentials"
+    "message": "Speech recognition service"
   },
   "voice_key_desc": {
-    "message": "Use your own Volcano Engine key. It is kept only on this device and never synced."
+    "message": "Use your own Volcano Engine key. It is kept only on this device."
+  },
+  "voice_key_source_gateway": {
+    "message": "FydeOS speech service"
+  },
+  "voice_key_source_own": {
+    "message": "Your own key"
+  },
+  "voice_key_desc_gateway": {
+    "message": "Recognition is done by Volcano Engine; usage is billed to your FydeOS account."
+  },
+  "voice_key_signin": {
+    "message": "Sign in with FydeOS"
+  },
+  "voice_key_signin_failed": {
+    "message": "Sign-in failed. Please try again."
+  },
+  "voice_key_signout": {
+    "message": "Sign out"
   },
   "voice_key_api": {
     "message": "API key"
   },
   "voice_key_save": {
     "message": "Save"
-  },
-  "voice_key_using_own": {
-    "message": "Using your key."
-  },
-  "voice_key_missing": {
-    "message": "Enter a Volcano Engine API key to enable voice input."
   },
   "voice_key_checking": {
     "message": "Saved — verifying the key…"
@@ -559,12 +571,21 @@
     "message": "Key verified."
   },
   "voice_key_invalid": {
-    "message": "The server rejected this key. Remove it and enter it again."
+    "message": "The key is invalid. Remove it and enter it again."
   },
   "voice_key_unreachable": {
     "message": "Saved, but the server couldn’t be reached to verify the key."
   },
   "voice_key_remove": {
     "message": "Remove key"
+  },
+  "voice_key_signed_in_as": {
+    "message": "Signed in as "
+  },
+  "voice_key_signed_out": {
+    "message": "Not signed in"
+  },
+  "voice_key_signed_in": {
+    "message": "Signed in"
   }
 }

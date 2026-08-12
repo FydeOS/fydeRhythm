@@ -13,17 +13,20 @@ import {
 import {
   acquireHeaderRule,
   buildSessionParams,
+  endpointFor,
   errorReasonFor,
   headerRule,
   type HeaderRuleLease,
+  kEndpoint,
   kEndpointHost,
+  kGatewayEndpoint,
   kHeaderRuleId,
   openTransport,
   type SocketLike,
   type TransportCallbacks,
 } from '../entrypoints/inputview/voice/transport';
 
-const kCredentials = { apiKey: 'api-key', resourceId: 'volc.seedasr.sauc.duration' };
+const kCredentials = { mode: 'direct' as const, apiKey: 'api-key', resourceId: 'volc.seedasr.sauc.duration' };
 
 // Several tests below stub `chrome`, and one replaces `navigator` wholesale and
 // resets the module registry. vitest.config.ts restores mocks but not stubbed
@@ -75,6 +78,7 @@ function harness(
   const transport = openTransport({
     callbacks,
     uid: 'test-uid',
+    credentials: kCredentials,
     headerRuleLease,
     connect: () => socket,
     handshakeTimeoutMs,
@@ -164,6 +168,107 @@ describe('voice header rule', () => {
   it('uses a fixed id so re-registering replaces rather than accumulates', () => {
     expect(rule.id).toBe(kHeaderRuleId);
     expect(headerRule(kCredentials, { requestId: 'other', connectId: 'other' }).id).toBe(kHeaderRuleId);
+  });
+});
+
+describe('a refusal the gateway spelled out', () => {
+  // These arrive AFTER onopen: the gateway upgrades in order to send them.
+  const refuse = async (code: number, reason?: string) => {
+    // A reachable host, so a verdict can only come from the close frame.
+    const { socket, events } = harness(undefined, 0, () => Promise.resolve(true));
+    socket.onopen?.call(null, {});
+    await Promise.resolve();
+    socket.onclose?.call(null, { code, reason });
+    await Promise.resolve();
+    return events.find(event => event.startsWith('error:')) ?? events.join(',');
+  };
+
+  it('takes quota from the reason, which the status cannot express', async () => {
+    // The gateway sends this on 401 and on 403 alike — whichever check caught
+    // it first — so only the reason separates a spent quota from a bad token.
+    expect(await refuse(4401, 'insufficient_quota')).toBe('error:quota:close 4401 insufficient_quota');
+    expect(await refuse(4403, 'insufficient_quota')).toBe('error:quota:close 4403 insufficient_quota');
+  });
+
+  it('reads a rejected credential as one', async () => {
+    expect(await refuse(4401, 'credential_rejected')).toBe('error:auth:close 4401 credential_rejected');
+  });
+
+  it('routes a forbidden account to the same card, not to a retry', async () => {
+    expect(await refuse(4403, 'forbidden')).toBe('error:auth:close 4403 forbidden');
+  });
+
+  it('blames itself for its own faults', async () => {
+    expect(await refuse(4503, 'channel_unavailable')).toBe('error:server:close 4503 channel_unavailable');
+    expect(await refuse(4404, 'model_not_found')).toBe('error:server:close 4404 model_not_found');
+    expect(await refuse(4500, 'internal_error')).toBe('error:server:close 4500 internal_error');
+  });
+
+  it('treats a reason it has never heard of as a retryable server problem', async () => {
+    // The vocabulary is additive on the gateway's side; guessing at a new one
+    // would put words in its mouth.
+    expect(await refuse(4403, 'account_suspended_pending_review')).toBe(
+      'error:server:close 4403 account_suspended_pending_review',
+    );
+  });
+
+  it('falls back to the status when a gateway sends no reason', async () => {
+    expect(await refuse(4401)).toBe('error:auth:close 4401');
+    expect(await refuse(4403)).toBe('error:server:close 4403');
+  });
+
+  // The gateway's whole vocabulary, from middleware.RejectionCode. Copied, not
+  // shared — two repos — so this pins that nothing here is unhandled and that
+  // unknown values fall through. It cannot notice a value the gateway ADDS.
+  const kVocabulary: Array<[string, string]> = [
+    ['insufficient_quota', 'quota'],
+    ['credential_rejected', 'auth'],
+    ['forbidden', 'auth'],
+    ['model_not_found', 'server'],
+    ['channel_unavailable', 'server'],
+    ['upstream_unavailable', 'server'],
+    ['internal_error', 'server'],
+  ];
+
+  it.each(kVocabulary)('lands %s on the %s card', async (reason, expected) => {
+    expect(await refuse(4403, reason)).toBe(`error:${expected}:close 4403 ${reason}`);
+  });
+
+  it('leaves an ordinary close an ordinary close', async () => {
+    const { socket, events } = harness();
+    socket.onopen?.call(null, {});
+    await Promise.resolve();
+    socket.onclose?.call(null, { code: 1000 });
+    await Promise.resolve();
+    expect(events.some(event => event.startsWith('error:'))).toBe(false);
+    expect(events).toContain('closed');
+  });
+});
+
+describe('route selection', () => {
+  const kGatewayCredentials = { mode: 'gateway' as const, token: 'sk-token' };
+
+  it('sends a direct key to Volcano with no subprotocol', () => {
+    // A subprotocol Volcano never offered fails the handshake outright.
+    expect(endpointFor(kCredentials)).toEqual({ url: kEndpoint });
+  });
+
+  it('carries a gateway token in the subprotocol, which is all a page can set', () => {
+    const { url, protocols } = endpointFor(kGatewayCredentials);
+    expect(url).toBe(kGatewayEndpoint);
+    expect(protocols).toEqual(['asr', 'api-key.sk-token']);
+  });
+
+  it('installs no header rule for a gateway session', async () => {
+    // A dynamic rule outlives the handshake that needed it.
+    const updateDynamicRules = vi.fn(async () => {});
+    vi.stubGlobal('chrome', { runtime: { id: 'test-extension-id' }, declarativeNetRequest: { updateDynamicRules } });
+
+    const lease = await acquireHeaderRule(kGatewayCredentials, { requestId: 'a', connectId: 'b' });
+    lease.release();
+    lease.release(); // idempotent, like the real lease
+
+    expect(updateDynamicRules).not.toHaveBeenCalled();
   });
 });
 
@@ -534,6 +639,7 @@ describe('voice transport', () => {
         onClosed: () => {},
       },
       uid: 'test-uid',
+      credentials: kCredentials,
       headerRuleLease: dictation,
       connect: () => dictationSocket,
     });

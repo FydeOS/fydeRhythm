@@ -41,6 +41,9 @@ export const sharedInputComponent = {
 };
 
 export const sharedVite: UserConfig['vite'] = () => ({
+  // Declared, or Vite exposes VITE_* only. FYDE_* now reaches the bundle, so
+  // no secret may be named that way.
+  envPrefix: ['VITE_', 'FYDE_'],
   // `~icons/<set>/<name>` imports compile to inline SVG React components at
   // build time — no runtime dependency or network fetch, so they stay within
   // the extension's strict CSP. Only imported icons are bundled.

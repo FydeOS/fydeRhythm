@@ -54,6 +54,7 @@ const baseState: InputViewState = {
   schemaName: '拼音',
   alphabet: kLuna,
   numericField: null,
+  passwordField: false,
 };
 
 const flush = () => act(async () => { await Promise.resolve(); });

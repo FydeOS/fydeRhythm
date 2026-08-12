@@ -75,9 +75,35 @@ export default createTheme({
             backgroundColor: 'rgba(228, 0, 70, 0.04)',
           },
         }),
-        text: {
-          color: brand,
-        },
+        // `color="inherit"` has to keep meaning inherit.
+        text: ({ ownerState }) => ({
+          color: ownerState.color === 'inherit' ? 'inherit' : brand,
+        }),
+      },
+    },
+    // A segmented control sits next to the buttons above and must read as the
+    // same family: same 12px corner, same type. MUI squares the inner corners
+    // of a group on its own, so only the outer radius is set here.
+    MuiToggleButton: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          'borderRadius': 12,
+          'padding': '8px 20px',
+          'borderColor': theme.vars.palette.divider,
+          'fontSize': '13px',
+          'lineHeight': '22px',
+          'textTransform': 'unset',
+          'fontWeight': 500,
+          'color': theme.vars.palette.text.secondary,
+          'transition': 'background-color 0.2s ease-in-out, color 0.2s ease-in-out',
+          '&.Mui-selected': {
+            'color': theme.vars.palette.text.primary,
+            'backgroundColor': theme.vars.palette.action.selected,
+            '&:hover': {
+              backgroundColor: theme.vars.palette.action.selected,
+            },
+          },
+        }),
       },
     },
     MuiOutlinedInput: {

@@ -3,25 +3,33 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { $$ } from '@/lib/utils';
 
-import { kDefaultResourceId, readStoredKey, writeStoredKey } from '../inputview/voice/credentials';
+import {
+  credentialsFrom,
+  type CredentialSource,
+  kVoiceOffered,
+  readStoredCredentials,
+  type StoredCredentials,
+  writeStoredCredentials,
+} from '../inputview/voice/credentials';
+import { signIn } from '../inputview/voice/signin';
+import { useMicPermission } from '../inputview/voice/use-mic-permission';
 import { type KeyVerdict, verifyCredentials } from '../inputview/voice/verify';
 import styles from './styles.module.less';
 
-type MicState = 'granted' | 'prompt' | 'denied' | 'unknown';
-
-async function queryMic(): Promise<MicState> {
-  if (!navigator.permissions?.query) return 'unknown';
+/** Raises the prompt; the watcher reports the answer. */
+async function request(): Promise<void> {
   try {
-    const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-    return status.state as MicState;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Holding it open would leave the recording indicator on for this tab.
+    stream.getTracks().forEach(track => track.stop());
   }
-  catch {
-    return 'unknown';
-  }
+  catch { /* nothing to read here */ }
 }
 
 /** Voice input's settings, and — more importantly — the only place in this
@@ -32,91 +40,96 @@ async function queryMic(): Promise<MicState> {
  *  to be made from a page that can: this one, which is an ordinary tab. Turning
  *  the switch on is what asks for it, because "enable voice input" is the
  *  intent the user actually has — being sent here to perform a permission
- *  errand is not. */
+ *  errand is not. The switch never waits on the answer: an unanswered bubble
+ *  leaves getUserMedia pending forever, with no rejection and no timeout. */
 export function VoiceSection({ enabled, onChange }: {
   enabled: boolean;
   onChange: (enabled: boolean) => void;
 }) {
-  const [mic, setMic] = useState<MicState>('unknown');
-  const [failed, setFailed] = useState(false);
-  // Enter-once, then locked: after saving, the key is never echoed back into
-  // the page — only its tail, for recognition. Changing it means removing it
-  // and entering a new one, like every service that issues keys.
-  const [key, setKey] = useState<{ present: boolean; tail: string } | null>(null);
+  const mic = useMicPermission();
+  // Both sources at once: switching is then local, with nothing to re-fetch.
+  const [record, setRecord] = useState<StoredCredentials | null>(null);
   const [draft, setDraft] = useState('');
   const [verdict, setVerdict] = useState<KeyVerdict | 'checking' | null>(null);
   // Verification is async and removing one key can be followed immediately by
-  // saving another. Only the newest user action may publish a verdict.
+  // saving another — or by switching source. Only the newest user action may
+  // publish a verdict.
   const verificationRequest = useRef(0);
 
   useEffect(() => {
-    void readStoredKey().then((value) => {
-      const trimmed = value.trim();
-      setKey({ present: trimmed !== '', tail: trimmed.slice(-4) });
-    });
+    void readStoredCredentials().then(setRecord);
   }, []);
 
-  const locked = key?.present === true;
+  const source = record?.source ?? 'own';
+  const field = source === 'gateway' ? 'gatewayToken' : 'apiKey';
+  // Enter-once, then locked: after saving, the credential is never echoed back
+  // into the page — only its tail, for recognition. Changing it means removing
+  // it and entering a new one, like every service that issues keys.
+  const saved = record?.[field] ?? '';
+  const locked = saved !== '';
+
+  const update = async (change: Partial<StoredCredentials>) => {
+    setRecord(current => (current ? { ...current, ...change } : current));
+    await writeStoredCredentials(change);
+  };
+
+  const pick = async (next: CredentialSource) => {
+    if (next === source) return;
+    // The other source's verdict says nothing about this one.
+    ++verificationRequest.current;
+    setVerdict(null);
+    setDraft('');
+    await update({ source: next });
+  };
+
   const save = async () => {
     const trimmed = draft.trim();
     if (!trimmed) return;
     const requestId = ++verificationRequest.current;
-    await writeStoredKey(trimmed);
+    await update({ [field]: trimmed });
     if (requestId !== verificationRequest.current) return;
-    setKey({ present: true, tail: trimmed.slice(-4) });
     setDraft('');
     // Saving is never blocked on the check: a key entered offline still keeps.
     setVerdict('checking');
-    const result = await verifyCredentials({ apiKey: trimmed, resourceId: kDefaultResourceId })
-      .catch((): KeyVerdict => 'unreachable');
+    const credentials = credentialsFrom(source, trimmed);
+    // Null: this source cannot connect in this build, so nothing to blame on
+    // the network.
+    const result = credentials
+      ? await verifyCredentials(credentials).catch((): KeyVerdict => 'unreachable')
+      : 'invalid' as KeyVerdict;
     if (requestId === verificationRequest.current) setVerdict(result);
   };
   const removeKey = async () => {
     const requestId = ++verificationRequest.current;
-    await writeStoredKey('');
+    // Clearing the token clears whose it was: a stale name on the next sign-in
+    // screen would name an account that is no longer connected.
+    await update(source === 'gateway' ? { gatewayToken: '', gatewayAccount: '' } : { apiKey: '' });
     if (requestId !== verificationRequest.current) return;
-    setKey({ present: false, tail: '' });
     setVerdict(null);
   };
 
-  const refresh = useCallback(() => { void queryMic().then(setMic); }, []);
-  useEffect(refresh, [refresh]);
-
-  const request = async () => {
-    setFailed(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // The grant is what was wanted, not the stream; holding it open would
-      // leave the recording indicator on for as long as this tab lives.
-      stream.getTracks().forEach(track => track.stop());
-      refresh();
-      onChange(true);
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInFailed, setSignInFailed] = useState(false);
+  const startSignIn = async () => {
+    setSigningIn(true);
+    setSignInFailed(false);
+    const result = await signIn();
+    setSigningIn(false);
+    // Cancelling is a decision, not an error.
+    if (!result.ok) {
+      setSignInFailed(result.reason === 'failed');
+      return;
     }
-    catch {
-      setFailed(true);
-      refresh();
-      onChange(false);
-    }
+    ++verificationRequest.current;
+    setVerdict(null);
+    // The exchange only succeeds against a live session; no verification needed.
+    await update({ gatewayToken: result.token, gatewayAccount: result.name ?? '' });
   };
 
   const toggle = (next: boolean) => {
-    if (!next) {
-      onChange(false);
-      return;
-    }
-    if (mic === 'granted') {
-      onChange(true);
-      return;
-    }
-    void request();
+    onChange(next);
+    if (next && mic !== 'granted') void request();
   };
-
-  // 'granted' can also mean a one-time grant that dies with this tab, and the
-  // Permissions API cannot tell the two apart. Nothing is said about that here:
-  // the switch being on with no warning IS the success state, and a note about
-  // a future failure is unusable at the moment it would be read. The guidance
-  // lives in the warning below, which appears exactly when it can be acted on.
-  const warn = enabled && mic !== 'granted';
 
   return (
     <div className={styles.formGroup}>
@@ -134,26 +147,29 @@ export function VoiceSection({ enabled, onChange }: {
             <Box sx={{ mt: 0.5, fontSize: '12px', color: 'text.disabled', maxWidth: 560 }}>
               {$$('voice_input_langs')}
             </Box>
-            {/* Before the prompt, not after it fails: "allow this time" stops
-                working the moment this page closes. A denied origin gets no
-                prompt at all, so the advice would be unfollowable there. */}
-            {!enabled && (mic === 'prompt' || mic === 'unknown') && (
-              <Box sx={{ mt: 0.5, fontSize: '12px', color: 'text.disabled', maxWidth: 560 }}>
-                {$$('voice_mic_choose')}
-              </Box>
-            )}
           </Box>
           <Switch
             checked={enabled}
             onChange={event => toggle(event.target.checked)}
-            inputProps={{ 'aria-label': $$('voice_input') }}
+            // MUI 7 drops inputProps, and slotProps replaces the defaults.
+            slotProps={{ input: { 'role': 'switch', 'aria-label': $$('voice_input') } }}
           />
         </Box>
 
-        {(warn || failed) && (
+        {enabled && mic !== 'granted' && (
           <Box sx={{ px: 4, pb: 2.5 }}>
-            <Alert severity={failed || mic === 'denied' ? 'error' : 'warning'}>
-              {failed || mic === 'denied' ? $$('voice_mic_denied') : $$('voice_mic_needed')}
+            {/* No retry once denied: no prompt will ever appear again there. */}
+            <Alert
+              severity={mic === 'denied' ? 'error' : 'warning'}
+              action={mic === 'denied'
+                ? undefined
+                : (
+                    <Button color="inherit" size="small" onClick={() => void request()}>
+                      {$$('voice_mic_retry')}
+                    </Button>
+                  )}
+            >
+              {mic === 'denied' ? $$('voice_mic_denied') : $$('voice_mic_needed')}
             </Alert>
           </Box>
         )}
@@ -169,44 +185,123 @@ export function VoiceSection({ enabled, onChange }: {
                   {$$('voice_key_title')}
                 </Box>
                 <Box sx={{ mt: 0.5, fontSize: '12px', color: 'text.disabled', maxWidth: 560 }}>
-                  {$$('voice_key_desc')}
+                  {source === 'gateway' ? $$('voice_key_desc_gateway') : $$('voice_key_desc')}
                 </Box>
               </Box>
-              {/* Locked and entry states share one geometry: the field keeps its
-              footprint and the action button its place, so saving or removing
-              the key never makes the controls jump. */}
-              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                <TextField
-                  label={$$('voice_key_api')}
-                  variant="filled"
+              {/* A picker with one option is furniture. */}
+              {kVoiceOffered && (
+                <ToggleButtonGroup
+                  exclusive
                   size="small"
-                  type={locked ? 'text' : 'password'}
-                  InputProps={{ readOnly: locked }}
-                  autoComplete="new-password"
-                  spellCheck={false}
-                  value={locked ? `············${key?.tail ?? ''}` : draft}
-                  onChange={event => setDraft(event.target.value)}
-                  sx={{ flex: 1, minWidth: 280 }}
-                />
-                {locked
-                  ? (
-                      <Button variant="outlined" onClick={() => void removeKey()}>
-                        {$$('voice_key_remove')}
-                      </Button>
-                    )
-                  : (
-                      <Button variant="contained" disableElevation disabled={draft.trim() === ''} onClick={() => void save()}>
-                        {$$('voice_key_save')}
-                      </Button>
-                    )}
-              </Box>
-              <Box sx={{ fontSize: '12px', color: 'text.secondary' }}>
-                {verdict === 'checking' && $$('voice_key_checking')}
-                {verdict === 'valid' && $$('voice_key_valid')}
-                {verdict === 'invalid' && $$('voice_key_invalid')}
-                {verdict === 'unreachable' && $$('voice_key_unreachable')}
-                {verdict === null && (locked ? $$('voice_key_using_own') : $$('voice_key_missing'))}
-              </Box>
+                  value={source}
+                  onChange={(_, next: CredentialSource | null) => next && void pick(next)}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  <ToggleButton value="gateway">
+                    {$$('voice_key_source_gateway')}
+                  </ToggleButton>
+                  <ToggleButton value="own">
+                    {$$('voice_key_source_own')}
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              )}
+              {/* Our own service asks for no credential: the token behind it is
+                  ours to fetch, and nobody outside this repo can obtain one. */}
+              {source === 'gateway'
+                ? (
+                    // Same geometry as the key form below: the status fills the
+                    // row and the action keeps the right edge, so the button
+                    // sits in one place whatever the account is called.
+                    <>
+                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                        <Box
+                          // The visible text may be cut short; the tooltip is not.
+                          title={locked ? record?.gatewayAccount : undefined}
+                          sx={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: '13px',
+                            color: 'text.secondary',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {locked
+                            ? (
+                                <>
+                                  {$$('voice_key_signed_in_as')}
+                                  <Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>
+                                    {record?.gatewayAccount || $$('voice_key_signed_in')}
+                                  </Box>
+                                </>
+                              )
+                            : $$('voice_key_signed_out')}
+                        </Box>
+                        {locked
+                          ? (
+                              <Button variant="outlined" onClick={() => void removeKey()}>
+                                {$$('voice_key_signout')}
+                              </Button>
+                            )
+                          : (
+                              <Button
+                                variant="contained"
+                                disableElevation
+                                disabled={signingIn}
+                                onClick={() => void startSignIn()}
+                              >
+                                {$$('voice_key_signin')}
+                              </Button>
+                            )}
+                      </Box>
+                      {/* Below the row, not inside it: an error must not move
+                          the controls it is about. */}
+                      {signInFailed && (
+                        <Box sx={{ fontSize: '12px', color: 'error.main' }}>
+                          {$$('voice_key_signin_failed')}
+                        </Box>
+                      )}
+                    </>
+                  )
+                : (
+                    // Locked and entry states share one geometry: the field keeps
+                    // its footprint and the action button its place, so saving or
+                    // removing the key never makes the controls jump.
+                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <TextField
+                        label={$$('voice_key_api')}
+                        variant="filled"
+                        size="small"
+                        type={locked ? 'text' : 'password'}
+                        InputProps={{ readOnly: locked }}
+                        autoComplete="new-password"
+                        spellCheck={false}
+                        value={locked ? `············${saved.slice(-4)}` : draft}
+                        onChange={event => setDraft(event.target.value)}
+                        sx={{ flex: 1, minWidth: 280 }}
+                      />
+                      {locked
+                        ? (
+                            <Button variant="outlined" onClick={() => void removeKey()}>
+                              {$$('voice_key_remove')}
+                            </Button>
+                          )
+                        : (
+                            <Button variant="contained" disableElevation disabled={draft.trim() === ''} onClick={() => void save()}>
+                              {$$('voice_key_save')}
+                            </Button>
+                          )}
+                    </Box>
+                  )}
+              {verdict !== null && (
+                <Box sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                  {verdict === 'checking' && $$('voice_key_checking')}
+                  {verdict === 'valid' && $$('voice_key_valid')}
+                  {verdict === 'invalid' && $$('voice_key_invalid')}
+                  {verdict === 'unreachable' && $$('voice_key_unreachable')}
+                </Box>
+              )}
             </Box>
           </>
         )}

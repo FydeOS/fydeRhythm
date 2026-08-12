@@ -4,7 +4,7 @@ import { buildHeader, gzip, kCompression, kErrorCode, kMessageType, kSerializati
 import type { SocketLike } from '../entrypoints/inputview/voice/transport';
 import { verifyCredentials } from '../entrypoints/inputview/voice/verify';
 
-const kCredentials = { apiKey: 'k', resourceId: 'r' };
+const kCredentials = { mode: 'direct' as const, apiKey: 'k', resourceId: 'r' };
 
 /** A full-server-response frame carrying the given JSON payload. */
 async function resultFrame(payload: object = {}): Promise<ArrayBuffer> {

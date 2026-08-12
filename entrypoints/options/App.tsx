@@ -30,6 +30,7 @@ import { getInstalledSchemaIds } from '@/lib/schema-install';
 import { kLatinLayoutIds, type LatinLayoutId, type LayoutId } from '@/lib/shared-types';
 import { $$, formatSchemaSwitchKey, getFs, type ImeSettings, interpretRecordingKey, kDefaultSettings, migrateLayoutSettings, resolveKeyboardLayout, resolveSchemaKeys, type SchemaKeys, type SchemaSwitchKey } from '@/lib/utils';
 
+import { kVoiceOffered } from '../inputview/voice/credentials';
 import { DictionaryPacks } from './DictionaryPacks';
 import FileEditorButton from './fileEditor';
 import RimeLogDisplay from './rimeLogDisplay';
@@ -113,9 +114,10 @@ function OptionsPage() {
   // response can overwrite the terminal "Ready" response.
   const engineStatusRequestId = useRef(0);
   const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
-  // Only where a keyboard exists to host the button. The key no longer gates
-  // the section: it is entered inside it.
-  const voiceHosted = Boolean(chrome.runtime.getManifest().input_components?.[0]?.input_view);
+  // Only where a keyboard hosts the button and the build has a service to
+  // reach. The key does not gate it: the key is entered inside.
+  const voiceHosted = kVoiceOffered
+    && Boolean(chrome.runtime.getManifest().input_components?.[0]?.input_view);
   enum SettingsDirtyStatus {
     NotDirty = 0,
     Dirty = 1,

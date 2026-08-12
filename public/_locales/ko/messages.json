@@ -468,20 +468,11 @@
   "vk_voice_stop": {
     "message": "중지"
   },
-  "vk_voice_consent_title": {
-    "message": "음성 입력"
-  },
-  "vk_voice_consent_body": {
-    "message": "말한 내용은 화산엔진(베이징 바이트댄스) 서버로 전송되어 인식됩니다."
-  },
-  "vk_voice_consent_accept": {
-    "message": "동의하고 시작"
-  },
   "vk_voice_permission_title": {
     "message": "마이크 권한이 필요합니다"
   },
   "vk_voice_permission_body": {
-    "message": "키보드에서는 권한 창을 표시할 수 없습니다. 설정 페이지에서 음성 입력을 켜고 “방문할 때마다 허용”을 선택해 허용하세요."
+    "message": "음성 입력을 사용하려면 설정 페이지에서 켜고 “방문할 때마다 허용”을 선택하세요."
   },
   "vk_voice_permission_open": {
     "message": "설정 열기"
@@ -504,6 +495,15 @@
   "vk_voice_error_auth_body": {
     "message": "설정 페이지에서 API 키를 확인해 주세요."
   },
+  "vk_voice_error_signin_body": {
+    "message": "설정 페이지에서 다시 로그인하거나 내 키로 전환하세요."
+  },
+  "vk_voice_error_quota": {
+    "message": "음성 서비스 사용량을 모두 사용했습니다"
+  },
+  "vk_voice_error_quota_body": {
+    "message": "설정 페이지에서 내 키로 전환할 수 있습니다."
+  },
   "vk_voice_error_body": {
     "message": "그동안 키보드로 계속 입력할 수 있습니다."
   },
@@ -514,13 +514,16 @@
     "message": "음성 입력"
   },
   "voice_input_desc": {
-    "message": "키보드의 마이크를 눌러 말하면 문자가 바로 입력됩니다. 인식은 화산엔진(바이트댄스)이 처리합니다."
+    "message": "화상 키보드의 마이크 아이콘을 눌러 말하면 음성이 자동으로 문자로 변환됩니다."
   },
   "voice_mic_needed": {
-    "message": "마이크 권한이 아직 없습니다. 스위치를 다시 켜고 창에서 “방문할 때마다 허용”을 선택하세요. “이번만 허용”은 이 페이지를 닫으면 사라집니다."
+    "message": "음성 입력을 사용하려면 브라우저 알림창에서 “방문할 때마다 허용”을 선택하세요."
   },
   "voice_mic_denied": {
-    "message": "마이크 권한이 거부되었습니다. 브라우저 사이트 설정에서 허용한 뒤 스위치를 다시 켜세요."
+    "message": "마이크 접근이 차단되었습니다. 브라우저의 사이트 설정에서 허용해 주세요."
+  },
+  "voice_mic_retry": {
+    "message": "다시 시도"
   },
   "vk_voice_idle": {
     "message": "완료"
@@ -531,26 +534,35 @@
   "voice_input_langs": {
     "message": "표준 중국어와 영어, 그리고 광둥어·상하이어·민난어·쓰촨어 등을 지원합니다."
   },
-  "voice_mic_choose": {
-    "message": "켜면 브라우저가 마이크 권한을 요청합니다. “방문할 때마다 허용”을 선택하세요."
-  },
   "voice_key_title": {
-    "message": "음성 인식 자격 증명"
+    "message": "음성 인식 서비스"
   },
   "voice_key_desc": {
-    "message": "자신의 Volcano Engine 키를 사용합니다. 키는 이 기기에만 저장되며 동기화되지 않습니다."
+    "message": "자신의 Volcano Engine 키를 사용합니다. 키는 이 기기에만 저장됩니다."
+  },
+  "voice_key_source_gateway": {
+    "message": "FydeOS 음성 서비스"
+  },
+  "voice_key_source_own": {
+    "message": "내 키"
+  },
+  "voice_key_desc_gateway": {
+    "message": "인식은 화산엔진이 처리하며, 사용량은 FydeOS 계정에 청구됩니다."
+  },
+  "voice_key_signin": {
+    "message": "FydeOS 계정으로 로그인"
+  },
+  "voice_key_signin_failed": {
+    "message": "로그인에 실패했습니다. 다시 시도해 주세요."
+  },
+  "voice_key_signout": {
+    "message": "로그아웃"
   },
   "voice_key_api": {
     "message": "API 키"
   },
   "voice_key_save": {
     "message": "저장"
-  },
-  "voice_key_using_own": {
-    "message": "내 키 사용 중."
-  },
-  "voice_key_missing": {
-    "message": "Volcano Engine API 키를 입력하면 음성 입력이 활성화됩니다."
   },
   "voice_key_checking": {
     "message": "저장되었습니다. 키를 확인하는 중…"
@@ -559,12 +571,21 @@
     "message": "키가 확인되었습니다."
   },
   "voice_key_invalid": {
-    "message": "서버가 이 키를 거부했습니다. 제거 후 다시 입력해 주세요."
+    "message": "키가 유효하지 않습니다. 제거 후 다시 입력해 주세요."
   },
   "voice_key_unreachable": {
     "message": "저장되었지만 서버에 연결할 수 없어 확인하지 못했습니다."
   },
   "voice_key_remove": {
     "message": "키 제거"
+  },
+  "voice_key_signed_in_as": {
+    "message": "로그인됨: "
+  },
+  "voice_key_signed_out": {
+    "message": "로그인되지 않음"
+  },
+  "voice_key_signed_in": {
+    "message": "로그인됨"
   }
 }

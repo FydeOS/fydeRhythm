@@ -21,30 +21,28 @@ import {
   type VoiceState,
 } from '../entrypoints/inputview/voice/session';
 
-const kGranted = { consent: true, permission: 'granted' as const };
-
 /** One representative of every state kind. */
 const kStates: Array<[string, VoiceState]> = [
   ['idle', kIdle],
-  ['blocked', { kind: 'blocked', reason: 'consent' }],
+  ['blocked', { kind: 'blocked' }],
   ['starting', { kind: 'starting' }],
   ['listening', { kind: 'listening', pending: '半句', level: 0.4 }],
   ['finalizing', { kind: 'finalizing', pending: '半句', stopped: 'silence' }],
   ['error', { kind: 'error', reason: 'network' }],
 ];
 
-/** Every event kind, with a gate that passes so `open`/`retry`/`prepare` are
+/** Every event kind, with a grant in place so `open`/`retry`/`prepare` are
  *  exercised on their permissive path; the blocked paths are covered below. */
 const kEvents: Array<[string, VoiceEvent]> = [
-  ['prepare', { type: 'prepare', gate: kGranted }],
-  ['open', { type: 'open', gate: kGranted }],
-  ['retry', { type: 'retry', gate: kGranted }],
+  ['prepare', { type: 'prepare', permission: 'granted' }],
+  ['open', { type: 'open', permission: 'granted' }],
+  ['retry', { type: 'retry', permission: 'granted' }],
   ['ready', { type: 'ready' }],
   ['partial', { type: 'partial', pending: '新的' }],
   ['level', { type: 'level', level: 0.9 }],
   ['stop', { type: 'stop', reason: 'silence' }],
   ['final', { type: 'final' }],
-  ['block', { type: 'block', reason: 'permission' }],
+  ['block', { type: 'block' }],
   ['fail', { type: 'fail', reason: 'server' }],
 ];
 
@@ -129,12 +127,9 @@ describe('the reducer over every state and event', () => {
     }
   });
 
-  it('routes a failed gate to a blocked card from anywhere it can start', () => {
-    const denied = { consent: true, permission: 'denied' as const };
-    const noConsent = { consent: false, permission: 'granted' as const };
+  it('routes a missing grant to a blocked card from anywhere it can start', () => {
     for (const type of ['prepare', 'open', 'retry'] as const) {
-      expect(reduce(kIdle, { type, gate: denied })).toEqual({ kind: 'blocked', reason: 'permission' });
-      expect(reduce(kIdle, { type, gate: noConsent })).toEqual({ kind: 'blocked', reason: 'consent' });
+      expect(reduce(kIdle, { type, permission: 'denied' })).toEqual({ kind: 'blocked' });
     }
   });
 
@@ -144,7 +139,7 @@ describe('the reducer over every state and event', () => {
     // open with the UI claiming the session had finished.
     for (const stateName of kActive) {
       const state = kStates.find(([name]) => name === stateName)![1];
-      expect(reduce(state, { type: 'prepare', gate: kGranted })).toBe(state);
+      expect(reduce(state, { type: 'prepare', permission: 'granted' })).toBe(state);
     }
   });
 

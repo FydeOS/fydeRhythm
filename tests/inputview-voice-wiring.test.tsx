@@ -45,7 +45,6 @@ vi.mock('../entrypoints/inputview/voice/use-voice-session', () => ({
       prepare: vi.fn(),
       open: vi.fn(),
       retry: vi.fn(),
-      consent: vi.fn(),
       stop: vi.fn(),
       close: vi.fn(),
     };
@@ -68,6 +67,7 @@ function state(zhVariant?: InputViewState['zhVariant']): InputViewState {
     script: 'zh',
     schemaId: 'aurora_pinyin',
     schemaName: '极光拼音',
+    alphabet: 'abcdefghijklmnopqrstuvwxyz',
     numericField: null,
     passwordField: false,
     zhVariant,

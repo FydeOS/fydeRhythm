@@ -32,7 +32,8 @@ import { tapShift, typeWithShift } from './shift-state';
 import { type FloatingPos, VkContainer } from './vk-container';
 import { voiceAvailable } from './voice/availability';
 import { hydrateCredentials, readCredentials, watchCredentials } from './voice/credentials';
-import { kDefaultVoiceSettings, readVoiceSettings, readVoiceUid, watchVoiceSettings, writeVoiceConsent } from './voice/settings';
+import { kDefaultVoiceSettings, readVoiceSettings, readVoiceUid, watchVoiceSettings } from './voice/settings';
+import { useMicPermission } from './voice/use-mic-permission';
 import { useVoiceSession } from './voice/use-voice-session';
 
 type Popover
@@ -101,6 +102,7 @@ export default function App() {
   const [panel, setPanel] = useState<InputPanel>(null);
   const [voiceSettings, setVoiceSettings] = useState(kDefaultVoiceSettings);
   const [voiceConfigured, setVoiceConfigured] = useState(false);
+  const voicePermission = useMicPermission();
   const [voiceUid, setVoiceUid] = useState('');
   const [clipboardRequest, setClipboardRequest] = useState<Promise<ClipboardReadResult> | null>(null);
   // On a numeric field, the user tapped ABC to see the letter keyboard.
@@ -466,15 +468,11 @@ export default function App() {
     enabled: voiceSettings.enabled,
     schemaId: vk.schemaId,
     passwordField: vk.passwordField,
+    permission: voicePermission,
   }));
 
   const voice = useVoiceSession({
     onCommit: text => host.insertText(text),
-    consent: voiceSettings.consent,
-    onConsentGiven: () => {
-      setVoiceSettings(previous => ({ ...previous, consent: true }));
-      void writeVoiceConsent(true);
-    },
     uid: voiceUid,
     // Match what Rime is producing: voice text bypasses it, so a traditional
     // document would otherwise get simplified insertions.
@@ -664,12 +662,12 @@ export default function App() {
         ) : panel === 'voice' ? (
           <VoicePanel
             state={devVoice ?? voice.state}
+            source={voice.source}
             elapsedMs={devVoice ? kMockElapsedMs : voice.elapsedMs}
             levels={devVoice ? kMockLevels : voice.levels}
             onStop={voice.stop}
             onStart={voice.open}
             onBackspace={() => host.typeStroke({ key: 'Backspace', code: 'Backspace' })}
-            onConsent={voice.consent}
             onOpenSettings={() => { voice.close(); host.openExtensionOptions(); }}
             onRetry={voice.retry}
             onBack={closeVoice}

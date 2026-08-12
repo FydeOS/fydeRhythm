@@ -102,7 +102,6 @@ export const states = [
   { name: 'voice-idle', query: '?voice=idle', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-action-btn' }] },
   { name: 'voice-long', query: '?voice=long', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-transcript' }] },
   { name: 'voice-latin', query: '?voice=latin', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-transcript' }] },
-  { name: 'voice-consent', query: '?voice=consent', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-action.primary' }] },
   { name: 'voice-permission', query: '?voice=permission', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-card-icon' }] },
   { name: 'voice-error', query: '?voice=error', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(4)', expect: '.kb-voice-card-body' }] },
   { name: 'clipboard-loading', query: '?clipboard=loading', rows: 4, steps: [{ sel: '.kb-bar .icon-btn:nth-child(3)', expect: '.kb-clipboard-spinner' }] },

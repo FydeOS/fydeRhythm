@@ -9,11 +9,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { type CaptureHandle, MicPermissionError, startCapture } from './audio';
 import { advanceCommit, type CommitState, kInitialCommit } from './commit-cursor';
-import { readCredentials } from './credentials';
+import { type CredentialSource, readCredentials } from './credentials';
 import { pushLevel } from './panel-model';
 import { micPermission, watchMicPermission } from './permission';
 import type { AsrUtterance } from './protocol';
-import { kIdle, reduce, type VoiceErrorReason, type VoiceEvent, type VoiceGate, type VoiceState } from './session';
+import { kIdle, reduce, type VoiceErrorReason, type VoiceEvent, type VoiceState } from './session';
 import { acquireHeaderRule, type HeaderRuleLease, newSessionIds, openTransport, type Transport, type ZhVariant } from './transport';
 
 /** Level samples kept for the meter — one per 200 ms batch, so ~5 s of history. */
@@ -29,9 +29,6 @@ const kFinalizeTimeoutMs = 5000;
 export interface VoiceSessionOptions {
   /** Insert finalised text into the focused field. */
   onCommit: (text: string) => void;
-  /** Whether the user has agreed to audio leaving the device. */
-  consent: boolean;
-  onConsentGiven: () => void;
   /** Stable per-installation id, for Volcano's server-side log filtering. */
   uid: string;
   /** Set when Rime is emitting traditional Chinese, so voice output matches. */
@@ -42,6 +39,10 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   const [state, setState] = useState<VoiceState>(kIdle);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [levels, setLevels] = useState<number[]>([]);
+  /** The source this session started on. Snapshot, not a live read: a change
+   *  made in options mid-session does not reach the running transport, so a
+   *  failure card must name the route that actually failed. */
+  const [source, setSource] = useState<CredentialSource>('own');
 
   const capture = useRef<CaptureHandle | null>(null);
   const transport = useRef<Transport | null>(null);
@@ -74,17 +75,26 @@ export function useVoiceSession(options: VoiceSessionOptions) {
    *  is awaiting permission or capture when the panel closes goes on to open a
    *  microphone that nothing will ever close. */
   const generation = useRef(0);
-  // Effects read the latest state without re-subscribing to it.
+  /** The dispatched state, authoritative and updated synchronously. Async
+   *  callbacks read it instead of the rendered state so they see the result of
+   *  a dispatch that React has not committed yet. */
   const current = useRef<VoiceState>(kIdle);
   const optionsRef = useRef(options);
-  optionsRef.current = options;
+  // Assigned after commit, never during render: a render React discards would
+  // otherwise leave the ref holding options that were never shown.
+  useEffect(() => {
+    optionsRef.current = options;
+  });
 
   const dispatch = useCallback((event: VoiceEvent) => {
-    setState((previous) => {
-      const next = reduce(previous, event);
-      current.current = next;
-      return next;
-    });
+    // Reduce against the ref, not inside the state updater. An updater must be
+    // pure — React may run it twice or throw its result away, and mutating the
+    // ref in there would record a state that never committed. The ref chains
+    // correctly across dispatches in one batch because it is written here,
+    // synchronously, before the next dispatch can read it.
+    const next = reduce(current.current, event);
+    current.current = next;
+    setState(next);
   }, []);
 
   const teardown = useCallback(() => {
@@ -108,23 +118,20 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     dispatch({ type: 'close' });
   }, [dispatch, teardown]);
 
-  const start = useCallback(async (granted?: Partial<VoiceGate>) => {
+  const start = useCallback(async () => {
     const credentials = readCredentials();
     if (!credentials) return;
+    setSource(credentials.mode === 'gateway' ? 'gateway' : 'own');
     committed.current = 0;
 
     // Everything below awaits, and the panel can close during any of it.
     const mine = ++generation.current;
     const current$ = () => generation.current === mine;
 
-    const gate: VoiceGate = {
-      consent: optionsRef.current.consent,
-      permission: await micPermission(),
-      ...granted,
-    };
+    const permission = await micPermission();
     if (!current$()) return;
-    dispatch({ type: 'open', gate });
-    if (!gate.consent || (gate.permission !== 'granted' && gate.permission !== 'unknown')) return;
+    dispatch({ type: 'open', permission });
+    if (permission !== 'granted' && permission !== 'unknown') return;
 
     let rule: HeaderRuleLease | undefined;
     try {
@@ -193,7 +200,9 @@ export function useVoiceSession(options: VoiceSessionOptions) {
         // zero and commit the same sentences again. A rejected key is never
         // retried: the second handshake fails identically, and the fix lives
         // on the options page.
-        if (reason !== 'auth' && retryablePhase && committed.current === 0 && retried.current === 0) {
+        // A retry only spends another quota reservation to be refused again.
+        const refused = reason === 'auth' || reason === 'quota';
+        if (!refused && retryablePhase && committed.current === 0 && retried.current === 0) {
           retried.current = 1;
           void start();
           return;
@@ -203,6 +212,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
 
       transport.current = openTransport({
         uid: optionsRef.current.uid,
+        credentials,
         zhVariant: optionsRef.current.zhVariant,
         headerRuleLease: rule,
         callbacks: {
@@ -259,7 +269,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
       // a broken device and a retry would fail identically. It routes to the
       // options page — the only place that can actually ask.
       if (error instanceof MicPermissionError) {
-        dispatch({ type: 'block', reason: 'permission' });
+        dispatch({ type: 'block' });
         return;
       }
       // NotFoundError, NotReadableError, AbortError: the microphone really is
@@ -276,23 +286,12 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     void capture.current?.stop();
   }, []);
 
-  /** Panel opened: surface a missing consent or grant straight away, but do not
-   *  touch the microphone until the user asks for it. */
+  /** Panel opened: surface a missing grant straight away, but do not touch the
+   *  microphone until the user asks for it. */
   const prepare = useCallback(async () => {
     if (!readCredentials()) return;
-    dispatch({
-      type: 'prepare',
-      gate: { consent: optionsRef.current.consent, permission: await micPermission() },
-    });
+    dispatch({ type: 'prepare', permission: await micPermission() });
   }, [dispatch]);
-
-  const consent = useCallback(() => {
-    optionsRef.current.onConsentGiven();
-    // The App's state update is scheduled, not applied, so optionsRef still
-    // holds consent: false — starting without saying so would show the consent
-    // card again and cost the user a second tap on their very first use.
-    void start({ consent: true });
-  }, [start]);
 
   // A server that never answers must not strand the panel in "finishing up".
   useEffect(() => {
@@ -330,12 +329,12 @@ export function useVoiceSession(options: VoiceSessionOptions) {
 
   return {
     state,
+    source,
     elapsedMs,
     levels,
     prepare: () => { void prepare(); },
     open: () => { retried.current = 0; void start(); },
     retry: () => { retried.current = 0; void start(); },
-    consent,
     stop,
     close,
   };

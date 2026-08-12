@@ -1,14 +1,12 @@
 // The voice panel's state machine.
 //
 // A reducer rather than a tangle of flags because the important properties are
-// about what CANNOT happen: reaching `listening` without both consent and a
-// microphone grant, and staying in `listening` after the keyboard is gone.
-// Both are one line here and would be scattered assertions otherwise.
+// about what CANNOT happen: reaching `listening` without a microphone grant,
+// and staying in `listening` after the keyboard is gone. Both are one line
+// here and would be scattered assertions otherwise.
 
 import type { CaptureEnd } from './audio';
 import type { MicPermission } from './permission';
-
-export type VoiceBlock = 'consent' | 'permission';
 
 /** No 'permission' member, deliberately: a permission problem is recoverable
  *  and has its own card, so routing it here would offer a retry of something
@@ -20,13 +18,17 @@ export type VoiceErrorReason
    *  not the connection. Only a pre-open death may carry this — authentication
    *  happens once, in the handshake, so later failures are never the key's. */
     | 'auth'
+  /** Accepted, then refused service: the gateway's quota is spent. Nothing is
+   *  wrong with the credential, and a retry cannot help. */
+    | 'quota'
     | 'server'
     | 'unknown';
 
 export type VoiceState
   = | { kind: 'idle' }
-  /** Nothing can start; the panel shows a card that routes to the options page. */
-    | { kind: 'blocked'; reason: VoiceBlock }
+  /** No microphone grant, so nothing can start; the panel shows a card that
+   *  routes to the options page, the only place that can ask for one. */
+    | { kind: 'blocked' }
   /** Acquiring the microphone and opening the socket. */
     | { kind: 'starting' }
     | { kind: 'listening'; pending: string; level: number }
@@ -36,17 +38,12 @@ export type VoiceState
 
 export const kIdle: VoiceState = { kind: 'idle' };
 
-export interface VoiceGate {
-  consent: boolean;
-  permission: MicPermission;
-}
-
 export type VoiceEvent
   /** The panel opened. Shows a blocker if there is one; otherwise waits. */
-  = | { type: 'prepare'; gate: VoiceGate }
+  = | { type: 'prepare'; permission: MicPermission }
   /** Begin recording now. */
-    | { type: 'open'; gate: VoiceGate }
-    | { type: 'retry'; gate: VoiceGate }
+    | { type: 'open'; permission: MicPermission }
+    | { type: 'retry'; permission: MicPermission }
   /** Microphone and socket are both up. */
     | { type: 'ready' }
     | { type: 'partial'; pending: string }
@@ -54,21 +51,15 @@ export type VoiceEvent
   /** A recoverable obstacle discovered after the session started — the
    *  microphone prompt was raised into a window that cannot show it, so it was
    *  dismissed unseen. The user needs the settings route, not a retry. */
-    | { type: 'block'; reason: VoiceBlock }
+    | { type: 'block' }
     | { type: 'stop'; reason: CaptureEnd }
     | { type: 'final' }
     | { type: 'fail'; reason: VoiceErrorReason }
   /** Panel closed, keyboard dismissed, page hidden. */
     | { type: 'close' };
 
-/** Consent is asked before the permission card because it is the one that
- *  explains why a microphone is wanted at all; sending someone to Chrome's
- *  settings first would be asking them to grant something unexplained. */
-function gateOf(gate: VoiceGate): VoiceState {
-  if (!gate.consent) return { kind: 'blocked', reason: 'consent' };
-  if (gate.permission !== 'granted' && gate.permission !== 'unknown') {
-    return { kind: 'blocked', reason: 'permission' };
-  }
+function gateOf(permission: MicPermission): VoiceState {
+  if (permission !== 'granted' && permission !== 'unknown') return { kind: 'blocked' };
   return { kind: 'starting' };
 }
 
@@ -93,13 +84,13 @@ export function reduce(state: VoiceState, event: VoiceEvent): VoiceState {
       // to idle while the microphone stayed open, since only teardown stops
       // capture — a state the panel would render as "finished" while recording.
       if (isActive(state)) return state;
-      const gated = gateOf(event.gate);
+      const gated = gateOf(event.permission);
       return gated.kind === 'blocked' ? gated : kIdle;
     }
 
     case 'open':
     case 'retry':
-      return gateOf(event.gate);
+      return gateOf(event.permission);
 
     case 'ready':
       // Only a session that is starting can begin listening. A late 'ready'
@@ -126,7 +117,7 @@ export function reduce(state: VoiceState, event: VoiceEvent): VoiceState {
       return state.kind === 'finalizing' ? kIdle : state;
 
     case 'block':
-      return isActive(state) ? { kind: 'blocked', reason: event.reason } : state;
+      return isActive(state) ? { kind: 'blocked' } : state;
 
     case 'fail':
       return isActive(state) ? { kind: 'error', reason: event.reason } : state;

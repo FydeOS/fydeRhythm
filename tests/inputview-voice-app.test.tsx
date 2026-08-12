@@ -43,13 +43,14 @@ vi.mock('../entrypoints/inputview/chrome-shim', () => ({
 // A build with a key: the microphone is otherwise never offered, and these
 // tests are about the other three conditions.
 vi.mock('../entrypoints/inputview/voice/credentials', () => ({
+  kVoiceOffered: true,
   readCredentials: () => ({ apiKey: 'k', resourceId: 'r' }),
   hydrateCredentials: async () => {},
   watchCredentials: () => () => {},
 }));
 vi.mock('../entrypoints/inputview/voice/settings', async original => ({
   ...(await original<object>()),
-  readVoiceSettings: () => Promise.resolve({ enabled: true, consent: true }),
+  readVoiceSettings: () => Promise.resolve({ enabled: true }),
   readVoiceUid: () => Promise.resolve('uid'),
   watchVoiceSettings: () => () => {},
 }));
@@ -64,6 +65,7 @@ function state(overrides: Partial<InputViewState> = {}): InputViewState {
     script: 'zh',
     schemaId: 'aurora_pinyin',
     schemaName: '极光拼音',
+    alphabet: 'abcdefghijklmnopqrstuvwxyz',
     numericField: null,
     passwordField: false,
     ...overrides,

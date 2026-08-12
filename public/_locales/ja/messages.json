@@ -468,20 +468,11 @@
   "vk_voice_stop": {
     "message": "停止"
   },
-  "vk_voice_consent_title": {
-    "message": "音声入力"
-  },
-  "vk_voice_consent_body": {
-    "message": "話した内容は火山引擎（北京字節跳動）のサーバーに送信されて認識されます。"
-  },
-  "vk_voice_consent_accept": {
-    "message": "同意して開始"
-  },
   "vk_voice_permission_title": {
     "message": "マイクの許可が必要です"
   },
   "vk_voice_permission_body": {
-    "message": "キーボードでは許可ダイアログを表示できません。設定ページで音声入力をオンにし、「毎回許可する」を選んで許可してください。"
+    "message": "音声入力を使うには、設定ページでオンにし、「アクセスを許可する」を選んでください。"
   },
   "vk_voice_permission_open": {
     "message": "設定を開く"
@@ -502,7 +493,16 @@
     "message": "音声サービスが接続を拒否しました"
   },
   "vk_voice_error_auth_body": {
-    "message": "設定ページで API キーをご確認ください。"
+    "message": "設定ページで API キーを確認してください。"
+  },
+  "vk_voice_error_signin_body": {
+    "message": "設定ページで再度ログインするか、自分のキーに切り替えてください。"
+  },
+  "vk_voice_error_quota": {
+    "message": "音声サービスの利用量を使い切りました"
+  },
+  "vk_voice_error_quota_body": {
+    "message": "設定ページで自分のキーに切り替えられます。"
   },
   "vk_voice_error_body": {
     "message": "キーボードでの入力は続けられます。"
@@ -514,13 +514,16 @@
     "message": "音声入力"
   },
   "voice_input_desc": {
-    "message": "キーボードのマイクをタップして話すと、文字がそのまま入力されます。認識は火山引擎（字節跳動）が行います。"
+    "message": "画面キーボードのマイクアイコンをタップして話すと、音声が自動で文字になります。"
   },
   "voice_mic_needed": {
-    "message": "マイクの許可がまだありません。スイッチをもう一度オンにし、ダイアログで「毎回許可する」を選んでください。「今回のみ許可」はこのページを閉じると無効になります。"
+    "message": "音声入力を使うには、ブラウザーのダイアログで「アクセスを許可する」を選んでください。"
   },
   "voice_mic_denied": {
-    "message": "マイクの使用が拒否されました。ブラウザのサイト設定で許可してから、スイッチをオンにしてください。"
+    "message": "マイクへのアクセスがブロックされています。ブラウザーのサイト設定で許可してください。"
+  },
+  "voice_mic_retry": {
+    "message": "再試行"
   },
   "vk_voice_idle": {
     "message": "終了"
@@ -531,26 +534,35 @@
   "voice_input_langs": {
     "message": "中国語（普通話）と英語のほか、広東語・上海語・閩南語・四川語などに対応します。"
   },
-  "voice_mic_choose": {
-    "message": "オンにするとブラウザがマイクの許可を求めます。「毎回許可する」を選んでください。"
-  },
   "voice_key_title": {
-    "message": "音声認識の資格情報"
+    "message": "音声認識サービス"
   },
   "voice_key_desc": {
-    "message": "自分の Volcano Engine キーを使用します。キーはこの端末にのみ保存され、同期されません。"
+    "message": "自分の Volcano Engine キーを使用します。キーはこの端末にのみ保存されます。"
+  },
+  "voice_key_source_gateway": {
+    "message": "FydeOS 音声サービス"
+  },
+  "voice_key_source_own": {
+    "message": "自分のキー"
+  },
+  "voice_key_desc_gateway": {
+    "message": "認識は火山引擎が行い、使用量は FydeOS アカウントに記録されます。"
+  },
+  "voice_key_signin": {
+    "message": "FydeOS アカウントでログイン"
+  },
+  "voice_key_signin_failed": {
+    "message": "ログインに失敗しました。もう一度お試しください。"
+  },
+  "voice_key_signout": {
+    "message": "ログアウト"
   },
   "voice_key_api": {
     "message": "API キー"
   },
   "voice_key_save": {
     "message": "保存"
-  },
-  "voice_key_using_own": {
-    "message": "あなたのキーを使用中。"
-  },
-  "voice_key_missing": {
-    "message": "Volcano Engine の API キーを入力すると音声入力が有効になります。"
   },
   "voice_key_checking": {
     "message": "保存しました。キーを確認しています…"
@@ -559,12 +571,21 @@
     "message": "キーを確認できました。"
   },
   "voice_key_invalid": {
-    "message": "サーバーがこのキーを拒否しました。削除してから入力し直してください。"
+    "message": "キーが無効です。削除してから入力し直してください。"
   },
   "voice_key_unreachable": {
     "message": "保存しましたが、サーバーに接続できず確認できませんでした。"
   },
   "voice_key_remove": {
     "message": "キーを削除"
+  },
+  "voice_key_signed_in_as": {
+    "message": "ログイン中："
+  },
+  "voice_key_signed_out": {
+    "message": "未ログイン"
+  },
+  "voice_key_signed_in": {
+    "message": "ログイン済み"
   }
 }

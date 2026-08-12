@@ -11,6 +11,7 @@ export default defineConfig({
       '@': fileURLToPath(new URL('.', import.meta.url)),
     },
   },
+  envPrefix: ['VITE_', 'FYDE_'],
   test: {
     environment: 'node',
     // Component tests are .tsx and opt into jsdom with a per-file

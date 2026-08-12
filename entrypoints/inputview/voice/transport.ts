@@ -8,6 +8,7 @@
 // of order.
 
 import type { ZhVariant } from '@/lib/shared-types';
+import { kDefaultGateway } from '@/lib/voice-build';
 
 import {
   type AsrResult,
@@ -36,6 +37,22 @@ export interface VolcanoCredentials {
   apiKey: string;
   /** e.g. volc.seedasr.sauc.duration — picks the model and the billing plan. */
   resourceId: string;
+}
+
+/** Our gateway, which holds the Volcano key server-side. */
+export const kGatewayEndpoint: string = import.meta.env.FYDE_ASR_GATEWAY ?? kDefaultGateway;
+
+/** The gateway by default; a user's own key talks to Volcano directly. */
+export type VoiceCredentials
+  = | { mode: 'gateway'; token: string }
+    | ({ mode: 'direct' } & VolcanoCredentials);
+
+/** A browser WebSocket cannot set headers, so the direct route borrows
+ *  declarativeNetRequest while the gateway reads the subprotocol — the one part
+ *  of the handshake a page controls. */
+export function endpointFor(credentials: VoiceCredentials): { url: string; protocols?: string[] } {
+  if (credentials.mode === 'direct') return { url: kEndpoint };
+  return { url: kGatewayEndpoint, protocols: ['asr', `api-key.${credentials.token}`] };
 }
 
 /** The parameters frame.
@@ -105,6 +122,32 @@ export function headerRule(
   };
 }
 
+/** The gateway's rejection vocabulary. Additive on its side, so anything not
+ *  listed here must fall through to the retryable verdict rather than be
+ *  guessed at. */
+const kRejections: Record<string, VoiceErrorReason> = {
+  insufficient_quota: 'quota',
+  credential_rejected: 'auth',
+  // Banned account, subnet binding, model not permitted: refused, and not by
+  // spending — the card names both moves the user has.
+  forbidden: 'auth',
+};
+
+/** Page JS cannot read a handshake's HTTP status, so the gateway completes the
+ *  upgrade and closes with `4000 + status` and a machine-readable reason.
+ *
+ *  The reason is authoritative: a status cannot separate a spent quota from a
+ *  rejected token, since both arrive as 401 or 403 depending on which check
+ *  caught it. The code is only a fallback for a gateway older than that
+ *  vocabulary. Null for ordinary codes — those end a session, not refuse one. */
+export function reasonForClose(code: number, reason?: string): VoiceErrorReason | null {
+  if (code < 4000 || code > 4999) return null;
+  const named = reason && kRejections[reason];
+  if (named) return named;
+  if (reason) return 'server';
+  return code - 4000 === 401 ? 'auth' : 'server';
+}
+
 /** Maps a documented error code onto what the panel should say about it. */
 export function errorReasonFor(code: number): VoiceErrorReason {
   if (code === kErrorCode.packetTimeout) return 'network';
@@ -115,9 +158,9 @@ export function errorReasonFor(code: number): VoiceErrorReason {
 /** True when the endpoint host answers HTTPS at all — the one observable a
  *  browser gets for telling "this socket was refused" from "no network",
  *  since the WebSocket handshake status is hidden from page JS. */
-export async function httpsReachable(): Promise<boolean> {
+export async function httpsReachable(host: string = kEndpointHost): Promise<boolean> {
   try {
-    await fetch(`https://${kEndpointHost}/`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(4000) });
+    await fetch(`https://${host}/`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(4000) });
     return true;
   }
   catch {
@@ -149,12 +192,14 @@ export interface TransportCallbacks {
 export interface TransportOptions {
   callbacks: TransportCallbacks;
   uid: string;
+  /** Picks the route and carries its proof of identity. */
+  credentials: VoiceCredentials;
   zhVariant?: ZhVariant;
   /** Held from rule installation until this socket's handshake finishes.
    *  Releasing it removes the rule before another page may install its own. */
   headerRuleLease?: HeaderRuleLease;
   /** Injectable so a session can be driven without a real socket. */
-  connect?: (url: string) => SocketLike;
+  connect?: (url: string, protocols?: string[]) => SocketLike;
   /** Test seam for black-holed handshakes. Zero disables the deadline. */
   handshakeTimeoutMs?: number;
   /** Consulted only when the handshake dies, to split 'auth' from 'network'. */
@@ -211,9 +256,12 @@ async function removeHeaderRule(): Promise<void> {
  * place from install through handshake. The local tail preserves the same
  * behaviour in tests and older non-browser environments. */
 export async function acquireHeaderRule(
-  credentials: VolcanoCredentials,
+  credentials: VoiceCredentials,
   ids: { requestId: string; connectId: string },
 ): Promise<HeaderRuleLease> {
+  // Nothing to install, and nothing to serialise against.
+  if (credentials.mode === 'gateway') return { release: () => {} };
+
   let releaseHold!: () => void;
   const hold = new Promise<void>((resolve) => { releaseHold = resolve; });
   let readyResolve!: () => void;
@@ -262,9 +310,11 @@ export async function acquireHeaderRule(
 
 export function openTransport(options: TransportOptions): Transport {
   const { callbacks } = options;
-  const connect = options.connect ?? ((url: string) => new WebSocket(url) as unknown as SocketLike);
+  const connect = options.connect
+    ?? ((url: string, protocols?: string[]) => new WebSocket(url, protocols) as unknown as SocketLike);
 
-  const socket = connect(kEndpoint);
+  const { url, protocols } = endpointFor(options.credentials);
+  const socket = connect(url, protocols);
   socket.binaryType = 'arraybuffer';
 
   let closed = false;
@@ -440,8 +490,17 @@ export function openTransport(options: TransportOptions): Transport {
     failSocket('network', 'websocket error');
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     if (closed) return;
+    // Before the handshake flag, not after: the gateway completes the upgrade
+    // in order to send this code, so `handshakeDone` is already true.
+    const closure = event as { code?: number; reason?: string } | undefined;
+    const code = closure?.code;
+    const refused = code === undefined ? null : reasonForClose(code, closure?.reason);
+    if (refused) {
+      failSocket(refused, `close ${code} ${closure?.reason ?? ''}`.trim());
+      return;
+    }
     // A refusal surfaces as error-then-close; classifying the close too keeps
     // the verdict the same if only the close event is delivered.
     if (!handshakeDone) {

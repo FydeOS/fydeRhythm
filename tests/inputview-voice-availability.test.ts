@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Read through a getter so one test can take the service away. Mocked at all
+// because the real value comes from the build's env, and a test must not pass
+// or fail on which machine ran it.
+let offered = true;
+vi.mock('../entrypoints/inputview/voice/credentials', () => ({
+  get kVoiceOffered() { return offered; },
+}));
 
 import {
   type VoiceAvailability,
@@ -10,9 +18,17 @@ const kOffered: VoiceAvailability = {
   enabled: true,
   schemaId: 'luna_pinyin',
   passwordField: false,
+  permission: 'granted',
 };
 
 describe('voice availability', () => {
+  beforeEach(() => { offered = true; });
+
+  it('offers nothing at all in a build with no speech service', () => {
+    offered = false;
+    expect(voiceAvailable(kOffered)).toBe(false);
+  });
+
   it('offers the microphone when everything lines up', () => {
     expect(voiceAvailable(kOffered)).toBe(true);
   });
@@ -28,6 +44,12 @@ describe('voice availability', () => {
 
   it('hides it when the setting is off', () => {
     expect(voiceAvailable({ ...kOffered, enabled: false })).toBe(false);
+  });
+
+  it('hides it only when the microphone is blocked outright', () => {
+    expect(voiceAvailable({ ...kOffered, permission: 'denied' })).toBe(false);
+    expect(voiceAvailable({ ...kOffered, permission: 'prompt' })).toBe(true);
+    expect(voiceAvailable({ ...kOffered, permission: 'unknown' })).toBe(true);
   });
 
   it('hides it on a schema the endpoint cannot transcribe', () => {
@@ -59,6 +81,7 @@ describe('voice availability', () => {
       enabled: true,
       schemaId: 'luna_pinyin',
       passwordField: true,
+      permission: 'granted',
     })).toBe(false);
   });
 
@@ -68,6 +91,7 @@ describe('voice availability', () => {
       { enabled: false },
       { schemaId: 'hakka' },
       { passwordField: true },
+      { permission: 'denied' },
     ];
     for (const clause of clauses) {
       // Reported per clause so a regression names the one that stopped hiding.

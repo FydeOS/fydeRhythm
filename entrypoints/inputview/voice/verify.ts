@@ -14,11 +14,11 @@ import { decodeServerMessage, encodeAudioPacket, encodeFullClientRequest, isServ
 import {
   acquireHeaderRule,
   buildSessionParams,
+  endpointFor,
   httpsReachable,
-  kEndpoint,
   newSessionIds,
   type SocketLike,
-  type VolcanoCredentials,
+  type VoiceCredentials,
 } from './transport';
 
 export type KeyVerdict = 'valid' | 'invalid' | 'unreachable';
@@ -33,22 +33,26 @@ function verdictOf(message: ServerMessage): KeyVerdict {
 }
 
 export interface VerifyOptions {
-  connect?: (url: string) => SocketLike;
+  connect?: (url: string, protocols?: string[]) => SocketLike;
   /** True when the endpoint host answers HTTPS at all. */
   probeReachability?: () => Promise<boolean>;
   timeoutMs?: number;
 }
 
 export async function verifyCredentials(
-  credentials: VolcanoCredentials,
+  credentials: VoiceCredentials,
   options: VerifyOptions = {},
 ): Promise<KeyVerdict> {
-  const connect = options.connect ?? ((url: string) => new WebSocket(url) as unknown as SocketLike);
-  const reachable = options.probeReachability ?? httpsReachable;
+  const connect = options.connect
+    ?? ((url: string, protocols?: string[]) => new WebSocket(url, protocols) as unknown as SocketLike);
+  const { url, protocols } = endpointFor(credentials);
+  // Whichever route this key takes, "is anything there?" must ask that route's
+  // own host — a gateway outage is not evidence about Volcano, or the reverse.
+  const reachable = options.probeReachability ?? (() => httpsReachable(new URL(url).host));
   const rule = await acquireHeaderRule(credentials, newSessionIds());
   try {
     return await new Promise<KeyVerdict>((resolve) => {
-      const socket = connect(kEndpoint);
+      const socket = connect(url, protocols);
       socket.binaryType = 'arraybuffer';
       let settled = false;
       let opened = false;
