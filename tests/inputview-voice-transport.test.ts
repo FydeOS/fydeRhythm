@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildHeader,
@@ -11,19 +11,34 @@ import {
   parseHeader,
 } from '../entrypoints/inputview/voice/protocol';
 import {
+  acquireHeaderRule,
   buildSessionParams,
   errorReasonFor,
   headerRule,
-  installHeaderRule,
+  type HeaderRuleLease,
   kEndpointHost,
   kHeaderRuleId,
   openTransport,
-  removeHeaderRule,
   type SocketLike,
   type TransportCallbacks,
 } from '../entrypoints/inputview/voice/transport';
 
-const kCredentials = { apiKey: 'api-key', resourceId: 'volc.bigasr.sauc.duration' };
+const kCredentials = { apiKey: 'api-key', resourceId: 'volc.seedasr.sauc.duration' };
+
+// Several tests below stub `chrome`, and one replaces `navigator` wholesale and
+// resets the module registry. vitest.config.ts restores mocks but not stubbed
+// globals, so without this the next test to be added runs in whatever world the
+// last one left — and acquireHeaderRule would take the Web Lock branch through a
+// leftover stub instead of the local fallback. Restoring by hand rather than
+// with unstubAllGlobals, which would also discard the `chrome` stub that
+// tests/setup.ts installs at load and leave every test here without one.
+const kOuterChrome = globalThis.chrome;
+const kOuterNavigator = globalThis.navigator;
+afterEach(() => {
+  vi.stubGlobal('chrome', kOuterChrome);
+  vi.stubGlobal('navigator', kOuterNavigator);
+  vi.resetModules();
+});
 
 class FakeSocket implements SocketLike {
   binaryType = '';
@@ -43,7 +58,12 @@ class FakeSocket implements SocketLike {
   }
 }
 
-function harness() {
+function harness(
+  headerRuleLease?: HeaderRuleLease,
+  handshakeTimeoutMs = 0,
+  // Every test drives its own probe: the default would fetch the real host.
+  probeReachability: () => Promise<boolean> = () => Promise.resolve(false),
+) {
   const socket = new FakeSocket();
   const events: string[] = [];
   const callbacks: TransportCallbacks = {
@@ -52,7 +72,14 @@ function harness() {
     onReady: () => events.push('ready'),
     onClosed: () => events.push('closed'),
   };
-  const transport = openTransport({ callbacks, uid: 'test-uid', connect: () => socket });
+  const transport = openTransport({
+    callbacks,
+    uid: 'test-uid',
+    headerRuleLease,
+    connect: () => socket,
+    handshakeTimeoutMs,
+    probeReachability,
+  });
   return { socket, events, transport };
 }
 
@@ -115,7 +142,7 @@ describe('voice header rule', () => {
     // pair, which the console no longer issues.
     expect(rule.action.requestHeaders?.map(h => [h.header, h.value])).toEqual([
       ['X-Api-Key', 'api-key'],
-      ['X-Api-Resource-Id', 'volc.bigasr.sauc.duration'],
+      ['X-Api-Resource-Id', 'volc.seedasr.sauc.duration'],
       ['X-Api-Request-Id', 'req-1'],
       ['X-Api-Connect-Id', 'conn-1'],
     ]);
@@ -153,6 +180,65 @@ describe('voice error mapping', () => {
 });
 
 describe('voice transport', () => {
+  it('terminates a black-holed handshake and ignores a late open', async () => {
+    vi.useFakeTimers();
+    try {
+      const release = vi.fn();
+      // A timeout is silence, not a refusal — it must never be probed into 'auth'.
+      const probe = vi.fn(() => Promise.resolve(true));
+      const { socket, events, transport } = harness({ release }, 1000, probe);
+      const queuedWrite = transport.sendAudio(new Int16Array(160));
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(events).toEqual([]);
+      expect(socket.closed).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(events).toEqual(['error:network:websocket handshake timeout']);
+      expect(socket.closed).toBe(true);
+      expect(release).toHaveBeenCalledOnce();
+      await expect(queuedWrite).rejects.toThrow('websocket handshake timeout');
+
+      socket.onopen?.call(null, {});
+      await Promise.resolve();
+      expect(socket.sent).toHaveLength(0);
+      expect(events).toEqual(['error:network:websocket handshake timeout']);
+      expect(probe).not.toHaveBeenCalled();
+    }
+    finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('allows a slow handshake before the deadline and drains queued audio in order', async () => {
+    vi.useFakeTimers();
+    try {
+      const release = vi.fn();
+      const { socket, events, transport } = harness({ release }, 1000);
+      const first = transport.sendAudio(new Int16Array(320));
+      const second = transport.sendAudio(new Int16Array(160));
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(socket.sent).toHaveLength(0);
+
+      socket.onopen?.call(null, {});
+      await Promise.all([first, second]);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(events).toEqual(['ready']);
+      expect(socket.closed).toBe(false);
+      expect(release).toHaveBeenCalledOnce();
+      expect(socket.sent.map(frame => parseHeader(frame).messageType)).toEqual([
+        kMessageType.fullClientRequest,
+        kMessageType.audioOnlyRequest,
+        kMessageType.audioOnlyRequest,
+      ]);
+    }
+    finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('holds every write until the socket opens', async () => {
     // send() on a CONNECTING socket throws, and audio queued by the caller
     // must not reach the wire ahead of the parameters frame.
@@ -226,10 +312,72 @@ describe('voice transport', () => {
     expect(events.some(e => e.startsWith('result'))).toBe(false);
   });
 
-  it('reports a socket error as a network problem', () => {
-    const { socket, events } = harness();
+  it('calls a refused handshake an auth problem when the host answers HTTPS', async () => {
+    // A rejected key and a dead network raise the same error event — the
+    // handshake status is invisible to page JS, and the probe is the only
+    // signal that tells them apart.
+    const { socket, events } = harness(undefined, 0, () => Promise.resolve(true));
     socket.onerror?.call(null, {});
+    expect(socket.closed).toBe(true);
+    await vi.waitUntil(() => events.length > 0);
+    expect(events).toEqual(['error:auth:websocket error']);
+  });
+
+  it('calls a refused handshake a network problem when nothing answers', async () => {
+    const { socket, events } = harness(undefined, 0, () => Promise.resolve(false));
+    socket.onerror?.call(null, {});
+    await vi.waitUntil(() => events.length > 0);
     expect(events).toEqual(['error:network:websocket error']);
+    expect(socket.closed).toBe(true);
+  });
+
+  it('classifies a pre-open close the same way as a pre-open error', async () => {
+    const { socket, events } = harness(undefined, 0, () => Promise.resolve(true));
+    socket.onclose?.call(null, {});
+    await vi.waitUntil(() => events.length > 0);
+    expect(events).toEqual(['error:auth:websocket closed during handshake']);
+  });
+
+  it('treats a probe that itself fails as no network', async () => {
+    const { socket, events } = harness(undefined, 0, () => Promise.reject(new Error('probe died')));
+    socket.onerror?.call(null, {});
+    await vi.waitUntil(() => events.length > 0);
+    expect(events).toEqual(['error:network:websocket error']);
+  });
+
+  it('keeps a post-open failure a network problem without consulting the probe', async () => {
+    // The handshake had already authenticated, so a later death is never the
+    // key's fault — probing it could misname a mid-session drop.
+    const probe = vi.fn(() => Promise.resolve(true));
+    const { socket, events } = harness(undefined, 0, probe);
+    socket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+
+    socket.onerror?.call(null, {});
+    expect(events).toEqual(['ready', 'error:network:websocket error']);
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it('turns a synchronous send failure into one terminal network error', async () => {
+    const release = vi.fn();
+    const { socket, events, transport } = harness({ release });
+    socket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+
+    const originalSend = socket.send.bind(socket);
+    socket.send = (data) => {
+      if (socket.sent.length === 1) throw new DOMException('link disappeared', 'NetworkError');
+      originalSend(data);
+    };
+
+    await expect(transport.sendAudio(new Int16Array(160))).rejects.toThrow('link disappeared');
+    expect(events).toEqual(['ready', 'error:network:link disappeared']);
+    expect(socket.closed).toBe(true);
+    expect(release).toHaveBeenCalledOnce();
+
+    socket.onerror?.call(null, {});
+    socket.onclose?.call(null, {});
+    expect(events).toEqual(['ready', 'error:network:link disappeared']);
   });
 
   it('ignores non-binary messages', () => {
@@ -266,114 +414,155 @@ describe('voice transport', () => {
     // Waiting for close() leaves the rule installed whenever the far end closes
     // first: `closed` is set by then and close() returns early. Dynamic rules
     // survive restarts, so that one is permanent.
-    const updateDynamicRules = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
+    const release = vi.fn();
 
-    const { socket, events } = harness();
+    const { socket, events } = harness({ release });
     socket.onopen?.call(null, {});
     await vi.waitUntil(() => events.includes('ready'));
 
-    expect(updateDynamicRules).toHaveBeenCalledWith({ removeRuleIds: [kHeaderRuleId] });
+    expect(release).toHaveBeenCalledOnce();
   });
 
   it('takes it down too when the far end closes first', async () => {
-    const updateDynamicRules = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
+    const release = vi.fn();
 
-    const { socket } = harness();
+    const { socket } = harness({ release });
     socket.onclose?.call(null, {});
-    await vi.waitUntil(() => updateDynamicRules.mock.calls.length > 0);
 
-    expect(updateDynamicRules).toHaveBeenCalledWith({ removeRuleIds: [kHeaderRuleId] });
+    expect(release).toHaveBeenCalledOnce();
   });
 
   it('takes the header rule down when the session ends', async () => {
     // Dynamic rules survive restarts, so a rule left installed is a standing
     // offer of our credentials for every future handshake — the headers are
     // needed for the few milliseconds of one.
-    const updateDynamicRules = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('chrome', {
-      ...globalThis.chrome,
-      declarativeNetRequest: { updateDynamicRules },
+    const release = vi.fn();
+
+    const { transport } = harness({ release });
+    transport.close();
+
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('reports a close that came from the far end', async () => {
+    const { socket, events } = harness();
+    socket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+
+    socket.onclose?.call(null, {});
+    expect(events).toEqual(['ready', 'closed']);
+  });
+
+  it('still delivers a final result whose decode the close overtook', async () => {
+    // Frames are gzipped, so delivery is async while the close event is not. The
+    // close is fired in the same turn as the message here, which guarantees the
+    // inflate is still in flight — the ordering a loaded machine produces on its
+    // own, and the one that used to drop the last sentence and report a network
+    // failure in its place. The close must wait behind the result, not race it.
+    const { socket, events } = harness();
+    socket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+
+    socket.onmessage?.call(null, { data: await serverResult('末尾', true) });
+    socket.onclose?.call(null, {});
+    await vi.waitUntil(() => events.includes('closed'));
+
+    expect(events).toEqual(['ready', 'result:末尾:true', 'closed']);
+  });
+
+  it('drops a decode still running when the caller closed the transport itself', async () => {
+    // The mirror case: teardown means the session is over, so a frame that was
+    // inflating when close() ran must not surface a result or an error into a
+    // caller that has moved on.
+    const { socket, events, transport } = harness();
+    socket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+
+    socket.onmessage?.call(null, { data: await serverResult('丢弃', true) });
+    transport.close();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(events).toEqual(['ready']);
+    expect(socket.closed).toBe(true);
+  });
+
+  it('does not take a rule down when its own install failed', async () => {
+    // Every session shares rule id 1, so a removal on behalf of an install that
+    // never happened would strip whatever the previous holder left behind. The
+    // lock makes the removal safe; this is the one case it cannot cover.
+    const updateDynamicRules = vi.fn<(change: {
+      addRules?: chrome.declarativeNetRequest.Rule[];
+      removeRuleIds?: number[];
+    }) => Promise<void>>(() => Promise.reject(new Error('rules api failed')));
+    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
+
+    await expect(acquireHeaderRule(kCredentials, { requestId: 'a', connectId: 'a' }))
+      .rejects.toThrow('rules api failed');
+    expect(updateDynamicRules.mock.calls).toHaveLength(1);
+    expect(updateDynamicRules.mock.calls[0]?.[0]).toMatchObject({ addRules: [{ id: kHeaderRuleId }] });
+  });
+
+  it('serialises rule ownership until the current handshake releases it', async () => {
+    // Web Locks are shared by same-origin extension pages, unlike module state.
+    // Load a second copy of the module to give it a separate install counter,
+    // just as InputView and Options have separate JS realms.
+    const updateDynamicRules = vi.fn<(change: {
+      addRules?: chrome.declarativeNetRequest.Rule[];
+      removeRuleIds?: number[];
+    }) => Promise<void>>(() => Promise.resolve());
+    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
+    let lockTail = Promise.resolve();
+    const request = vi.fn((_name: string, operation: () => Promise<void>) => {
+      const turn = lockTail.then(operation);
+      lockTail = turn.catch(() => {});
+      return turn;
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    const dictation = await acquireHeaderRule(kCredentials, { requestId: 'dictation', connectId: 'a' });
+    vi.resetModules();
+    const optionsRealm = await import('../entrypoints/inputview/voice/transport');
+    expect(optionsRealm.acquireHeaderRule).not.toBe(acquireHeaderRule);
+
+    const dictationSocket = new FakeSocket();
+    const events: string[] = [];
+    openTransport({
+      callbacks: {
+        onResult: () => {},
+        onError: () => {},
+        onReady: () => events.push('ready'),
+        onClosed: () => {},
+      },
+      uid: 'test-uid',
+      headerRuleLease: dictation,
+      connect: () => dictationSocket,
     });
 
-    const { transport } = harness();
-    transport.close();
-    await vi.waitUntil(() => updateDynamicRules.mock.calls.length > 0);
-
-    expect(updateDynamicRules).toHaveBeenCalledWith({ removeRuleIds: [kHeaderRuleId] });
-    // Deliberately not unstubbed: the stub extends the global chrome that
-    // tests/setup.ts installs at load, and unstubbing would remove that too —
-    // every later assertion would then pass for the wrong reason.
-  });
-
-  it('reports a close that came from the far end', () => {
-    const { socket, events } = harness();
-    socket.onclose?.call(null, {});
-    expect(events).toEqual(['closed']);
-  });
-
-  it('lets only the latest install take the rule down by token', async () => {
-    // Every session shares rule id 1. An attempt abandoned during its install
-    // resolves late, and "its" rule is by then the one a newer session just
-    // put up for its own handshake — an unconditional removal strips that
-    // handshake of its credentials.
-    const updateDynamicRules = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
-
-    const stale = await installHeaderRule(kCredentials, { requestId: 'a', connectId: 'a' });
-    const fresh = await installHeaderRule(kCredentials, { requestId: 'b', connectId: 'b' });
-    updateDynamicRules.mockClear();
-
-    await removeHeaderRule(stale);
-    expect(updateDynamicRules).not.toHaveBeenCalled();
-
-    await removeHeaderRule(fresh);
-    expect(updateDynamicRules).toHaveBeenCalledWith({ removeRuleIds: [kHeaderRuleId] });
-  });
-
-  it('holds the transport to its own token at every exit', async () => {
-    // The transport takes the rule down itself at three points — handshake
-    // done, far end gone, close() — and shares rule id 1 with every other
-    // session. Untokenised, a socket that outlives its session removes
-    // whichever rule is installed by the time it notices.
-    const updateDynamicRules = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('chrome', { ...globalThis.chrome, declarativeNetRequest: { updateDynamicRules } });
-
-    const stale = await installHeaderRule(kCredentials, { requestId: 'a', connectId: 'a' });
-    await installHeaderRule(kCredentials, { requestId: 'b', connectId: 'b' });
-    updateDynamicRules.mockClear();
-
-    const stalled = () => {
-      const socket = new FakeSocket();
-      const events: string[] = [];
-      const transport = openTransport({
-        callbacks: {
-          onResult: () => {},
-          onError: () => {},
-          onReady: () => events.push('ready'),
-          onClosed: () => events.push('closed'),
-        },
-        uid: 'test-uid',
-        headerRuleToken: stale,
-        connect: () => socket,
+    let verifierAcquired = false;
+    const verifierPromise = optionsRealm.acquireHeaderRule(kCredentials, { requestId: 'verify', connectId: 'b' })
+      .then((lease) => {
+        verifierAcquired = true;
+        return lease;
       });
-      return { socket, events, transport };
-    };
-
-    // Each exit is reached on its own transport: the first one taken latches
-    // `closed` and the other two then return early for that reason instead.
-    const handshake = stalled();
-    handshake.socket.onopen?.call(null, {});
-    await vi.waitUntil(() => handshake.events.includes('ready'));
-
-    const dropped = stalled();
-    dropped.socket.onclose?.call(null, {});
-    await vi.waitUntil(() => dropped.events.includes('closed'));
-
-    stalled().transport.close();
     await Promise.resolve();
 
-    expect(updateDynamicRules).not.toHaveBeenCalled();
+    expect(verifierAcquired).toBe(false);
+    expect(updateDynamicRules.mock.calls.filter(([change]) => change.addRules)).toHaveLength(1);
+
+    // A real transport releases immediately after the WebSocket handshake,
+    // not when dictation ends. Options can proceed while that socket remains
+    // open, so ordinary recognition is not serialised behind key verification.
+    dictationSocket.onopen?.call(null, {});
+    await vi.waitUntil(() => events.includes('ready'));
+    const verifier = await verifierPromise;
+    expect(dictationSocket.closed).toBe(false);
+    expect(updateDynamicRules.mock.calls.map(([change]) => change)).toEqual([
+      expect.objectContaining({ addRules: [expect.objectContaining({ id: kHeaderRuleId })] }),
+      { removeRuleIds: [kHeaderRuleId] },
+      expect.objectContaining({ addRules: [expect.objectContaining({ id: kHeaderRuleId })] }),
+    ]);
+
+    verifier.release();
+    await vi.waitUntil(() => updateDynamicRules.mock.calls.length === 4);
   });
 });

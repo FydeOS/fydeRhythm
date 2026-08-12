@@ -14,6 +14,7 @@ const kMeterBars = 24;
 const kErrorMessages: Record<VoiceErrorReason, string> = {
   microphone: 'vk_voice_error_microphone',
   network: 'vk_voice_error_network',
+  auth: 'vk_voice_error_auth',
   server: 'vk_voice_error_server',
   unknown: 'vk_voice_error_unknown',
 };
@@ -181,18 +182,29 @@ export function VoicePanel(props: VoicePanelProps) {
   }
 
   if (state.kind === 'error') {
+    // A rejected key cannot be fixed from the keyboard, and a retry must fail
+    // the same way — this one card routes to the options page instead.
+    const auth = state.reason === 'auth';
     return (
       <div className="kb-voice">
         <Card
           icon={<ErrorIcon />}
           title={t(kErrorMessages[state.reason])}
-          body={t('vk_voice_error_body')}
+          body={t(auth ? 'vk_voice_error_auth_body' : 'vk_voice_error_body')}
           actions={(
             <>
               {back}
-              <button className="kb-voice-action primary" onClick={props.onRetry}>
-                {t('vk_clipboard_retry')}
-              </button>
+              {auth
+                ? (
+                    <button className="kb-voice-action primary" onClick={props.onOpenSettings}>
+                      {t('vk_voice_permission_open')}
+                    </button>
+                  )
+                : (
+                    <button className="kb-voice-action primary" onClick={props.onRetry}>
+                      {t('vk_clipboard_retry')}
+                    </button>
+                  )}
             </>
           )}
         />

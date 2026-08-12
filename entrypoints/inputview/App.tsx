@@ -31,7 +31,7 @@ import { installPointerModality } from './pointer-modality';
 import { tapShift, typeWithShift } from './shift-state';
 import { type FloatingPos, VkContainer } from './vk-container';
 import { voiceAvailable } from './voice/availability';
-import { readCredentials } from './voice/credentials';
+import { hydrateCredentials, readCredentials, watchCredentials } from './voice/credentials';
 import { kDefaultVoiceSettings, readVoiceSettings, readVoiceUid, watchVoiceSettings, writeVoiceConsent } from './voice/settings';
 import { useVoiceSession } from './voice/use-voice-session';
 
@@ -100,6 +100,7 @@ export default function App() {
   const [layer, setLayer] = useState<LayerId>('main');
   const [panel, setPanel] = useState<InputPanel>(null);
   const [voiceSettings, setVoiceSettings] = useState(kDefaultVoiceSettings);
+  const [voiceConfigured, setVoiceConfigured] = useState(false);
   const [voiceUid, setVoiceUid] = useState('');
   const [clipboardRequest, setClipboardRequest] = useState<Promise<ClipboardReadResult> | null>(null);
   // On a numeric field, the user tapped ABC to see the letter keyboard.
@@ -441,9 +442,9 @@ export default function App() {
     setPanel('clipboard');
   };
 
-  // Voice input is offered only when the build carries credentials, the script
-  // is one the streaming endpoint can transcribe, and the focused field is not
-  // a password box. See voice/availability.ts for why each clause hides the
+  // Voice input is offered only when a key is stored, the active schema is one
+  // the streaming endpoint can transcribe, and the focused field is not a
+  // password box. See voice/availability.ts for why each clause hides the
   // button rather than showing one that fails when pressed.
   // Mock only: ?voice=<state> renders the panel without a live session, which
   // is how the layout audit reaches selectors that otherwise exist only while a
@@ -461,9 +462,9 @@ export default function App() {
   const reported = vk !== null && !(kGuessed in vk);
 
   const voiceOffered = devVoice !== null || (reported && voiceAvailable({
-    configured: readCredentials() !== null,
+    configured: voiceConfigured,
     enabled: voiceSettings.enabled,
-    script: vk.script,
+    schemaId: vk.schemaId,
     passwordField: vk.passwordField,
   }));
 
@@ -486,6 +487,14 @@ export default function App() {
     void readVoiceSettings().then(setVoiceSettings);
     void readVoiceUid().then(setVoiceUid);
     return watchVoiceSettings(setVoiceSettings);
+  }, []);
+
+  // The key can arrive from the options page while the keyboard is open; the
+  // microphone button follows it without a reload.
+  useEffect(() => {
+    const update = () => setVoiceConfigured(readCredentials() !== null);
+    void hydrateCredentials().then(update);
+    return watchCredentials(update);
   }, []);
 
   const closeVoice = () => {

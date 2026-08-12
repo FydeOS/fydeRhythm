@@ -13,7 +13,14 @@ import type { CaptureCallbacks, CaptureHandle } from '../entrypoints/inputview/v
 import { MicPermissionError, startCapture } from '../entrypoints/inputview/voice/audio';
 import { readCredentials } from '../entrypoints/inputview/voice/credentials';
 import { micPermission, watchMicPermission } from '../entrypoints/inputview/voice/permission';
-import { installHeaderRule, openTransport, removeHeaderRule, type TransportCallbacks } from '../entrypoints/inputview/voice/transport';
+import {
+  acquireHeaderRule,
+  type HeaderRuleLease,
+  kHandshakeTimeoutMs,
+  openTransport,
+  type SocketLike,
+  type TransportCallbacks,
+} from '../entrypoints/inputview/voice/transport';
 import { useVoiceSession } from '../entrypoints/inputview/voice/use-voice-session';
 
 vi.mock('../entrypoints/inputview/voice/audio', async original => ({
@@ -27,8 +34,7 @@ vi.mock('../entrypoints/inputview/voice/permission', () => ({
 }));
 vi.mock('../entrypoints/inputview/voice/transport', async original => ({
   ...(await original<object>()),
-  installHeaderRule: vi.fn(),
-  removeHeaderRule: vi.fn(),
+  acquireHeaderRule: vi.fn(),
   openTransport: vi.fn(),
   newSessionIds: () => ({ requestId: 'r', connectId: 'c' }),
 }));
@@ -53,6 +59,7 @@ function deferred<T>() {
 const stop = vi.fn(() => Promise.resolve());
 const sendAudio = vi.fn<(pcm: Int16Array, last?: boolean) => Promise<void>>(() => Promise.resolve());
 const closeTransport = vi.fn();
+const releaseRule = vi.fn();
 
 let captured: CaptureCallbacks;
 let transportCallbacks: TransportCallbacks;
@@ -73,8 +80,7 @@ beforeEach(() => {
   vi.mocked(readCredentials).mockReturnValue({ apiKey: 'k', resourceId: 'r' });
   vi.mocked(micPermission).mockResolvedValue('granted');
   vi.mocked(watchMicPermission).mockReturnValue(() => {});
-  vi.mocked(installHeaderRule).mockResolvedValue(1);
-  vi.mocked(removeHeaderRule).mockResolvedValue(undefined);
+  vi.mocked(acquireHeaderRule).mockResolvedValue({ release: releaseRule });
   vi.mocked(startCapture).mockImplementation((callbacks) => {
     captured = callbacks;
     return Promise.resolve({ stop } as CaptureHandle);
@@ -164,46 +170,44 @@ describe('a session abandoned while it was still starting', () => {
 
 describe('the first generation check', () => {
   it('takes the credential rule back down when it abandons an attempt', async () => {
-    // Dynamic rules survive restarts, and the removal carries the install's own
-    // token so a late abandon cannot take down a newer session's rule.
-    const rule = deferred<number>();
-    vi.mocked(installHeaderRule).mockReturnValue(rule.promise);
+    // Dynamic rules survive restarts, so abandoning a lease after acquisition
+    // must release it before another extension page can install its own rule.
+    const rule = deferred<HeaderRuleLease>();
+    vi.mocked(acquireHeaderRule).mockReturnValue(rule.promise);
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
     act(() => { result.current.close(); });
     await act(async () => {
-      rule.settle(7);
+      rule.settle({ release: releaseRule });
       await rule.promise;
     });
 
-    expect(removeHeaderRule).toHaveBeenCalledWith(7);
+    expect(releaseRule).toHaveBeenCalledOnce();
   });
 
-  it('hands the transport the token of the rule it was opened with', async () => {
-    // The transport removes the rule itself once the handshake is over, and it
-    // shares rule id 1 with every other session — untokenised, an outlived
-    // socket takes down whichever rule is installed by the time it notices.
-    vi.mocked(installHeaderRule).mockResolvedValue(42);
+  it('hands the transport the lease of the rule it was opened with', async () => {
+    const lease = { release: releaseRule };
+    vi.mocked(acquireHeaderRule).mockResolvedValue(lease);
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
 
-    expect(openTransport).toHaveBeenCalledWith(expect.objectContaining({ headerRuleToken: 42 }));
+    expect(openTransport).toHaveBeenCalledWith(expect.objectContaining({ headerRuleLease: lease }));
   });
 
   it('abandons an attempt whose header rule finished after the panel closed', async () => {
     // The rule is installed and the socket opened between two awaits; without a
     // check here the transport is created behind a closed panel and stays open.
-    const rule = deferred<number>();
-    vi.mocked(installHeaderRule).mockReturnValue(rule.promise);
+    const rule = deferred<HeaderRuleLease>();
+    vi.mocked(acquireHeaderRule).mockReturnValue(rule.promise);
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
     act(() => { result.current.close(); });
 
     await act(async () => {
-      rule.settle(1);
+      rule.settle({ release: releaseRule });
       await rule.promise;
     });
 
@@ -214,7 +218,7 @@ describe('the first generation check', () => {
   it('does not blame the microphone for a failure past capture', async () => {
     // The catch spans the header-rule install and the socket; capture already
     // succeeded there, so the failure is a connection problem, not the mic's.
-    vi.mocked(installHeaderRule).mockRejectedValue(new Error('rules api failed'));
+    vi.mocked(acquireHeaderRule).mockRejectedValue(new Error('rules api failed'));
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
@@ -230,6 +234,325 @@ describe('the first generation check', () => {
     act(() => { result.current.close(); });
     expect(stop).toHaveBeenCalled();
     expect(closeTransport).toHaveBeenCalled();
+  });
+});
+
+describe('transport failure recovery', () => {
+  it('turns two real black-holed handshakes into one retry and a visible error', async () => {
+    vi.useFakeTimers();
+    const sockets: SocketLike[] = [];
+    class BlackHoleSocket implements SocketLike {
+      binaryType = '';
+      onopen: SocketLike['onopen'] = null;
+      onmessage: SocketLike['onmessage'] = null;
+      onerror: SocketLike['onerror'] = null;
+      onclose: SocketLike['onclose'] = null;
+
+      constructor(_url: string) {
+        sockets.push(this);
+      }
+
+      send() {}
+      close() {}
+    }
+
+    const actualTransport = await vi.importActual<{ openTransport: typeof openTransport }>(
+      '../entrypoints/inputview/voice/transport',
+    );
+    vi.mocked(openTransport).mockImplementation(actualTransport.openTransport);
+    const originalWebSocket = globalThis.WebSocket;
+    vi.stubGlobal('WebSocket', BlackHoleSocket);
+    try {
+      const { result } = setup();
+      await settled(() => { result.current.open(); });
+      expect(sockets).toHaveLength(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(kHandshakeTimeoutMs);
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => expect(sockets).toHaveLength(2));
+      expect(result.current.state.kind).toBe('listening');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(kHandshakeTimeoutMs);
+        await Promise.resolve();
+      });
+      expect(sockets).toHaveLength(2);
+      expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+    }
+    finally {
+      vi.stubGlobal('WebSocket', originalWebSocket);
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries from the real transport close event, not only a mocked callback', async () => {
+    const sockets: SocketLike[] = [];
+    class ClosingSocket implements SocketLike {
+      binaryType = '';
+      onopen: SocketLike['onopen'] = null;
+      onmessage: SocketLike['onmessage'] = null;
+      onerror: SocketLike['onerror'] = null;
+      onclose: SocketLike['onclose'] = null;
+
+      constructor(_url: string) {
+        sockets.push(this);
+      }
+
+      send() {}
+      close() {}
+    }
+
+    const actualTransport = await vi.importActual<{ openTransport: typeof openTransport }>(
+      '../entrypoints/inputview/voice/transport',
+    );
+    // Pin the handshake probe to "no network": these sockets die before they
+    // open, and the default probe would fetch the real endpoint host.
+    vi.mocked(openTransport).mockImplementation(options =>
+      actualTransport.openTransport({ ...options, probeReachability: () => Promise.resolve(false) }));
+    const originalWebSocket = globalThis.WebSocket;
+    vi.stubGlobal('WebSocket', ClosingSocket);
+    try {
+      const { result } = setup();
+      await settled(() => { result.current.open(); });
+      expect(sockets).toHaveLength(1);
+
+      act(() => { sockets[0]?.onclose?.call(null, {}); });
+      await waitFor(() => expect(sockets).toHaveLength(2));
+      expect(result.current.state.kind).toBe('listening');
+
+      // The retried real transport shares the same one-retry budget. A second
+      // failure delivered through WebSocket.onerror must surface instead of
+      // starting a third invisible recording attempt.
+      act(() => { sockets[1]?.onerror?.call(null, {}); });
+      await waitFor(() => expect(result.current.state).toEqual({ kind: 'error', reason: 'network' }));
+      expect(sockets).toHaveLength(2);
+    }
+    finally {
+      vi.stubGlobal('WebSocket', originalWebSocket);
+    }
+  });
+
+  it('retries a clean pre-commit close once, then reports the next close', async () => {
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+
+    act(() => { transportCallbacks.onClosed(); });
+    await waitFor(() => expect(openTransport).toHaveBeenCalledTimes(2));
+    expect(result.current.state.kind).toBe('listening');
+
+    // The retry budget is shared with the socket-error path. A second clean
+    // close must stop rather than loop forever.
+    act(() => { transportCallbacks.onClosed(); });
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+  });
+
+  it('does not reopen the microphone when the stop and the close land together', async () => {
+    // The retry gate asks whether the session is still listening, and the answer
+    // lives in a ref written inside a setState updater — so a close arriving in
+    // the same batch as the stop still sees 'listening'. The user tapped stop;
+    // restarting capture there records them without being asked.
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+    act(() => { transportCallbacks.onReady(); });
+
+    await settled(() => {
+      captured.onEnd('caller');
+      transportCallbacks.onClosed();
+    });
+    // The retry is async, so let it get as far as it is going to.
+    await settled(() => {});
+
+    expect(startCapture).toHaveBeenCalledOnce();
+    expect(openTransport).toHaveBeenCalledOnce();
+    expect(result.current.state.kind).not.toBe('listening');
+  });
+
+  it('does not reopen the microphone when the socket fails while a stop is winding down', async () => {
+    // stop() asks the capture layer to end; its onEnd arrives later. A socket
+    // failure in that gap must not read as "still talking" either — the user has
+    // already said they were done.
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+    act(() => { transportCallbacks.onReady(); });
+
+    await settled(() => {
+      result.current.stop();
+      transportCallbacks.onClosed();
+    });
+    await settled(() => {});
+
+    expect(startCapture).toHaveBeenCalledOnce();
+    expect(result.current.state.kind).not.toBe('listening');
+  });
+
+  it('does not retry a clean close after text has been committed', async () => {
+    const { result, onCommit } = setup();
+    await settled(() => { result.current.open(); });
+    act(() => { transportCallbacks.onReady(); });
+    act(() => {
+      transportCallbacks.onResult({ utterances: [{ text: '已经写入。', definite: true }] }, false);
+    });
+    expect(onCommit).toHaveBeenCalledWith('已经写入。');
+
+    act(() => { transportCallbacks.onClosed(); });
+
+    expect(openTransport).toHaveBeenCalledOnce();
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+  });
+
+  it('retries once when the network drops mid-speech without inserting an unconfirmed tail', async () => {
+    const { result, onCommit } = setup();
+    await settled(() => { result.current.open(); });
+    act(() => { transportCallbacks.onReady(); });
+    act(() => {
+      transportCallbacks.onResult({ utterances: [{ text: '还没有确认的内容' }] }, false);
+    });
+    expect(result.current.state).toMatchObject({ kind: 'listening', pending: '还没有确认的内容' });
+
+    act(() => { transportCallbacks.onError('network', 'offline'); });
+    await waitFor(() => expect(openTransport).toHaveBeenCalledTimes(2));
+
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(result.current.state).toMatchObject({ kind: 'listening', pending: '' });
+  });
+
+  it('does not retry a rejected key', async () => {
+    // The second handshake fails identically; the fix lives on the options
+    // page, and the silent retry would only double the wait before saying so.
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+
+    act(() => { transportCallbacks.onError('auth', 'websocket error'); });
+
+    expect(openTransport).toHaveBeenCalledOnce();
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'auth' });
+  });
+
+  it('allows a manual retry after repeated failure and ignores the dead sockets afterward', async () => {
+    const { result, onCommit } = setup();
+    await settled(() => { result.current.open(); });
+    const first = transportCallbacks;
+
+    act(() => { first.onError('network', 'offline'); });
+    await waitFor(() => expect(openTransport).toHaveBeenCalledTimes(2));
+    const second = transportCallbacks;
+
+    act(() => { second.onError('network', 'still offline'); });
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+    expect(openTransport).toHaveBeenCalledTimes(2);
+
+    await settled(() => { result.current.retry(); });
+    await waitFor(() => expect(openTransport).toHaveBeenCalledTimes(3));
+    const recovered = transportCallbacks;
+    expect(result.current.state.kind).toBe('listening');
+
+    // Browsers may deliver close/message after a replacement socket is live.
+    // Neither old attempt may repaint or commit into the recovered generation.
+    act(() => {
+      first.onResult({ utterances: [{ text: '旧连接一', definite: true }] }, false);
+      first.onClosed();
+      second.onResult({ utterances: [{ text: '旧连接二', definite: true }] }, false);
+      second.onClosed();
+    });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(result.current.state.kind).toBe('listening');
+
+    act(() => {
+      recovered.onReady();
+      recovered.onResult({ utterances: [{ text: '网络恢复', definite: true }] }, false);
+    });
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith('网络恢复');
+  });
+
+  it('reports a clean close while finalizing without reopening the microphone', async () => {
+    const { result } = setup();
+    await settled(() => { result.current.open(); });
+    act(() => { transportCallbacks.onReady(); });
+    act(() => { captured.onEnd('caller'); });
+    expect(result.current.state.kind).toBe('finalizing');
+
+    act(() => { transportCallbacks.onClosed(); });
+
+    expect(openTransport).toHaveBeenCalledOnce();
+    expect(startCapture).toHaveBeenCalledOnce();
+    expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+  });
+
+  it('reports a missing final response instead of silently claiming success', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = setup();
+      await settled(() => { result.current.open(); });
+      act(() => { transportCallbacks.onReady(); });
+      act(() => {
+        transportCallbacks.onResult({ utterances: [{ text: '没有返回的结尾' }] }, false);
+        captured.onEnd('silence');
+      });
+      expect(result.current.state.kind).toBe('finalizing');
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+      expect(openTransport).toHaveBeenCalledOnce();
+      expect(result.current.state).toEqual({ kind: 'error', reason: 'network' });
+    }
+    finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not invent a loss when the deadline passes with nothing pending', async () => {
+    // The server confirmed every sentence and then went quiet. All of it is
+    // already in the user's document, so the session did finish — an error card
+    // here would report a loss that did not happen.
+    vi.useFakeTimers();
+    try {
+      const { result, onCommit } = setup();
+      await settled(() => { result.current.open(); });
+      act(() => { transportCallbacks.onReady(); });
+      act(() => {
+        transportCallbacks.onResult({ utterances: [{ text: '全部都已写入。', definite: true }] }, false);
+        captured.onEnd('silence');
+      });
+      expect(onCommit).toHaveBeenCalledWith('全部都已写入。');
+      expect(result.current.state).toEqual({ kind: 'finalizing', pending: '', stopped: 'silence' });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+      expect(result.current.state).toEqual({ kind: 'idle' });
+    }
+    finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('accepts a final response that arrives just before the deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result, onCommit } = setup();
+      await settled(() => { result.current.open(); });
+      act(() => { transportCallbacks.onReady(); });
+      act(() => {
+        transportCallbacks.onResult({ utterances: [{ text: '慢网络的最后一句' }] }, false);
+        captured.onEnd('silence');
+      });
+      expect(result.current.state.kind).toBe('finalizing');
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4999); });
+      expect(result.current.state.kind).toBe('finalizing');
+      expect(onCommit).not.toHaveBeenCalled();
+
+      act(() => { transportCallbacks.onResult(null, true); });
+      expect(onCommit).toHaveBeenCalledWith('慢网络的最后一句');
+      expect(result.current.state).toEqual({ kind: 'idle' });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(result.current.state).toEqual({ kind: 'idle' });
+    }
+    finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -311,15 +634,15 @@ describe('ordering across the readiness boundary', () => {
     // The transport exists from the moment the socket starts connecting, so
     // switching to it on assignment would put newer audio — and a stop's final
     // packet — ahead of everything captured before it.
-    const rule = deferred<number>();
-    vi.mocked(installHeaderRule).mockReturnValue(rule.promise);
+    const rule = deferred<HeaderRuleLease>();
+    vi.mocked(acquireHeaderRule).mockReturnValue(rule.promise);
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
     act(() => { captured.onBatch(new Int16Array([1])); });
 
     await act(async () => {
-      rule.settle(1);
+      rule.settle({ release: releaseRule });
       await rule.promise;
     });
     // The transport is assigned but the handshake has not finished.
@@ -361,8 +684,8 @@ describe('an empty server packet', () => {
 
 describe('stopping before the socket is up', () => {
   it('still tells the server to finalise once it connects', async () => {
-    const rule = deferred<number>();
-    vi.mocked(installHeaderRule).mockReturnValue(rule.promise);
+    const rule = deferred<HeaderRuleLease>();
+    vi.mocked(acquireHeaderRule).mockReturnValue(rule.promise);
 
     const { result } = setup();
     await settled(() => { result.current.open(); });
@@ -374,7 +697,7 @@ describe('stopping before the socket is up', () => {
     expect(sendAudio).not.toHaveBeenCalled();
 
     await act(async () => {
-      rule.settle(1);
+      rule.settle({ release: releaseRule });
       await rule.promise;
     });
     act(() => { transportCallbacks.onReady(); });

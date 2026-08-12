@@ -1,0 +1,463 @@
+{
+  "_source": "rime/rppi (the plum package index), read 2026-07-30",
+  "_regenerate": "for each of Chinese/{Mandarin,Cantonese,Wu,Hakka,Hokkien,Xiang,Old,Shape} English Japanese Korean Other Collection: curl https://raw.githubusercontent.com/rime/rppi/master/<path>/index.json and keep repo, name and schemas",
+  "recipes": [
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-luna-pinyin",
+      "name": "朙月拼音",
+      "schemas": [
+        "luna_pinyin",
+        "luna_pinyin_fluency",
+        "luna_pinyin_simp",
+        "luna_pinyin_tw",
+        "luna_quanpin"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-double-pinyin",
+      "name": "双拼",
+      "schemas": [
+        "double_pinyin",
+        "double_pinyin_abc",
+        "double_pinyin_flypy",
+        "double_pinyin_mspy",
+        "double_pinyin_pyjj"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-pinyin-simp",
+      "name": "袖珍简拼",
+      "schemas": [
+        "pinyin_simp"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-terra-pinyin",
+      "name": "地球拼音",
+      "schemas": [
+        "terra_pinyin"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-bopomofo",
+      "name": "注音",
+      "schemas": [
+        "bopomofo",
+        "bopomofo_express"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-combo-pinyin",
+      "name": "宫保拼音",
+      "schemas": [
+        "combo_pinyin",
+        "combo_pinyin_8",
+        "combo_pinyin_9",
+        "combo_pinyin_10"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "rime/rime-stenotype",
+      "name": "打字速记法",
+      "schemas": [
+        "stenotype"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "lotem/rime-c2h6-pinyin",
+      "name": "乙烷拼音",
+      "schemas": [
+        "c2h6_pinyin"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "lotem/rime-zhung",
+      "name": "中原官话",
+      "schemas": [
+        "zhung",
+        "zhung_42",
+        "zhung_combo",
+        "zhung_combo_transcript",
+        "zhung_stenotype",
+        "zhung_transcript"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "xiaobai9978/rime-xiaobai_simp",
+      "name": "小白T9",
+      "schemas": [
+        "xiaobai_simp"
+      ]
+    },
+    {
+      "category": "Chinese/Mandarin",
+      "repo": "picado-tv/rime-handarin",
+      "name": "韩官话",
+      "schemas": [
+        "handarin"
+      ]
+    },
+    {
+      "category": "Chinese/Cantonese",
+      "repo": "rime/rime-cantonese",
+      "name": "粤语拼音",
+      "schemas": [
+        "jyut6ping3",
+        "jyut6ping3_ipa"
+      ]
+    },
+    {
+      "category": "Chinese/Cantonese",
+      "repo": "leimaau/naamning_jyutping",
+      "name": "南宁话",
+      "schemas": [
+        "naamning_baakwaa",
+        "naamning_baakwaa_ipa",
+        "naamning_bingwaa",
+        "naamning_bingwaa_ipa"
+      ]
+    },
+    {
+      "category": "Chinese/Wu",
+      "repo": "rime/rime-wugniu",
+      "name": "上海吴语",
+      "schemas": [
+        "wugniu_lopha",
+        "wugniu"
+      ]
+    },
+    {
+      "category": "Chinese/Wu",
+      "repo": "rime/rime-soutzoe",
+      "name": "苏州吴语",
+      "schemas": [
+        "soutzoe"
+      ]
+    },
+    {
+      "category": "Chinese/Hakka",
+      "repo": "syndict/hakka",
+      "name": "客语",
+      "schemas": [
+        "hakka",
+        "hakka_meixian"
+      ]
+    },
+    {
+      "category": "Chinese/Hokkien",
+      "repo": "kahaani/dieghv",
+      "name": "潮语拼音",
+      "schemas": [
+        "dieziu",
+        "dioion",
+        "gekion",
+        "riaupeng",
+        "suantau",
+        "tenghai"
+      ]
+    },
+    {
+      "category": "Chinese/Xiang",
+      "repo": "AlfredLouis00/rime-Sautungva",
+      "name": "湘语邵东话拼音",
+      "schemas": [
+        "sautungva",
+        "sautungva_beta",
+        "sautungva_phinin",
+        "sautungva_cyrillic"
+      ]
+    },
+    {
+      "category": "Chinese/Old",
+      "repo": "rime/rime-middle-chinese",
+      "name": "中古拼音",
+      "schemas": [
+        "zyenpheng",
+        "sampheng"
+      ]
+    },
+    {
+      "category": "Chinese/Old",
+      "repo": "lotem/rime-dungfungpuo",
+      "name": "东风破",
+      "schemas": [
+        "dungfungpuo"
+      ]
+    },
+    {
+      "category": "Chinese/Old",
+      "repo": "rime-aca/rime-nieh-ched",
+      "name": "爾切羅馬字",
+      "schemas": [
+        "njerchet"
+      ]
+    },
+    {
+      "category": "Chinese/Old",
+      "repo": "Hulenkius/RIME_OC_collections",
+      "name": "上古音方案集",
+      "schemas": [
+        "OC_msoegDK",
+        "OC_msoeg",
+        "OC_baxter-sagart",
+        "OC_starostinLO",
+        "OC_starostinTK",
+        "OC_schuesslerOC",
+        "OC_schuesslerLHC",
+        "OC_zhengzhang",
+        "OC_baxter1992",
+        "OC_wangli",
+        "OC_lifanggui",
+        "OC_zhoufagao"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-wubi",
+      "name": "86五笔",
+      "schemas": [
+        "wubi86",
+        "wubi_pinyin",
+        "wubi_trad"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-cangjie",
+      "name": "仓颉五代",
+      "schemas": [
+        "cangjie5",
+        "cangjie5_express"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-stroke",
+      "name": "五笔画",
+      "schemas": [
+        "stroke"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-array",
+      "name": "行列",
+      "schemas": [
+        "array30",
+        "array30_query",
+        "array30_wsymbols"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-scj",
+      "name": "快速仓颉",
+      "schemas": [
+        "scj6"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "rime/rime-quick",
+      "name": "速成",
+      "schemas": [
+        "quick5"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "KyleBing/rime-wubi86-jidian",
+      "name": "86五笔极点",
+      "schemas": [
+        "numbers",
+        "pinyin_simp",
+        "wubi86_jidian",
+        "wubi86_jidian_pinyin",
+        "wubi86_jidian_trad",
+        "wubi86_jidian_trad_pinyin"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "lotem/rime-zhengma",
+      "name": "郑码",
+      "schemas": [
+        "zhengma"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "lotem/rime-wubi98",
+      "name": "98五笔",
+      "schemas": [
+        "wubi98"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "lotem/rime-linguistic-wubi",
+      "name": "大字符集五笔",
+      "schemas": [
+        "linguistic_wubi"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "lotem/rime-guhuwubi",
+      "name": "孤狐五笔",
+      "schemas": [
+        "guhuwubi"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "amorphobia/rime-jiandao",
+      "name": "星空键道",
+      "schemas": [
+        "jiandao"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "amorphobia/openfly",
+      "name": "OpenFly",
+      "schemas": [
+        "openfly"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "miounet/rime-kmm",
+      "name": "空明码",
+      "schemas": [
+        "kongmingma"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "0ZDragon/rime-huma",
+      "name": "虎码",
+      "schemas": [
+        "tiger",
+        "tigress"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "bigshans/rime-zrm",
+      "name": "自然码+辅码",
+      "schemas": [
+        "zrm_pinyin"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "pingshunhuangalex/rime-keydo",
+      "name": "键道·我流",
+      "schemas": [
+        "keydo"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "zongxinbo/rime-zong",
+      "name": "四角号码",
+      "schemas": [
+        "sjhm"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "ksqsf/rime-moran",
+      "name": "魔改自然码",
+      "schemas": [
+        "moran",
+        "moran_sentence",
+        "moran_fixed"
+      ]
+    },
+    {
+      "category": "Chinese/Shape",
+      "repo": "mirtlecn/rime-radical-pinyin",
+      "name": "部件拆字",
+      "schemas": [
+        "radical_pinyin"
+      ]
+    },
+    {
+      "category": "English",
+      "repo": "sdadonkey/rime-english",
+      "name": "English",
+      "schemas": [
+        "english"
+      ]
+    },
+    {
+      "category": "Japanese",
+      "repo": "lotem/rime-kana",
+      "name": "假名",
+      "schemas": [
+        "kana"
+      ]
+    },
+    {
+      "category": "Japanese",
+      "repo": "momijineko/Rime-KappaJP",
+      "name": "河童五笔",
+      "schemas": [
+        "KappaJP",
+        "KappaJP_fluency"
+      ]
+    },
+    {
+      "category": "Korean",
+      "repo": "picado-tv/rime-hangul",
+      "name": "도한글",
+      "schemas": [
+        "hangul"
+      ]
+    },
+    {
+      "category": "Other",
+      "repo": "rime/rime-ipa",
+      "name": "国际音标",
+      "schemas": [
+        "ipa_xsampa",
+        "ipa_yunlong"
+      ]
+    },
+    {
+      "category": "Other",
+      "repo": "lotem/rime-bopomofo-script",
+      "name": "注音文",
+      "schemas": [
+        "bopomofo_script"
+      ]
+    },
+    {
+      "category": "Collection",
+      "repo": "iDvel/rime-ice",
+      "name": "雾凇拼音",
+      "schemas": [
+        "double_pinyin",
+        "double_pinyin_abc",
+        "double_pinyin_flypy",
+        "double_pinyin_mspy",
+        "double_pinyin_ziguang",
+        "liangfen",
+        "melt_eng",
+        "rime_ice"
+      ]
+    }
+  ]
+}

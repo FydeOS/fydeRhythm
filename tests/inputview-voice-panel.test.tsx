@@ -273,16 +273,27 @@ describe('voice panel cards', () => {
     expect(handlers.onRetry).toHaveBeenCalledOnce();
   });
 
+  it('routes a rejected key to the options page instead of a doomed retry', () => {
+    const handlers = draw({ kind: 'error', reason: 'auth' });
+    expect(screen.getByText('语音服务拒绝了连接')).toBeTruthy();
+    expect(screen.getByText('请在设置页检查 API Key。')).toBeTruthy();
+
+    fireEvent.click(primaryAction());
+    expect(handlers.onOpenSettings).toHaveBeenCalledOnce();
+    // A retry must fail the same way until the key is fixed over there.
+    expect(handlers.onRetry).not.toHaveBeenCalled();
+  });
+
   it('names the failure rather than reporting a generic error', () => {
     const seen = new Set<string>();
-    for (const reason of ['microphone', 'network', 'server', 'unknown'] as const) {
+    for (const reason of ['microphone', 'network', 'auth', 'server', 'unknown'] as const) {
       cleanup();
       draw({ kind: 'error', reason });
       seen.add(document.querySelector('.kb-voice-card-title')?.textContent ?? '');
     }
-    // 'permission' deliberately shares the microphone wording; the other four
+    // 'permission' deliberately shares the microphone wording; the other five
     // must stay distinguishable.
-    expect(seen.size).toBe(4);
+    expect(seen.size).toBe(5);
   });
 
   it('lets every card get back to the keyboard', () => {

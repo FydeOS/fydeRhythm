@@ -113,10 +113,9 @@ function OptionsPage() {
   // response can overwrite the terminal "Ready" response.
   const engineStatusRequestId = useRef(0);
   const [imeSettings, setImeSettings] = useState<ImeSettings>(kDefaultSettings);
-  // Present only in a build made with FYDE_ASR_KEY, and only where the keyboard
-  // exists to host the button.
-  const voiceConfigured = Boolean(import.meta.env.FYDE_ASR_KEY)
-    && Boolean(chrome.runtime.getManifest().input_components?.[0]?.input_view);
+  // Only where a keyboard exists to host the button. The key no longer gates
+  // the section: it is entered inside it.
+  const voiceHosted = Boolean(chrome.runtime.getManifest().input_components?.[0]?.input_view);
   enum SettingsDirtyStatus {
     NotDirty = 0,
     Dirty = 1,
@@ -709,10 +708,10 @@ function OptionsPage() {
           onRepoSchemaIdChange={setPersonalRepoSchemaId}
           onImportCompiledSchema={importCompiledSchema}
         />
-        {/* Voice input needs a build that carries an ASR key and a keyboard to
-            put the microphone button on — the Web Store build has neither, so
-            the section would be a switch that does nothing. */}
-        {voiceConfigured && (
+        {/* Keyless builds still render this: the key is entered here, so
+            hiding the section would make voice unreachable exactly where it
+            has to be configured. */}
+        {voiceHosted && (
           <VoiceSection
             enabled={imeSettings.voiceInput ?? false}
             onChange={enabled => changeSettings({ voiceInput: enabled })}

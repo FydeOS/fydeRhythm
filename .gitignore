@@ -49,5 +49,8 @@ tmp/
 .vscode/
 /entrypoints/background/rime_emscripten.wasm
 
+# Playwright MCP scratch output.
+.playwright-mcp/
+
 # Agent worktrees live inside the repo; the config beside them stays tracked.
 .claude/worktrees/

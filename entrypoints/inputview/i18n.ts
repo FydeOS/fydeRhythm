@@ -74,6 +74,8 @@ const kFallbacks: Record<string, string> = {
   vk_voice_error_network: '网络连接中断',
   vk_voice_error_server: '语音服务暂时不可用',
   vk_voice_error_unknown: '语音输入出错了',
+  vk_voice_error_auth: '语音服务拒绝了连接',
+  vk_voice_error_auth_body: '请在设置页检查 API Key。',
   vk_voice_error_body: '可以先用键盘继续输入。',
 };
 

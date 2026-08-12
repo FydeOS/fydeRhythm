@@ -498,6 +498,12 @@
   "vk_voice_error_unknown": {
     "message": "Voice input failed"
   },
+  "vk_voice_error_auth": {
+    "message": "Voice service refused the connection"
+  },
+  "vk_voice_error_auth_body": {
+    "message": "Check your API key on the settings page."
+  },
   "vk_voice_error_body": {
     "message": "You can keep typing in the meantime."
   },
@@ -527,5 +533,38 @@
   },
   "voice_mic_choose": {
     "message": "Turning it on asks the browser for the microphone — choose “Allow on every visit”."
+  },
+  "voice_key_title": {
+    "message": "Speech recognition credentials"
+  },
+  "voice_key_desc": {
+    "message": "Use your own Volcano Engine key. It is kept only on this device and never synced."
+  },
+  "voice_key_api": {
+    "message": "API key"
+  },
+  "voice_key_save": {
+    "message": "Save"
+  },
+  "voice_key_using_own": {
+    "message": "Using your key."
+  },
+  "voice_key_missing": {
+    "message": "Enter a Volcano Engine API key to enable voice input."
+  },
+  "voice_key_checking": {
+    "message": "Saved — verifying the key…"
+  },
+  "voice_key_valid": {
+    "message": "Key verified."
+  },
+  "voice_key_invalid": {
+    "message": "The server rejected this key. Remove it and enter it again."
+  },
+  "voice_key_unreachable": {
+    "message": "Saved, but the server couldn’t be reached to verify the key."
+  },
+  "voice_key_remove": {
+    "message": "Remove key"
   }
 }

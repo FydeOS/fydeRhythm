@@ -498,6 +498,12 @@
   "vk_voice_error_unknown": {
     "message": "语音输入出错了"
   },
+  "vk_voice_error_auth": {
+    "message": "语音服务拒绝了连接"
+  },
+  "vk_voice_error_auth_body": {
+    "message": "请在设置页检查 API Key。"
+  },
   "vk_voice_error_body": {
     "message": "可以先用键盘继续输入。"
   },
@@ -527,5 +533,38 @@
   },
   "voice_mic_choose": {
     "message": "开启时浏览器会请求麦克风权限，请选择“每次访问时允许”。"
+  },
+  "voice_key_title": {
+    "message": "语音识别凭据"
+  },
+  "voice_key_desc": {
+    "message": "使用你自己的火山引擎密钥。密钥仅保存在本设备上，不会同步。"
+  },
+  "voice_key_api": {
+    "message": "API 密钥"
+  },
+  "voice_key_save": {
+    "message": "保存"
+  },
+  "voice_key_using_own": {
+    "message": "正在使用你的密钥。"
+  },
+  "voice_key_missing": {
+    "message": "填写火山引擎 API 密钥后即可启用语音输入。"
+  },
+  "voice_key_checking": {
+    "message": "已保存，正在验证密钥…"
+  },
+  "voice_key_valid": {
+    "message": "密钥验证通过。"
+  },
+  "voice_key_invalid": {
+    "message": "服务器拒绝了该密钥，请移除后重新填写。"
+  },
+  "voice_key_unreachable": {
+    "message": "已保存，但无法连接服务器完成验证。"
+  },
+  "voice_key_remove": {
+    "message": "移除密钥"
   }
 }

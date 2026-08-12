@@ -498,6 +498,12 @@
   "vk_voice_error_unknown": {
     "message": "音声入力に失敗しました"
   },
+  "vk_voice_error_auth": {
+    "message": "音声サービスが接続を拒否しました"
+  },
+  "vk_voice_error_auth_body": {
+    "message": "設定ページで API キーをご確認ください。"
+  },
   "vk_voice_error_body": {
     "message": "キーボードでの入力は続けられます。"
   },
@@ -527,5 +533,38 @@
   },
   "voice_mic_choose": {
     "message": "オンにするとブラウザがマイクの許可を求めます。「毎回許可する」を選んでください。"
+  },
+  "voice_key_title": {
+    "message": "音声認識の資格情報"
+  },
+  "voice_key_desc": {
+    "message": "自分の Volcano Engine キーを使用します。キーはこの端末にのみ保存され、同期されません。"
+  },
+  "voice_key_api": {
+    "message": "API キー"
+  },
+  "voice_key_save": {
+    "message": "保存"
+  },
+  "voice_key_using_own": {
+    "message": "あなたのキーを使用中。"
+  },
+  "voice_key_missing": {
+    "message": "Volcano Engine の API キーを入力すると音声入力が有効になります。"
+  },
+  "voice_key_checking": {
+    "message": "保存しました。キーを確認しています…"
+  },
+  "voice_key_valid": {
+    "message": "キーを確認できました。"
+  },
+  "voice_key_invalid": {
+    "message": "サーバーがこのキーを拒否しました。削除してから入力し直してください。"
+  },
+  "voice_key_unreachable": {
+    "message": "保存しましたが、サーバーに接続できず確認できませんでした。"
+  },
+  "voice_key_remove": {
+    "message": "キーを削除"
   }
 }

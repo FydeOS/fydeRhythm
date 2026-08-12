@@ -13,8 +13,8 @@ import { readCredentials } from './credentials';
 import { pushLevel } from './panel-model';
 import { micPermission, watchMicPermission } from './permission';
 import type { AsrUtterance } from './protocol';
-import { kIdle, reduce, type VoiceEvent, type VoiceGate, type VoiceState } from './session';
-import { installHeaderRule, newSessionIds, openTransport, removeHeaderRule, type Transport, type ZhVariant } from './transport';
+import { kIdle, reduce, type VoiceErrorReason, type VoiceEvent, type VoiceGate, type VoiceState } from './session';
+import { acquireHeaderRule, type HeaderRuleLease, newSessionIds, openTransport, type Transport, type ZhVariant } from './transport';
 
 /** Level samples kept for the meter — one per 200 ms batch, so ~5 s of history. */
 const kLevelHistory = 24;
@@ -63,6 +63,12 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   /** Stop requested before the transport existed, so the final packet — the one
    *  that makes the server emit its last sentence — is not silently dropped. */
   const endPending = useRef(false);
+  /** The microphone is no longer collecting — the user tapped stop, or capture
+   *  ended by itself. Kept here rather than read off the rendered state because
+   *  the retry decision can run in the same React batch as the stop that
+   *  precedes it, and would then still see `listening`: measured as a second
+   *  startCapture, a microphone reopening on someone who had just stopped. */
+  const stopped = useRef(false);
   /** Bumped by every teardown. Each attempt captures the value it started with
    *  and abandons itself if it no longer matches: without this, a start() that
    *  is awaiting permission or capture when the panel closes goes on to open a
@@ -92,6 +98,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     queued.current = [];
     ready.current = false;
     endPending.current = false;
+    stopped.current = false;
     setElapsedMs(0);
     setLevels([]);
   }, []);
@@ -119,7 +126,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     dispatch({ type: 'open', gate });
     if (!gate.consent || (gate.permission !== 'granted' && gate.permission !== 'unknown')) return;
 
-    let rule: number | undefined;
+    let rule: HeaderRuleLease | undefined;
     try {
       // Open the microphone BEFORE the socket. Building the connection takes a
       // TLS handshake plus a parameters frame, and audio that arrives during it
@@ -143,6 +150,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
           // A previous attempt's capture can end long after this one began; its
           // stop must not flush or fail the session that replaced it.
           if (!current$()) return;
+          stopped.current = true;
           if (reason === 'error') {
             teardown();
             dispatch({ type: 'fail', reason: 'microphone' });
@@ -167,17 +175,36 @@ export function useVoiceSession(options: VoiceSessionOptions) {
       dispatch({ type: 'ready' });
 
       const ids = newSessionIds();
-      rule = await installHeaderRule(credentials, ids);
+      rule = await acquireHeaderRule(credentials, ids);
       if (!current$()) {
-        // Dynamic rules survive restarts; the token spares a successor's rule.
-        void removeHeaderRule(rule);
+        rule.release();
         return;
       }
+
+      const failTransport = (reason: VoiceErrorReason) => {
+        if (!current$()) return;
+        // Restarting is only appropriate while the user is still talking. Once
+        // capture has ended, reopening the microphone after a late network
+        // failure would record again without a new intent.
+        const retryablePhase = !stopped.current;
+        teardown();
+        // Retrying is only safe before anything has been inserted. Once text
+        // is in the user's document a fresh session would start its cursor at
+        // zero and commit the same sentences again. A rejected key is never
+        // retried: the second handshake fails identically, and the fix lives
+        // on the options page.
+        if (reason !== 'auth' && retryablePhase && committed.current === 0 && retried.current === 0) {
+          retried.current = 1;
+          void start();
+          return;
+        }
+        dispatch({ type: 'fail', reason });
+      };
 
       transport.current = openTransport({
         uid: optionsRef.current.uid,
         zhVariant: optionsRef.current.zhVariant,
-        headerRuleToken: rule,
+        headerRuleLease: rule,
         callbacks: {
           onReady: () => {
             if (!current$()) return;
@@ -209,26 +236,14 @@ export function useVoiceSession(options: VoiceSessionOptions) {
             }
           },
           onError: (reason) => {
-            if (!current$()) return;
-            teardown();
-            // Retrying is only safe before anything has been inserted. Once text
-            // is in the user's document a fresh session would start its cursor
-            // at zero and commit the same sentences again, so a failure after
-            // that point is the user's to retry.
-            if (committed.current === 0 && retried.current === 0) {
-              retried.current = 1;
-              void start();
-              return;
-            }
-            dispatch({ type: 'fail', reason });
+            failTransport(reason);
           },
           onClosed: () => {
             if (!current$()) return;
-            // A close while still listening is the far end going away, not a
-            // finished session; the reducer ignores it once idle.
-            if (current.current.kind === 'listening') {
-              teardown();
-              dispatch({ type: 'fail', reason: 'network' });
+            // A close during either active network phase is the far end going
+            // away. Finalizing uses the same error path but is not retryable.
+            if (current.current.kind === 'listening' || current.current.kind === 'finalizing') {
+              failTransport('network');
             }
           },
         },
@@ -236,7 +251,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     }
     catch (error) {
       // A failure here leaves no transport for teardown to close the rule with.
-      if (rule !== undefined) void removeHeaderRule(rule);
+      rule?.release();
       if (!current$()) return;
       const captureBegan = capture.current !== null;
       teardown();
@@ -255,6 +270,9 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   }, [dispatch, teardown]);
 
   const stop = useCallback(() => {
+    // Recorded before the capture layer gets a chance to end asynchronously: a
+    // socket failure in between must not be read as "still talking".
+    stopped.current = true;
     void capture.current?.stop();
   }, []);
 
@@ -280,10 +298,15 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   useEffect(() => {
     if (state.kind !== 'finalizing') return;
     const timer = setTimeout(() => {
-      // Nothing to flush: the cursor already committed every definite sentence,
-      // and the tail was never confirmed, so it is dropped rather than guessed.
+      // An unconfirmed tail is dropped rather than guessed, so whether this is a
+      // failure depends on whether there was one. With nothing pending, every
+      // definite sentence is already in the document and the session did finish;
+      // reporting a network error there would invent a loss. Read from the ref
+      // rather than the closure so a partial that arrived while finalizing
+      // counts, without restarting the deadline on every packet.
+      const pending = current.current.kind === 'finalizing' ? current.current.pending : '';
       teardown();
-      dispatch({ type: 'final' });
+      dispatch(pending === '' ? { type: 'final' } : { type: 'fail', reason: 'network' });
     }, kFinalizeTimeoutMs);
     return () => clearTimeout(timer);
   }, [state.kind, dispatch, teardown]);

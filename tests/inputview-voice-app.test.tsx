@@ -44,6 +44,8 @@ vi.mock('../entrypoints/inputview/chrome-shim', () => ({
 // tests are about the other three conditions.
 vi.mock('../entrypoints/inputview/voice/credentials', () => ({
   readCredentials: () => ({ apiKey: 'k', resourceId: 'r' }),
+  hydrateCredentials: async () => {},
+  watchCredentials: () => () => {},
 }));
 vi.mock('../entrypoints/inputview/voice/settings', async original => ({
   ...(await original<object>()),
@@ -139,10 +141,12 @@ describe('offering the microphone', () => {
     expect(micButton()).toBeNull();
   });
 
-  it('withholds it for a script the model cannot transcribe', async () => {
+  it('withholds it on a schema the model cannot transcribe', async () => {
+    // Japanese, and the guessed script says 'zh' for it — the schema id is what
+    // decides, so the keyboard withholds the button anyway.
     render(<App />);
     await flush();
-    await send(state({ script: 'ja' }));
+    await send(state({ schemaId: 'KappaJP', schemaName: '河童五笔' }));
     expect(await toolbarRendered()).toBe(true);
     expect(micButton()).toBeNull();
   });

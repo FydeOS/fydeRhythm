@@ -498,6 +498,12 @@
   "vk_voice_error_unknown": {
     "message": "음성 입력에 실패했습니다"
   },
+  "vk_voice_error_auth": {
+    "message": "음성 서비스가 연결을 거부했습니다"
+  },
+  "vk_voice_error_auth_body": {
+    "message": "설정 페이지에서 API 키를 확인해 주세요."
+  },
   "vk_voice_error_body": {
     "message": "그동안 키보드로 계속 입력할 수 있습니다."
   },
@@ -527,5 +533,38 @@
   },
   "voice_mic_choose": {
     "message": "켜면 브라우저가 마이크 권한을 요청합니다. “방문할 때마다 허용”을 선택하세요."
+  },
+  "voice_key_title": {
+    "message": "음성 인식 자격 증명"
+  },
+  "voice_key_desc": {
+    "message": "자신의 Volcano Engine 키를 사용합니다. 키는 이 기기에만 저장되며 동기화되지 않습니다."
+  },
+  "voice_key_api": {
+    "message": "API 키"
+  },
+  "voice_key_save": {
+    "message": "저장"
+  },
+  "voice_key_using_own": {
+    "message": "내 키 사용 중."
+  },
+  "voice_key_missing": {
+    "message": "Volcano Engine API 키를 입력하면 음성 입력이 활성화됩니다."
+  },
+  "voice_key_checking": {
+    "message": "저장되었습니다. 키를 확인하는 중…"
+  },
+  "voice_key_valid": {
+    "message": "키가 확인되었습니다."
+  },
+  "voice_key_invalid": {
+    "message": "서버가 이 키를 거부했습니다. 제거 후 다시 입력해 주세요."
+  },
+  "voice_key_unreachable": {
+    "message": "저장되었지만 서버에 연결할 수 없어 확인하지 못했습니다."
+  },
+  "voice_key_remove": {
+    "message": "키 제거"
   }
 }

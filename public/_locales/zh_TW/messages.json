@@ -498,6 +498,12 @@
   "vk_voice_error_unknown": {
     "message": "語音輸入發生錯誤"
   },
+  "vk_voice_error_auth": {
+    "message": "語音服務拒絕了連線"
+  },
+  "vk_voice_error_auth_body": {
+    "message": "請在設定頁檢查 API Key。"
+  },
   "vk_voice_error_body": {
     "message": "可以先用鍵盤繼續輸入。"
   },
@@ -527,5 +533,38 @@
   },
   "voice_mic_choose": {
     "message": "開啟時瀏覽器會請求麥克風權限，請選擇“每次造訪時允許”。"
+  },
+  "voice_key_title": {
+    "message": "語音辨識憑證"
+  },
+  "voice_key_desc": {
+    "message": "使用你自己的火山引擎金鑰。金鑰僅保存在本裝置上，不會同步。"
+  },
+  "voice_key_api": {
+    "message": "API 金鑰"
+  },
+  "voice_key_save": {
+    "message": "儲存"
+  },
+  "voice_key_using_own": {
+    "message": "正在使用你的金鑰。"
+  },
+  "voice_key_missing": {
+    "message": "填寫火山引擎 API 金鑰後即可啟用語音輸入。"
+  },
+  "voice_key_checking": {
+    "message": "已儲存，正在驗證金鑰…"
+  },
+  "voice_key_valid": {
+    "message": "金鑰驗證通過。"
+  },
+  "voice_key_invalid": {
+    "message": "伺服器拒絕了該金鑰，請移除後重新輸入。"
+  },
+  "voice_key_unreachable": {
+    "message": "已儲存，但無法連線伺服器完成驗證。"
+  },
+  "voice_key_remove": {
+    "message": "移除金鑰"
   }
 }

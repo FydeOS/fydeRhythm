@@ -40,19 +40,7 @@ export const sharedInputComponent = {
   layouts: ['us'],
 };
 
-// FYDE_ASR_KEY is not WXT_-prefixed, so it is not exposed to the bundle
-// automatically; injecting it here keeps the .env variable name as the one the
-// team already uses. Absent on a machine without .env, which is exactly what
-// makes such a build carry no voice feature at all.
-export const asrDefine = () => ({
-  'import.meta.env.FYDE_ASR_KEY': JSON.stringify(process.env.FYDE_ASR_KEY?.trim() ?? ''),
-  'import.meta.env.FYDE_ASR_RESOURCE_ID': JSON.stringify(
-    process.env.FYDE_ASR_RESOURCE_ID?.trim() ?? 'volc.bigasr.sauc.duration',
-  ),
-});
-
 export const sharedVite: UserConfig['vite'] = () => ({
-  define: asrDefine(),
   // `~icons/<set>/<name>` imports compile to inline SVG React components at
   // build time — no runtime dependency or network fetch, so they stay within
   // the extension's strict CSP. Only imported icons are bundled.

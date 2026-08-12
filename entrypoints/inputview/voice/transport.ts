@@ -21,6 +21,10 @@ import type { VoiceErrorReason } from './session';
 
 export const kEndpoint = 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async';
 export const kEndpointHost = 'openspeech.bytedance.com';
+/** A black-holed TCP/TLS/WebSocket handshake may emit neither error nor close.
+ *  Fifteen seconds leaves ample room for a weak link; the session layer then
+ *  gets one fresh attempt rather than recording indefinitely into a dead one. */
+export const kHandshakeTimeoutMs = 15_000;
 
 /** Rule id for the header-injection rule. Fixed so re-registering replaces it
  *  rather than accumulating duplicates. */
@@ -30,7 +34,7 @@ export interface VolcanoCredentials {
   /** New-console auth: a single X-Api-Key replaces the old console's
    *  X-Api-App-Key / X-Api-Access-Key pair. */
   apiKey: string;
-  /** e.g. volc.bigasr.sauc.duration — picks the model and the billing plan. */
+  /** e.g. volc.seedasr.sauc.duration — picks the model and the billing plan. */
   resourceId: string;
 }
 
@@ -108,6 +112,19 @@ export function errorReasonFor(code: number): VoiceErrorReason {
   return 'server';
 }
 
+/** True when the endpoint host answers HTTPS at all — the one observable a
+ *  browser gets for telling "this socket was refused" from "no network",
+ *  since the WebSocket handshake status is hidden from page JS. */
+export async function httpsReachable(): Promise<boolean> {
+  try {
+    await fetch(`https://${kEndpointHost}/`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(4000) });
+    return true;
+  }
+  catch {
+    return false;
+  }
+}
+
 /** The slice of WebSocket this module uses, so a session can be driven without
  *  a real socket. */
 export interface SocketLike {
@@ -133,11 +150,15 @@ export interface TransportOptions {
   callbacks: TransportCallbacks;
   uid: string;
   zhVariant?: ZhVariant;
-  /** The token from the install that put up this session's handshake rule, so
-   *  the removals below cannot take down a rule a newer session installed. */
-  headerRuleToken?: number;
+  /** Held from rule installation until this socket's handshake finishes.
+   *  Releasing it removes the rule before another page may install its own. */
+  headerRuleLease?: HeaderRuleLease;
   /** Injectable so a session can be driven without a real socket. */
   connect?: (url: string) => SocketLike;
+  /** Test seam for black-holed handshakes. Zero disables the deadline. */
+  handshakeTimeoutMs?: number;
+  /** Consulted only when the handshake dies, to split 'auth' from 'network'. */
+  probeReachability?: () => Promise<boolean>;
 }
 
 export interface Transport {
@@ -146,37 +167,97 @@ export interface Transport {
   close: () => void;
 }
 
-/** Counts installs. Every session shares rule id 1, so a removal issued on
- *  behalf of an old attempt must prove that install is still the latest — or
- *  it takes down the rule a newer session just put up for its handshake. */
-let installCount = 0;
+const kHeaderRuleLock = 'fyde-rhythm:voice-header-rule';
+let localHeaderRuleTail: Promise<void> = Promise.resolve();
 
-/** Returns a token identifying this install, for removeHeaderRule. */
-export async function installHeaderRule(
+export interface HeaderRuleLease {
+  /** Idempotent. Removal completes before the next lease is granted. */
+  release: () => void;
+}
+
+/** Puts the handshake rule up. Only acquireHeaderRule may call this: the lease
+ *  it hands out is what keeps one install from replacing another's rule, and a
+ *  caller that installs directly bypasses that. */
+async function installHeaderRule(
   credentials: VolcanoCredentials,
   ids: { requestId: string; connectId: string },
-): Promise<number> {
-  const token = ++installCount;
+): Promise<void> {
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: [kHeaderRuleId],
     addRules: [headerRule(credentials, ids)],
   });
-  return token;
 }
 
 /** Takes the rule down again. Dynamic rules persist across restarts, so a rule
  *  left installed is a standing offer of our credentials for every future
  *  handshake — the headers are only needed for the few milliseconds of one.
  *
- *  With a token, the removal happens only while that install is the latest:
- *  an attempt abandoned mid-install resolves late, and by then the rule it
- *  would remove can belong to the session that replaced it. */
-export async function removeHeaderRule(token?: number): Promise<void> {
-  if (token !== undefined && token !== installCount) return;
+ *  Unconditional, because the lock makes it safe: the removal runs inside the
+ *  same critical section as its install, so no other holder can have replaced
+ *  the rule in between. An install-counter token used to stand in for that
+ *  guarantee and is gone with it. */
+async function removeHeaderRule(): Promise<void> {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [kHeaderRuleId] });
   }
   catch { /* the next install replaces it by id anyway */ }
+}
+
+/** Owns the one extension-wide handshake rule until release.
+ *
+ * InputView and Options run in separate JS realms, so the install token above
+ * cannot coordinate them: both realms can believe their own install is latest.
+ * A Web Lock is shared by same-origin extension pages and keeps one rule in
+ * place from install through handshake. The local tail preserves the same
+ * behaviour in tests and older non-browser environments. */
+export async function acquireHeaderRule(
+  credentials: VolcanoCredentials,
+  ids: { requestId: string; connectId: string },
+): Promise<HeaderRuleLease> {
+  let releaseHold!: () => void;
+  const hold = new Promise<void>((resolve) => { releaseHold = resolve; });
+  let readyResolve!: () => void;
+  let readyReject!: (error: unknown) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    readyResolve = resolve;
+    readyReject = reject;
+  });
+
+  const ownRule = async () => {
+    let installed = false;
+    try {
+      await installHeaderRule(credentials, ids);
+      installed = true;
+      readyResolve();
+      await hold;
+    }
+    catch (error) {
+      readyReject(error);
+    }
+    finally {
+      // Only if it went up: a failed install has no rule of ours to remove, and
+      // removing anyway would strip whatever the previous holder left behind.
+      if (installed) await removeHeaderRule();
+    }
+  };
+
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    void navigator.locks.request(kHeaderRuleLock, ownRule).catch(readyReject);
+  }
+  else {
+    const turn = localHeaderRuleTail.then(ownRule, ownRule);
+    localHeaderRuleTail = turn.catch(() => {});
+  }
+
+  await ready;
+  let released = false;
+  return {
+    release: () => {
+      if (released) return;
+      released = true;
+      releaseHold();
+    },
+  };
 }
 
 export function openTransport(options: TransportOptions): Transport {
@@ -187,6 +268,25 @@ export function openTransport(options: TransportOptions): Transport {
   socket.binaryType = 'arraybuffer';
 
   let closed = false;
+  // Authentication lives entirely in the handshake, so this bit is what
+  // decides whether a failure may still be the key's fault.
+  let handshakeDone = false;
+  // Every frame is gzipped, so a result is decoded asynchronously and the close
+  // event can win the race — measured: a `message` immediately followed by a
+  // `close` loses the result whenever the inflate needs a task turn, which under
+  // load it does. That frame is usually the final one, so the tail vanished and
+  // the panel reported a network failure instead of committing it. Deliveries
+  // therefore stop only when WE tear the transport down, and a remote close
+  // waits for decodes already in flight before it is announced.
+  let abandoned = false;
+  let decoding = 0;
+  let closeDeferred = false;
+  let headerRuleReleased = false;
+  const releaseHeaderRule = () => {
+    if (headerRuleReleased) return;
+    headerRuleReleased = true;
+    options.headerRuleLease?.release();
+  };
   // Nothing may be written before the socket opens: send() on a CONNECTING
   // socket throws, and audio queued by the caller can otherwise reach the wire
   // ahead of the parameters frame. Seeding the chain with the open event makes
@@ -205,18 +305,88 @@ export function openTransport(options: TransportOptions): Transport {
   // The seed is consumed by the first write; nothing else observes it.
   tail.catch(() => {});
 
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearHandshakeTimer = () => {
+    if (handshakeTimer === undefined) return;
+    clearTimeout(handshakeTimer);
+    handshakeTimer = undefined;
+  };
+  /** Announces a remote close once nothing is still being decoded. */
+  const announceClose = () => {
+    if (!closeDeferred || decoding > 0) return;
+    closeDeferred = false;
+    callbacks.onClosed();
+  };
+
+  const teardownFailed = (detail: string) => {
+    closed = true;
+    // A failure is our own teardown: a result decoded after it belongs to a
+    // session the caller has already been told is over.
+    abandoned = true;
+    closeDeferred = false;
+    clearHandshakeTimer();
+    failed(new Error(detail));
+    try {
+      socket.close();
+    }
+    catch { /* already unusable; the error callback is the terminal signal */ }
+    releaseHeaderRule();
+  };
+  const failSocket = (reason: VoiceErrorReason, detail: string) => {
+    if (closed) return;
+    teardownFailed(detail);
+    callbacks.onError(reason, detail);
+  };
+  // A death before the handshake finishes is the one place a rejected key can
+  // hide: the handshake status is invisible to page JS, so a refusal and a
+  // dead network raise the same event. The host answering HTTPS while refusing
+  // this socket means the refusal was aimed at the credentials. Teardown is
+  // immediate; only the verdict waits on the probe.
+  const failHandshake = (detail: string) => {
+    if (closed) return;
+    teardownFailed(detail);
+    const probe = options.probeReachability ?? httpsReachable;
+    void probe()
+      .catch(() => false)
+      .then(up => callbacks.onError(up ? 'auth' : 'network', detail));
+  };
+
   const write = (make: () => Promise<Uint8Array>): Promise<void> => {
     const next = tail.then(async () => {
       if (closed) return;
-      socket.send(await make());
+      let frame: Uint8Array;
+      try {
+        frame = await make();
+      }
+      catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        failSocket('unknown', detail);
+        throw error;
+      }
+      if (closed) return;
+      try {
+        socket.send(frame);
+      }
+      catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        failSocket('network', detail);
+        throw error;
+      }
     });
     // Keep the chain alive after a failure so later packets still have an
-    // ordering anchor; the rejection is surfaced to the caller of write().
+    // ordering anchor. Attaching the handler here also means fire-and-forget
+    // capture callbacks cannot create an unhandled rejection when send throws.
     tail = next.catch(() => {});
     return next;
   };
 
   socket.onopen = () => {
+    if (closed) return;
+    handshakeDone = true;
+    clearHandshakeTimer();
+    // The headers were needed for the handshake, which is now over. Release
+    // before async frame encoding so Options is never serialised behind it.
+    releaseHeaderRule();
     // The parameters frame bypasses the queue deliberately: callers may have
     // queued audio before the socket opened, and going through write() would
     // put the frame BEHIND that audio — the server would receive sound before
@@ -224,60 +394,92 @@ export function openTransport(options: TransportOptions): Transport {
     void (async () => {
       const frame = await encodeFullClientRequest(buildSessionParams(options.uid, options.zhVariant));
       if (closed) return;
-      socket.send(frame);
+      try {
+        socket.send(frame);
+      }
+      catch (error) {
+        failSocket('network', error instanceof Error ? error.message : String(error));
+        return;
+      }
       opened();
-      // The headers were needed for the handshake, which is over. Waiting for
-      // close() to remove the rule leaves it installed whenever the far end
-      // closes first — `closed` is already set by then, so close() returns
-      // early — and dynamic rules survive restarts.
-      void removeHeaderRule(options.headerRuleToken);
       callbacks.onReady();
     })().catch((error: unknown) => {
-      failed(error instanceof Error ? error : new Error(String(error)));
-      if (!closed) callbacks.onError('unknown', error instanceof Error ? error.message : String(error));
+      failSocket('unknown', error instanceof Error ? error.message : String(error));
     });
   };
 
   socket.onmessage = (event) => {
-    if (closed) return;
+    if (abandoned) return;
     const data = event.data;
     if (!(data instanceof ArrayBuffer)) return;
 
+    decoding++;
     void decodeServerMessage(data).then((message) => {
-      if (closed) return;
+      if (abandoned) return;
       if (message.kind === 'error') {
         callbacks.onError(errorReasonFor(message.code), `${message.code}: ${message.message}`);
         return;
       }
       callbacks.onResult(message.result, message.last);
     }).catch((error: unknown) => {
+      if (abandoned) return;
       callbacks.onError('server', error instanceof Error ? error.message : String(error));
+    }).finally(() => {
+      decoding--;
+      announceClose();
     });
   };
 
   socket.onerror = () => {
     // Unblocks anything waiting on the handshake; the write itself then no-ops
     // because close() has set `closed`.
-    failed(new Error('websocket error'));
-    if (!closed) callbacks.onError('network', 'websocket error');
+    if (!handshakeDone) {
+      failHandshake('websocket error');
+      return;
+    }
+    failSocket('network', 'websocket error');
   };
 
   socket.onclose = () => {
     if (closed) return;
+    // A refusal surfaces as error-then-close; classifying the close too keeps
+    // the verdict the same if only the close event is delivered.
+    if (!handshakeDone) {
+      failHandshake('websocket closed during handshake');
+      return;
+    }
     closed = true;
+    clearHandshakeTimer();
     failed(new Error('closed'));
-    void removeHeaderRule(options.headerRuleToken);
-    callbacks.onClosed();
+    releaseHeaderRule();
+    // The far end went away. Anything already being inflated was sent before
+    // that and is still owed to the caller — usually the final sentence — so the
+    // close is announced only once those have landed.
+    closeDeferred = true;
+    announceClose();
   };
+
+  const handshakeTimeoutMs = options.handshakeTimeoutMs ?? kHandshakeTimeoutMs;
+  if (handshakeTimeoutMs > 0) {
+    handshakeTimer = setTimeout(() => {
+      // Never probed into 'auth': a timeout is silence, not a refusal.
+      failSocket('network', 'websocket handshake timeout');
+    }, handshakeTimeoutMs);
+  }
 
   return {
     sendAudio: (pcm, last = false) => write(() => encodeAudioPacket(pcm, last)),
     close: () => {
       if (closed) return;
       closed = true;
+      // The caller is done with this session, so a frame still inflating is no
+      // longer wanted — unlike a remote close, which may still owe us the tail.
+      abandoned = true;
+      closeDeferred = false;
+      clearHandshakeTimer();
       failed(new Error('closed'));
       socket.close();
-      void removeHeaderRule(options.headerRuleToken);
+      releaseHeaderRule();
     },
   };
 }

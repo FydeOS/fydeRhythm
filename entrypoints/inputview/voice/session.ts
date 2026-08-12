@@ -16,6 +16,10 @@ export type VoiceBlock = 'consent' | 'permission';
 export type VoiceErrorReason
   = | 'microphone'
     | 'network'
+  /** The handshake was refused while the host answered HTTPS: the credentials,
+   *  not the connection. Only a pre-open death may carry this — authentication
+   *  happens once, in the handshake, so later failures are never the key's. */
+    | 'auth'
     | 'server'
     | 'unknown';
 
