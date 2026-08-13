@@ -20,15 +20,15 @@ const gateway = () => process.env.FYDE_ASR_GATEWAY?.trim() || kDefaultGateway;
  *  cover it. */
 const accountIssuer = () => process.env.FYDE_ACCOUNT_ISSUER?.trim() || kDefaultIssuer;
 
-/** Match patterns for a configured URL, in both schemes it is used with:
- *  the socket scheme for dictation and the matching http(s) one for fetches.
- *  Derived from the URL rather than fixed, so a plain-http development
+/** Match patterns for a configured URL, in the schemes it is actually dialled
+ *  in. Derived from the URL rather than fixed, so a plain-http development
  *  deployment is granted what it actually dials. Hostname, not host: a match
  *  pattern may not carry a port, and ignores it anyway.
  *
- *  A wss:// gateway therefore yields wss:// + https://, and a ws:// one
- *  ws:// + http://. */
-function hostPermissionsFor(raw: string, name: string): string[] {
+ *  `sockets` is what separates the two hosts: the gateway is dictated to over a
+ *  WebSocket and fetched from, while the account server is only ever fetched
+ *  from — granting it wss:// would be a permission nothing opens. */
+function hostPermissionsFor(raw: string, name: string, sockets = true): string[] {
   // Only reached in a voice build, where an empty host is a misconfiguration.
   if (!raw) throw new Error(`FYDE_VOICE_INPUT is set but ${name} has no value`);
   let url: URL;
@@ -39,9 +39,10 @@ function hostPermissionsFor(raw: string, name: string): string[] {
     throw new Error(`${name} is not a URL: ${raw}`);
   }
   const secure = url.protocol === 'https:' || url.protocol === 'wss:';
-  return secure
-    ? [`wss://${url.hostname}/*`, `https://${url.hostname}/*`]
-    : [`ws://${url.hostname}/*`, `http://${url.hostname}/*`];
+  return [
+    ...sockets ? [`${secure ? 'wss' : 'ws'}://${url.hostname}/*`] : [],
+    `${secure ? 'https' : 'http'}://${url.hostname}/*`,
+  ];
 }
 
 // See https://wxt.dev/api/config.html
@@ -92,7 +93,7 @@ export default defineConfig({
             ...hostPermissionsFor(gateway(), 'FYDE_ASR_GATEWAY'),
             // Resolved, not raw: an unset issuer still has a default the code
             // will dial, and a permission it lacked would fail at sign-in.
-            ...hostPermissionsFor(accountIssuer(), 'FYDE_ACCOUNT_ISSUER'),
+            ...hostPermissionsFor(accountIssuer(), 'FYDE_ACCOUNT_ISSUER', false),
           ]
         : [],
 
