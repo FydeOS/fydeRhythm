@@ -75,6 +75,11 @@ export class InputController extends EventEmitter {
   sessionEpoch = 0;
   contextEpoch = 0;
   visibilityEpoch = 0;
+  // Ownership of the screen. Not candidateGeneration: commits bump that too.
+  keySequence = 0;
+  // Bumped by resetUI. Teardowns run outside sessionMutex and touch no other
+  // counter, so this is what a queued operation checks before repainting.
+  presentationEpoch = 0;
 
   rimeLogBuffer: string[];
   rimeLogBufferPos: number;
@@ -487,6 +492,7 @@ export class InputController extends EventEmitter {
   }
 
   resetUI() {
+    this.presentationEpoch++;
     if (this.context != null) {
       void this.setComposition({
         contextID: this.context.contextID,
@@ -648,11 +654,20 @@ export class InputController extends EventEmitter {
     return message.includes('IME is not active');
   }
 
+  // What the window was last told. True, not false: a restarted worker inherits
+  // an unknown window, so its first hide must go out rather than dedup away.
+  candidateWindowShown = true;
+
   setCandidateWindowProperties(
     engineId: string,
     properties: chrome.input.ime.CandidateWindowParameterProperties,
   ): Promise<void> {
     if (this.engineId !== engineId) return Promise.resolve();
+    if (properties.visible === false && !this.candidateWindowShown) return Promise.resolve();
+    // Issued, not confirmed: Chrome applies these in call order, and latching on
+    // completion could record "hidden" while a later show is on screen.
+    this.candidateWindowShown = properties.visible ?? true;
+    const unknown = () => { this.candidateWindowShown = true; };
     return new Promise((res, rej) => {
       try {
         chrome.input.ime.setCandidateWindowProperties({
@@ -664,14 +679,17 @@ export class InputController extends EventEmitter {
             res();
           }
           else if (error && this.isInactiveImeError(error.message)) {
+            unknown();
             res();
           }
           else {
+            unknown();
             rej(error ? new Error(error.message) : new Error('setCandidateWindowProperties failed'));
           }
         });
       }
       catch (error) {
+        unknown();
         if (this.isInactiveImeError(error)) {
           res();
         }
@@ -751,7 +769,9 @@ export class InputController extends EventEmitter {
         }
         if (!this.inputViewVisible) {
           // Virtual keyboard is not visible, candidiates are displayed in system candidate window
-          if (rimeContext.menu.candidates.length > 0) {
+          // Under the same context guard as the candidates it describes: a blur
+          // that lands mid-key hides the window and never repaints again.
+          if (rimeContext.menu.candidates.length > 0 && this.context != null) {
             promises.push(this.setCandidateWindowProperties(engineId, {
               visible: true,
               cursorVisible: true,
@@ -848,17 +868,17 @@ export class InputController extends EventEmitter {
         }
         if (!this.inputViewVisible) {
           // Virtual keyboard is not visible, candidiates are displayed in system candidate window
-          promises.push(this.setCandidateWindowProperties(engineId, {
-            visible: true,
-            cursorVisible: false,
-            auxiliaryTextVisible: true,
-            pageSize: 1,
-            auxiliaryText: chrome.i18n.getMessage('loading_engine'),
-            windowPosition: 'composition',
-            vertical: true,
-          }));
           if (this.context != null) {
             const contextId = this.context.contextID;
+            promises.push(this.setCandidateWindowProperties(engineId, {
+              visible: true,
+              cursorVisible: false,
+              auxiliaryTextVisible: true,
+              pageSize: 1,
+              auxiliaryText: chrome.i18n.getMessage('loading_engine'),
+              windowPosition: 'composition',
+              vertical: true,
+            }));
             promises.push(new Promise<void>((res, rej) => {
               chrome.input.ime.setCandidates({
                 contextID: contextId,
@@ -885,6 +905,19 @@ export class InputController extends EventEmitter {
     await Promise.all(promises);
   }
 
+  // What an operation must still own to repaint. Capture BEFORE queueing on
+  // sessionMutex: teardowns run outside it, so the wait is most of the window.
+  private presentationOwner(): () => boolean {
+    const session = this.session;
+    const sessionEpoch = this.sessionEpoch;
+    const context = this.context;
+    const contextEpoch = this.contextEpoch;
+    const presentation = this.presentationEpoch;
+    return () => this.session === session && this.sessionEpoch === sessionEpoch
+      && this.context === context && this.contextEpoch === contextEpoch
+      && this.presentationEpoch === presentation;
+  }
+
   async commitIfAvailable(
     session = this.session,
     context = this.context,
@@ -903,6 +936,9 @@ export class InputController extends EventEmitter {
           text: commit.text,
         }, this.imeCallDone('commitText', res, rej));
       });
+      // commitText dropped Chrome's composition; recording it keeps the repaint's
+      // empty setComposition from going out and killing omnibox autofill.
+      this.preeditEmpty = true;
       await this.invalidateCandidateCache();
       return true;
     }
@@ -1026,7 +1062,8 @@ export class InputController extends EventEmitter {
         }
       }
       void this.invalidateCandidateCache();
-      const keyGeneration = this.candidateGeneration;
+      const keySeq = ++this.keySequence;
+      const owns = this.presentationOwner();
       const sessionEpoch = this.sessionEpoch;
       const context = this.context;
       const contextEpoch = this.contextEpoch;
@@ -1047,7 +1084,7 @@ export class InputController extends EventEmitter {
         // non-QWERTY Latin layout we must insert the remapped char
         // ourselves and swallow the event. keydown only — the system
         // inserts nothing on keyup.
-        if (!handled && !release && this.isPlainPrintable(keyData) && this.context) {
+        if (!handled && !release && this.isPlainPrintable(keyData) && context) {
           const asciiChar = remapPhysicalKey(
             this.remapLayouts().ascii,
             keyData.code,
@@ -1055,27 +1092,40 @@ export class InputController extends EventEmitter {
             !!keyData.capsLock,
           );
           if (asciiChar !== null && asciiChar !== keyData.key) {
-            const contextId = this.context.contextID;
-            await new Promise<void>((res) => {
-              chrome.input.ime.commitText({ contextID: contextId, text: asciiChar }, () => {
-                const error = chrome.runtime.lastError;
-                if (error) console.warn('commitText (ascii remap) failed:', error.message);
-                res();
+            // Belongs to the field the key was pressed in. Still swallowed when
+            // dropped, or the system inserts the unremapped US char instead.
+            if (this.context === context && this.contextEpoch === contextEpoch) {
+              const contextId = context.contextID;
+              await new Promise<void>((res) => {
+                chrome.input.ime.commitText({ contextID: contextId, text: asciiChar }, () => {
+                  const error = chrome.runtime.lastError;
+                  if (error) console.warn('commitText (ascii remap) failed:', error.message);
+                  res();
+                });
               });
-            });
+            }
             handled = true;
           }
         }
-        const committed = await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch);
-        // Newer queued input owns presentation. Processing still runs
-        // in order, but an intermediate key must not repaint over the
-        // candidate state requested by a later key.
-        if (!committed && keyGeneration === this.candidateGeneration) {
-          await this.refreshContextInSessionOperation();
+        // processKey already consumed the key: neither this nor the repaint below
+        // may demote handled, or Chrome delivers the key to the page as well.
+        await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch)
+          .catch((error: unknown) => {
+            if (!this.isInactiveImeError(error)) this.printErr(`commit: ${String(error)}`);
+          });
+        // An intermediate key must not repaint over the state a queued key
+        // already asked for. Commits repaint like any other outcome.
+        if (keySeq === this.keySequence && owns()) {
+          await this.refreshContextInSessionOperation().catch((error: unknown) => {
+            if (!this.isInactiveImeError(error)) this.printErr(`repaint: ${String(error)}`);
+          });
         }
-        if (!this.preeditEmpty && (keyData.code == 'PageUp' || keyData.code == 'PageDown')) {
+        if ((this.candidateWindowShown || !this.preeditEmpty)
+          && (keyData.code == 'PageUp' || keyData.code == 'PageDown')) {
           // Chrome will crash if PageUp or PageDown is sent while user is typing in OmniBar and candidate box is shown
-          // So we always return handled = true in this case, to prevent key event being sent to Chrome
+          // So we always return handled = true in this case, to prevent key event being sent to Chrome.
+          // Both terms: a commit clears preeditEmpty while a skipped repaint can
+          // still leave the window up.
           return true;
         }
         return handled;
@@ -1148,17 +1198,22 @@ export class InputController extends EventEmitter {
   // except into numeric fields, which reject full-width characters. The
   // flushed text is never re-shaped: the engine already shaped its own.
   async insertLiteral(text: string) {
+    const session = this.session;
+    const context = this.context;
+    const sessionEpoch = this.sessionEpoch;
+    const contextEpoch = this.contextEpoch;
     await this.invalidateCandidateCache();
     await this.sessionMutex.runExclusive(async () => {
-      const session = this.session;
-      const context = this.context;
-      const sessionEpoch = this.sessionEpoch;
-      const contextEpoch = this.contextEpoch;
       if (!context) return;
-      const stale = () => this.session !== session || this.sessionEpoch !== sessionEpoch
-        || this.context !== context || this.contextEpoch !== contextEpoch;
+      // The glyph is cancelled by the field alone — it commits with no session
+      // at all. The session gates only the flush, and is re-checked BEFORE the
+      // first call: a deleted embind handle aborts the worker.
+      const fieldStale = () => this.context !== context || this.contextEpoch !== contextEpoch;
+      const stale = () => fieldStale()
+        || this.session !== session || this.sessionEpoch !== sessionEpoch;
       let flushed = '';
-      if (session) {
+      if (fieldStale()) return;
+      if (session && !stale()) {
         const rimeContext = await session.getContext();
         if (stale()) return;
         const preedit = rimeContext?.composition?.preedit ?? '';
@@ -1176,36 +1231,44 @@ export class InputController extends EventEmitter {
           text: flushed + literal,
         }, this.imeCallDone('commitText', res, rej));
       });
+      // Never gated: flushed implies clearComposition ran, so this can only
+      // blank — withholding it leaves the flushed word's candidates up.
       if (flushed) await this.refreshContextInSessionOperation();
     });
   }
 
   async selectCandidate(index: number, currentPage: boolean = true) {
+    // Captured where the tap happened: the field it was aimed at decides where
+    // its text may land.
+    const owns = this.presentationOwner();
+    const session = this.session;
+    const context = this.context;
+    const sessionEpoch = this.sessionEpoch;
+    const contextEpoch = this.contextEpoch;
     await this.invalidateCandidateCache();
     await this.sessionMutex.runExclusive(async () => {
-      const session = this.session;
-      const context = this.context;
-      const sessionEpoch = this.sessionEpoch;
-      const contextEpoch = this.contextEpoch;
-      if (!session) return;
+      // A reload may replace the session while this tap is queued.
+      if (!session || this.session !== session || this.sessionEpoch !== sessionEpoch) return;
       await session.actionCandidate(index, 'select', currentPage);
-      const committed = await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch);
-      if (!committed && this.session === session && this.sessionEpoch === sessionEpoch) {
+      await this.commitIfAvailable(session, context, sessionEpoch, contextEpoch);
+      if (owns()) {
         await this.refreshContextInSessionOperation();
       }
     });
   }
 
   async deleteCandidate(index: number, currentPage: boolean = true) {
+    const owns = this.presentationOwner();
+    const session = this.session;
+    const sessionEpoch = this.sessionEpoch;
     // Invalidate before the action so an active pagination loop cannot
     // publish the candidate being deleted while the action is pending.
     await this.invalidateCandidateCache();
     await this.sessionMutex.runExclusive(async () => {
-      const session = this.session;
-      const sessionEpoch = this.sessionEpoch;
-      if (!session) return;
+      // The index addresses the menu the user right-clicked, not a reloaded one.
+      if (!session || this.session !== session || this.sessionEpoch !== sessionEpoch) return;
       await session.actionCandidate(index, 'delete', currentPage);
-      if (this.session !== session || this.sessionEpoch !== sessionEpoch) return;
+      if (!owns()) return;
       await this.refreshContextInSessionOperation();
     });
     // Deleting rewrites the menu WITHOUT changing the preedit, so the
