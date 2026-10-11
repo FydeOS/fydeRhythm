@@ -288,8 +288,16 @@ export class InputController extends EventEmitter {
       if (!Array.isArray(schemaConfig.speller.algebra)) {
         schemaConfig.speller.algebra = [];
       }
-      for (const a of settings.algebraList) {
-        schemaConfig.speller.algebra.push(a);
+      // Double-pinyin only: insert fuzzy rules before the xform/xlit rewrites; append otherwise.
+      const algebra: string[] = schemaConfig.speller.algebra;
+      const rewriteIdx = settings.schema.startsWith('double_pinyin')
+        ? algebra.findIndex(a => typeof a === 'string' && /^(xform|xlit)\//.test(a))
+        : -1;
+      if (rewriteIdx === -1) {
+        algebra.push(...settings.algebraList);
+      }
+      else {
+        algebra.splice(rewriteIdx, 0, ...settings.algebraList);
       }
     }
     const enabledDictPacks = await this.listEnabledDictPacks(fs, settings.schema);

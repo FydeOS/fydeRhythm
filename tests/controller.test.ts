@@ -1595,6 +1595,24 @@ describe('InputController loadRimeConfig', () => {
     expect(config.speller.algebra).toEqual(['derive/^x/y/', 'abbrev/^(.).+$/$1/']);
   });
 
+  it('inserts user algebra before the first xform/xlit rewrite', async () => {
+    const flypyPath = '/root/double_pinyin_flypy/build/double_pinyin_flypy.schema.yaml';
+    scriptFs({
+      [flypyPath]:
+        'speller:\n  algebra:\n    - derive/^([jqxy])u$/$1v/\n    - xform/^zh/V/\n    - xform/(.)en$/$1F/\n    - xlit/VF/vf/\n',
+    });
+
+    const config = await loadConfig({ schema: 'double_pinyin_flypy', algebraList: ['derive/([ei])n$/$1ng/'] });
+
+    expect(config.speller.algebra).toEqual([
+      'derive/^([jqxy])u$/$1v/',
+      'derive/([ei])n$/$1ng/',
+      'xform/^zh/V/',
+      'xform/(.)en$/$1F/',
+      'xlit/VF/vf/',
+    ]);
+  });
+
   it('creates the speller block when the schema has none', async () => {
     scriptFs({ [kSchemaYamlPath]: 'translator:\n  dictionary: aurora_dict\n' });
 
